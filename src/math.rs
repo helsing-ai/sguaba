@@ -318,6 +318,7 @@ impl<From, To> Rotation<From, To> {
     /// use njord::{system, math::Rotation};
     /// use uom::si::f64::Angle;
     /// use uom::si::angle::degree;
+    /// use approx::assert_relative_eq;
     ///
     /// system!(struct PlaneFrd using NED);
     /// system!(struct PlaneNedFromCrate1 using NED);
@@ -335,7 +336,7 @@ impl<From, To> Rotation<From, To> {
     /// };
     ///
     /// let (yaw, pitch, roll) = rotation_into_1.to_tait_bryan_angles();
-    /// assert_eq!(
+    /// assert_relative_eq!(
     ///     unsafe { Rotation::<PlaneFrd, PlaneNedFromCrate2>::from_tait_bryan_angles(yaw, pitch, roll) },
     ///     unsafe { rotation_into_1.is_also_into::<PlaneNedFromCrate2>() }
     /// );
@@ -376,6 +377,7 @@ impl<From, To> Rotation<From, To> {
     /// use njord::{system, math::Rotation};
     /// use uom::si::f64::Angle;
     /// use uom::si::angle::degree;
+    /// use approx::assert_relative_eq;
     ///
     /// system!(struct PlaneFrd using NED);
     /// system!(struct PlaneNedFromCrate1 using NED);
@@ -393,7 +395,7 @@ impl<From, To> Rotation<From, To> {
     /// };
     ///
     /// let (yaw, pitch, roll) = rotation_into_1.to_tait_bryan_angles();
-    /// assert_eq!(
+    /// assert_relative_eq!(
     ///     unsafe { Rotation::<PlaneNedFromCrate2, PlaneFrd>::from_tait_bryan_angles(yaw, pitch, roll) },
     ///     unsafe { rotation_into_1.is_also_from::<PlaneNedFromCrate2>() }
     /// );
