@@ -1,0 +1,28 @@
+[package]
+name = "njord"
+version = "0.9.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+description = "Hard to misuse rigid body transforms (aka \"spatial math\") for engineers with better things to think about than linear algebra."
+repository = "https://github.com/helsing-ai/njord"
+keywords = ["spatial", "rigid body transforms", "coordinate systems"]
+categories = ["aerospace", "mathematics"]
+
+[features]
+default = ["serde", "approx"]
+serde = ["dep:serde", "nalgebra/serde-serialize", "uom/use_serde"]
+approx = ["dep:approx"]
+
+[dependencies]
+approx = { version = "0.5.1", optional = true }
+nalgebra = { version = "0.33.2" }
+serde = { version = "1.0.215", features = ["derive"], optional = true }
+uom = { version = "0.37.0", default-features = false, features = ["autoconvert", "std", "si", "f64"] }
+
+[dev-dependencies]
+nav-types = "0.5.2"
+rstest = "0.25.0"
+serde_yaml = "0.9.34"
+insta = "1.41.1"
+quickcheck = "1.0.3"
