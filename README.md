@@ -68,7 +68,7 @@ relative to North, East, and Down, and converting between [NED] and
 [ECEF] (or [WGS84]) requires also knowing the position of the observer
 in Earth-bound coordinates.
 
-[WGS84](https://en.wikipedia.org/wiki/World_Geodetic_System#WGS84)
+[WGS84]: https://en.wikipedia.org/wiki/World_Geodetic_System#WGS84
 [ECEF]: https://en.wikipedia.org/wiki/Earth-centered,_Earth-fixed_coordinate_system
 [NED]: https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates#Local_north,_east,_down_(NED)_coordinates
 [FRD]: https://en.wikipedia.org/wiki/Body_relative_direction
