@@ -126,13 +126,13 @@ will appeal more to a math-oriented crowd. We'll explore each in turn.
 
 ### Using the engineering-focused API
 
-In the engineering API, we can directly talk about an object's
-orientation and its "pose" in the world (ie, position + orientation).
-using these, we can transform between different coordinate systems to go
+In the "engineering-focused" API, we can directly talk about an object's
+orientation and its "pose" (ie, position + orientation) in the world.
+Using these, we can transform between different coordinate systems to go
 from `PlaneFrd` to `PlaneNed` to `Ecef` (cartesian world location) to
 WGS84.
 
-It's worth noting here that it's not possible to go directly from NED to ECEF!
+Note that it is not possible to go directly from NED to ECEF, because ___.
 
 ```rust
 // to convert between NED and ECEF, we need a transform between the two.
@@ -156,11 +156,10 @@ let observation_in_ecef = ecef_to_plane_frd.inverse_transform(observation);
 println!("{:?}", observation_in_ecef.to_wgs84());
 ```
 
-## Using the math-focused API
+### Using the math-focused API
 
-In the math API, everything is represented in terms of transforms
-between coordinate systems and the components of those transforms.
-
+In the "math-focused" API, everything is represented in terms of transforms
+between coordinate systems and the components of those transforms. For example:
 
 ```rust
 // we need to find the ECEF<>NED transform for the plane's location
@@ -198,10 +197,10 @@ recent versions.
 
 Licensed under either of
 
- * Apache License, Version 2.0
-   ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license
-   ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+* Apache License, Version 2.0
+   ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+* MIT license
+   ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
 
