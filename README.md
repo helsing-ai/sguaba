@@ -130,9 +130,9 @@ In the "engineering-focused" API, we can directly talk about an object's
 orientation and its "pose" (ie, position + orientation) in the world.
 Using these, we can transform between different coordinate systems to go
 from `PlaneFrd` to `PlaneNed` to `Ecef` (cartesian world location) to
-WGS84.
-
-Note that it is not possible to go directly from NED to ECEF, because ___.
+WGS84. Note that one must know the observer's body orientation relative
+to NED to go from FRD to NED, and the observer's ECEF position to go
+from NED to ECEF.
 
 ```rust
 // to convert between NED and ECEF, we need a transform between the two.
@@ -158,8 +158,9 @@ println!("{:?}", observation_in_ecef.to_wgs84());
 
 ### Using the math-focused API
 
-In the "math-focused" API, everything is represented in terms of transforms
-between coordinate systems and the components of those transforms. For example:
+In the "math-focused" API, everything is represented in terms of
+transforms between coordinate systems and the components of those
+transforms. For example:
 
 ```rust
 // we need to find the ECEF<>NED transform for the plane's location
