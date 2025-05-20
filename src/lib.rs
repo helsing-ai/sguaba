@@ -27,7 +27,7 @@
 //! that thing (ie, in [WGS84](systems::Wgs84)).
 //!
 //! ```
-//! # use njord::{system, Bearing, Coordinate, engineering::Orientation, systems::Wgs84};
+//! # use sguaba::{system, Bearing, Coordinate, engineering::Orientation, systems::Wgs84};
 //! use uom::si::f64::{Angle, Length};
 //! use uom::si::{angle::degree, length::meter};
 //!
@@ -77,7 +77,7 @@
 //! It's worth noting here that it's not possible to go directly from NED to ECEF!
 //!
 //! ```
-//! # use njord::{system, Bearing, Coordinate, engineering::Orientation, math::RigidBodyTransform, systems::Wgs84};
+//! # use sguaba::{system, Bearing, Coordinate, engineering::Orientation, math::RigidBodyTransform, systems::Wgs84};
 //! # use uom::si::f64::{Angle, Length};
 //! # use uom::si::{angle::degree, length::meter};
 //! # system!(struct PlaneFrd using FRD);
@@ -129,7 +129,7 @@
 //!
 //!
 //! ```
-//! # use njord::{system, Bearing, Coordinate, engineering::Orientation, math::RigidBodyTransform, systems::{Ecef, Wgs84}};
+//! # use sguaba::{system, Bearing, Coordinate, engineering::Orientation, math::RigidBodyTransform, systems::{Ecef, Wgs84}};
 //! # use uom::si::f64::{Angle, Length};
 //! # use uom::si::{angle::degree, length::meter};
 //! # system!(struct PlaneFrd using FRD);

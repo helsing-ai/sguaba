@@ -1,4 +1,4 @@
-# Njord
+# sguaba
 
 This library provides hard-to-misuse rigid body transforms (aka "spatial
 math") for engineers with better things to think about than linear
@@ -6,14 +6,14 @@ algebra.
 
 ## Naming
 
-> In Norse mythology,
-> [Njörðr](https://en.wikipedia.org/wiki/Nj%C3%B6r%C3%B0r) [...] is
-> associated with the sea, seafaring, wind, fishing, wealth, and crop
-> fertility.
+In Celtic mythology, Sguaba Tuinne ("Wave-sweeper") is the
+self-navigating boat of [Manannán mac
+Lir](https://en.wikipedia.org/wiki/Manann%C3%A1n_mac_Lir) that is
+navigated solely by the thoughts of its pilot.
 
 ## Getting started
 
-Prefer using [the generated docs](https://docs.rs/njord).
+Prefer using [the generated docs](https://docs.rs/sguaba).
 
 First and foremost, the library provides `Coordinate` and `Vector` types
 for representing points and vectors in coordinate spaces respectively.

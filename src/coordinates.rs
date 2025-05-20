@@ -121,7 +121,7 @@ impl<In> Coordinate<In> {
     ///
     /// ```rust
     /// use approx::assert_relative_eq;
-    /// use njord::{system, Coordinate};
+    /// use sguaba::{system, Coordinate};
     /// use uom::si::f64::{Angle, Length};
     /// use uom::si::{angle::degree, length::meter};
     ///
@@ -170,7 +170,7 @@ impl<In> Coordinate<In> {
     ///
     /// ```rust
     /// use approx::assert_relative_eq;
-    /// use njord::{system, Bearing, Coordinate};
+    /// use sguaba::{system, Bearing, Coordinate};
     /// use uom::si::f64::{Angle, Length};
     /// use uom::si::{angle::degree, length::meter};
     ///
@@ -216,7 +216,7 @@ impl<In> Coordinate<In> {
     /// # Examples
     ///
     /// ```rust
-    /// use njord::{system, Coordinate};
+    /// use sguaba::{system, Coordinate};
     /// use uom::si::f64::{Length};
     /// use uom::si::length::meter;
     ///
@@ -271,7 +271,7 @@ impl<In> Coordinate<In> {
     ///
     /// ```rust
     /// use approx::assert_relative_eq;
-    /// use njord::{system, Bearing, Coordinate, engineering::Orientation, systems::Ecef};
+    /// use sguaba::{system, Bearing, Coordinate, engineering::Orientation, systems::Ecef};
     /// use uom::si::f64::Length;
     /// use uom::si::length::meter;
     ///
@@ -320,7 +320,7 @@ impl<In> Coordinate<In> {
     /// unnecessary when `EquivalentTo` is implemented.
     ///
     /// ```
-    /// use njord::{system, systems::EquivalentTo, Coordinate};
+    /// use sguaba::{system, systems::EquivalentTo, Coordinate};
     /// use uom::si::{f64::Length, length::meter};
     ///
     /// system!(struct PlaneNedFromCrate1 using NED);
@@ -430,7 +430,7 @@ impl<In> Coordinate<In> {
     ///
     /// ```rust
     /// use approx::assert_relative_eq;
-    /// use njord::{Coordinate, Vector, systems::Ecef};
+    /// use sguaba::{Coordinate, Vector, systems::Ecef};
     /// use uom::si::f64::{Length};
     /// use uom::si:: length::meter;
     ///
@@ -454,7 +454,7 @@ impl<In> Coordinate<In> {
     ///
     /// ```rust
     /// use approx::assert_relative_eq;
-    /// use njord::{Coordinate, Vector, systems::Ecef};
+    /// use sguaba::{Coordinate, Vector, systems::Ecef};
     /// use uom::si::f64::{Length};
     /// use uom::si:: length::meter;
     ///

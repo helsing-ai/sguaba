@@ -1,11 +1,11 @@
 [package]
-name = "njord"
+name = "sguaba"
 version = "0.9.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
 description = "Hard to misuse rigid body transforms (aka \"spatial math\") for engineers with better things to think about than linear algebra."
-repository = "https://github.com/helsing-ai/njord"
+repository = "https://github.com/helsing-ai/sguaba"
 keywords = ["spatial", "rigid body transforms", "coordinate systems"]
 categories = ["aerospace", "mathematics"]
 

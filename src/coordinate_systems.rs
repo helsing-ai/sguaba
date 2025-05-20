@@ -149,21 +149,21 @@ pub struct RightHandedXyzLike;
 /// [`NedLike`]
 ///
 /// ```rust
-/// # use njord::system;
+/// # use sguaba::system;
 /// system!(pub struct SensorNed using NED);
 /// ```
 ///
 /// [`FrdLike`]
 ///
 /// ```rust
-/// # use njord::system;
+/// # use sguaba::system;
 /// system!(pub struct EmitterFrd using FRD);
 /// ```
 ///
 /// [`RightHandedXyzLike`]
 ///
 /// ```rust
-/// # use njord::system;
+/// # use sguaba::system;
 /// system!(pub struct PlaneEcef using right-handed XYZ);
 /// ```
 ///
@@ -171,7 +171,7 @@ pub struct RightHandedXyzLike;
 /// and derived traits to your type:
 ///
 /// ```rust
-/// njord::system! {
+/// sguaba::system! {
 ///     #[derive(Hash)]
 ///     pub(crate) struct SensorNed using NED
 /// }

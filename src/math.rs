@@ -315,7 +315,7 @@ impl<From, To> Rotation<From, To> {
     /// equal to:
     ///
     /// ```
-    /// use njord::{system, math::Rotation};
+    /// use sguaba::{system, math::Rotation};
     /// use uom::si::f64::Angle;
     /// use uom::si::angle::degree;
     /// use approx::assert_relative_eq;
@@ -374,7 +374,7 @@ impl<From, To> Rotation<From, To> {
     /// equal to:
     ///
     /// ```
-    /// use njord::{system, math::Rotation};
+    /// use sguaba::{system, math::Rotation};
     /// use uom::si::f64::Angle;
     /// use uom::si::angle::degree;
     /// use approx::assert_relative_eq;
@@ -773,7 +773,7 @@ impl<From, To> RigidBodyTransform<From, To> {
     /// `NewTo`.
     ///
     /// ```rust
-    /// use njord::{
+    /// use sguaba::{
     ///     system, Coordinate, Vector,
     ///     math::{RigidBodyTransform, Rotation},
     ///     systems::{Ecef, Wgs84},

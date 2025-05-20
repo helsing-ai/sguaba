@@ -198,7 +198,7 @@ impl<In> Orientation<In> {
     ///
     /// ```rust
     /// use approx::assert_relative_eq;
-    /// use njord::{system, Bearing, Coordinate, engineering::Orientation};
+    /// use sguaba::{system, Bearing, Coordinate, engineering::Orientation};
     /// use uom::si::f64::{Angle, Length};
     /// use uom::si::{angle::degree, length::meter};
     ///
@@ -250,7 +250,7 @@ impl<In> Orientation<In> {
     /// unnecessary when `EquivalentTo` is implemented.
     ///
     /// ```
-    /// use njord::{system, systems::EquivalentTo, Bearing, engineering::Orientation};
+    /// use sguaba::{system, systems::EquivalentTo, Bearing, engineering::Orientation};
     /// use uom::si::{f64::Angle, angle::degree};
     ///
     /// system!(struct PlaneNedFromCrate1 using NED);
@@ -547,7 +547,7 @@ impl<In> Pose<In> {
     ///
     /// ```rust
     /// use approx::assert_relative_eq;
-    /// use njord::{system, Bearing, Coordinate, engineering::{Orientation, Pose}};
+    /// use sguaba::{system, Bearing, Coordinate, engineering::{Orientation, Pose}};
     /// use uom::si::f64::{Angle, Length};
     /// use uom::si::{angle::degree, length::meter};
     ///
@@ -611,7 +611,7 @@ impl<In> Pose<In> {
     /// unnecessary when `EquivalentTo` is implemented.
     ///
     /// ```
-    /// use njord::{system, systems::EquivalentTo, Bearing, Coordinate, engineering::{Orientation, Pose}};
+    /// use sguaba::{system, systems::EquivalentTo, Bearing, Coordinate, engineering::{Orientation, Pose}};
     /// use uom::si::f64::{Angle, Length};
     /// use uom::si::{angle::degree, length::meter};
     ///

@@ -112,7 +112,7 @@ impl<In> Vector<In> {
     ///
     /// ```rust
     /// use approx::assert_relative_eq;
-    /// use njord::{system, Vector};
+    /// use sguaba::{system, Vector};
     /// use uom::si::f64::{Angle, Length};
     /// use uom::si::{angle::degree, length::meter};
     ///
@@ -168,7 +168,7 @@ impl<In> Vector<In> {
     ///
     /// ```rust
     /// use approx::assert_relative_eq;
-    /// use njord::{system, Bearing, Vector};
+    /// use sguaba::{system, Bearing, Vector};
     /// use uom::si::f64::{Angle, Length};
     /// use uom::si::{angle::degree, length::meter};
     ///
@@ -230,7 +230,7 @@ impl<In> Vector<In> {
     /// equal to:
     ///
     /// ```
-    /// use njord::{system, Bearing, Vector};
+    /// use sguaba::{system, Bearing, Vector};
     /// use uom::si::f64::{Angle, Length};
     /// use uom::si::{angle::degree, length::meter};
     ///
@@ -267,7 +267,7 @@ impl<In> Vector<In> {
     /// unnecessary when `EquivalentTo` is implemented.
     ///
     /// ```
-    /// use njord::{system, systems::EquivalentTo, Vector};
+    /// use sguaba::{system, systems::EquivalentTo, Vector};
     /// use uom::si::{f64::Length, length::meter};
     ///
     /// system!(struct PlaneNedFromCrate1 using NED);
