@@ -74,12 +74,12 @@
 //!
 //! ## Using the engineering-focused API
 //!
-//! In the [engineering API](engineering), we can directly talk about an object's orientation and
-//! its "pose" in the world (ie, position + orientation). using these, we can transform between
-//! different coordinate systems to go from `PlaneFrd` to `PlaneNed` to [`Ecef`](systems::Ecef)
-//! (cartesian world location) to [`Wgs84`](systems::Wgs84).
-//!
-//! It's worth noting here that it's not possible to go directly from NED to ECEF!
+//! In the ["engineering-focused" API](engineering), we can directly talk about an object's
+//! orientation and its "pose" (ie, position + orientation) in the world. Using these, we can
+//! transform between different coordinate systems to go from `PlaneFrd` to `PlaneNed` to
+//! [`Ecef`](systems::Ecef) (cartesian world location) to [`Wgs84`](systems::Wgs84). Note that one
+//! must know the observer's body orientation relative to NED to go from FRD to NED, and the
+//! observer's ECEF position to go from NED to ECEF.
 //!
 //! ```
 //! # use sguaba::{system, Bearing, Coordinate, engineering::Orientation, math::RigidBodyTransform, systems::Wgs84};
@@ -129,9 +129,8 @@
 //!
 //! ## Using the math-focused API
 //!
-//! In the [math API](math), everything is represented in terms of transforms between coordinate
-//! systems and the components of those transforms.
-//!
+//! In the ["math-focused" API](math), everything is represented in terms of transforms between
+//! coordinate systems and the components of those transforms. For example:
 //!
 //! ```
 //! # use sguaba::{system, Bearing, Coordinate, engineering::Orientation, math::RigidBodyTransform, systems::{Ecef, Wgs84}};
