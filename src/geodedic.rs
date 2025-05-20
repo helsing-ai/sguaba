@@ -36,7 +36,7 @@ const SEMI_MINOR_AXIS: f64 = SEMI_MAJOR_AXIS * (1.0 - FLATTENING);
 //     = 2 * f - f^2
 const ECCENTRICITY_SQ: f64 = 2.0 * FLATTENING - FLATTENING * FLATTENING;
 
-/// Representing a real-world location using the [World Geodedic System
+/// Representing an Earth-bound location using the [World Geodedic System
 /// '84](https://en.wikipedia.org/wiki/World_Geodetic_System#WGS_84).
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

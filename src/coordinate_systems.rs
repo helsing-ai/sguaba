@@ -82,16 +82,15 @@ pub trait BearingDefined: Sized {
 /// - Positive Y is East.
 /// - Positive Z is towards the center of the earth ("Down").
 ///
-/// Note that two NED-like coordinate systems may have different real-world coordinates for their
-/// origin. For example, two different aircraft may both define their observations in NED-like
-/// coordinate systems, but for each aircraft, (0, 0, 0) corresponds to the location of that
-/// aircraft. Thus, an object observed at, say, (10, 20, 30) in one aircraft's local NED-like
+/// Note that two NED-like coordinate systems may have different "absolute" Earth-bound coordinates
+/// for their origin. For example, two different aircraft may both define their observations in
+/// NED-like coordinate systems, but for each aircraft, (0, 0, 0) corresponds to the location of
+/// that aircraft. Thus, an object observed at, say, (10, 20, 30) in one aircraft's local NED-like
 /// coordinate system will have completely different coordinates in the other aircraft's local
 /// NED-like coordinate system.
 ///
 /// Since NED has earth bounded axes, two observers that are located in the same place but face in
-/// different directions, they will still have the same NED-like coordinates to a given real-world
-/// emitter.
+/// different directions, they will still have the same NED-like coordinates to a given emitter.
 ///
 /// [Bearing](BearingDefined) in NED-like coordinate systems are defined as:
 ///
@@ -110,17 +109,17 @@ pub struct NedLike;
 ///   wingtip to wingtip.
 /// - Positive Z is along the line that runs through the belly of the plane.
 ///
-/// Note that two FRD-like coordinate systems may have different real-world coordinates for their
-/// origin. For example, two different aircraft may both define their observations in FRD-like
-/// coordinate systems, but for each aircraft, (0, 0, 0) corresponds to the center of mass of that
-/// aircraft. Thus, an object observed at, say, (10, 20, 30) in one aircraft's local FRD-like
-/// coordinate system will have completely different coordinates in the other aircraft's local
-/// FRD-like coordinate system.
+/// Note that two FRD-like coordinate systems may have different "absolute" Earth-bound coordinates
+/// for their origin. For example, two different aircraft may both define their observations in
+/// FRD-like coordinate systems, but for each aircraft, (0, 0, 0) corresponds to the center of mass
+/// of that aircraft. Thus, an object observed at, say, (10, 20, 30) in one aircraft's local
+/// FRD-like coordinate system will have completely different coordinates in the other aircraft's
+/// local FRD-like coordinate system.
 ///
-/// Further note that, unlike [`NedLike`], two FRD-like systems with the same real-world origin may
-/// also be rotated with respect to each other. In other words, two observers that are located in
-/// the same place but face in different directions will measure _different_ FRD-like coordinates
-/// to a given real-world emitter.
+/// Further note that, unlike [`NedLike`], two FRD-like systems with a colocated origin may also be
+/// rotated with respect to each other. In other words, two observers that are located in the same
+/// place but face in different directions will measure _different_ FRD-like coordinates to a given
+/// emitter.
 ///
 /// [Bearing](BearingDefined) in FRD-like coordinate systems are defined as:
 ///
@@ -254,7 +253,8 @@ system! {
     /// - Positive Y is towards 90°E on the equator.
     ///
     /// This system has global coordinates; two observers with arbitrary position and orientation
-    /// that name the same coordinate in this system are referring to the same real-world position.
+    /// that name the same coordinate in this system are referring to the same absolute Earth-bound
+    /// position.
     ///
     /// [ecef]: https://en.wikipedia.org/wiki/Earth-centered,_Earth-fixed_coordinate_system
     #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

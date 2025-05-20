@@ -1,5 +1,5 @@
 //! This library provides hard-to-misuse rigid body transforms (aka "spatial math") for engineers
-//! with better things to think about than linear algebra.
+//! with other things to worry about than linear algebra.
 //!
 //! First and foremost, the library provides [`Coordinate`] and [`Vector`] types for representing
 //! points and vectors in coordinate spaces respectively. They are all generic over a
@@ -22,9 +22,10 @@
 //!
 //! # Examples
 //!
-//! Assume that a pilot of a plane observes something out of their window at a given bearing (ie,
-//! in the plane's [FRD](systems::FrdLike)) and wants to communicate the real-world location of
-//! that thing (ie, in [WGS84](systems::Wgs84)).
+//! Assume that a pilot of a plane observes something out of their window at a given bearing and
+//! elevation angles (ie, measured in the plane's [FRD](systems::FrdLike)) and wants to know the
+//! location of that thing in terms of Earth-bound Latitude and Longitude coordinates (ie,
+//! [WGS84](systems::Wgs84).
 //!
 //! ```
 //! # use sguaba::{system, Bearing, Coordinate, engineering::Orientation, systems::Wgs84};
@@ -66,6 +67,10 @@
 //!     Angle::new::<degree>(0.),  // roll
 //! );
 //! ```
+//!
+//! From there, there are two possible paths forward, one using an API that
+//! will appeal more to folks with an engineering background, and one that
+//! will appeal more to a math-oriented crowd. We'll explore each in turn.
 //!
 //! ## Using the engineering-focused API
 //!
@@ -163,6 +168,8 @@
 //! let ecef_to_frd = unsafe { pose_in_ecef.map_as_zero_in::<PlaneFrd>() };
 //! // and we can apply that transform to the original observation to get it in ECEF
 //! let observation_in_ecef: Coordinate<Ecef> = ecef_to_frd * observation;
+//! // which we can then turn into WGS84 lat/lon/altitude!
+//! println!("{:?}", observation_in_ecef.to_wgs84());
 //! ```
 
 #[macro_use]

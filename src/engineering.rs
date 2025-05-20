@@ -586,7 +586,7 @@ impl<In> Pose<In> {
     /// let observation_in_ned = plane_frd_to_ned.transform(observation);
     /// ```
     ///
-    /// Note that in the example above, to convert `observation` into absolute real-world
+    /// Note that in the example above, to convert `observation` into absolute Earth-bound
     /// coordinates (eg, ECEF or WGS84), we'd also need the plane's absolute location so that we
     /// can construct a a transform from ECEF to `PlaneNed`. For that, see
     /// [`RigidBodyTransform::ecef_to_ned_at`].
