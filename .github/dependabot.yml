@@ -3,7 +3,18 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: daily
+      # we mostly care about this for the purposes of updates to the Rust
+      # version, which updates every six weeks. unfortunately, "every six
+      # weeks" isn't something we can specify here. we could do monthly, but
+      # that'll yield noise from other actions updating that we don't
+      # necessarily care so much about (ie, we're unlikely to need new features
+      # from them). since security updates are posted immediately by dependabot
+      # anyway, setting this to quarterly feels like the right compromise, as
+      # it gives us roughly every other Rust version. as we're a library, more
+      # frequent updates than that wouldn't really benefit us since we're
+      # mainly upgrading to ensure we keep up with the Rust requirements of
+      # dependencies.
+      interval: quarterly
   - package-ecosystem: cargo
     directory: /
     schedule:
