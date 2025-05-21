@@ -112,6 +112,7 @@
 //!
 //! // to convert between FRD (which the observation was made in) and NED,
 //! // we just need the plane's orientation, which we have from the instruments!
+//! // SAFETY: we're claiming that the given NED orientation makes up the axes of `PlaneFrd`.
 //! let plane_ned_to_plane_frd = unsafe { orientation_in_ned.map_as_zero_in::<PlaneFrd>() };
 //!
 //! // these transformations can be chained to go from ECEF to NED.

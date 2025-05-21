@@ -137,11 +137,13 @@ from NED to ECEF.
 ```rust
 // to convert between NED and ECEF, we need a transform between the two.
 // this transform depends on where on the globe you are, so it takes the WGS84 position:
-let ecef_to_plane_ned = RigidBodyTransform::ecef_to_ned_at(&wgs84);
+// SAFETY: we're claiming that `wgs84` is the location of `PlaneNed`'s origin.
+let ecef_to_plane_ned = unsafe { RigidBodyTransform::ecef_to_ned_at(&wgs84) };
 
 // to convert between FRD (which the observation was made in) and NED,
 // we just need the plane's orientation, which we have from the instruments!
-let plane_ned_to_plane_frd = orientation_in_ned.map_as_zero_in::<PlaneFrd>();
+// SAFETY: we're claiming that the given NED orientation makes up the axes of `PlaneFrd`.
+let plane_ned_to_plane_frd = unsafe { orientation_in_ned.map_as_zero_in::<PlaneFrd>() };
 
 // these transformations can be chained to go from ECEF to NED.
 // this chaining would fail to compile if you got the arguments wrong!
@@ -164,12 +166,14 @@ transforms. For example:
 
 ```rust
 // we need to find the ECEF<>NED transform for the plane's location
-let ecef_to_plane_ned = RigidBodyTransform::ecef_to_ned_at(&wgs84);
+// SAFETY: we're claiming that `wgs84` is the location of `PlaneNed`'s origin.
+let ecef_to_plane_ned = unsafe { RigidBodyTransform::ecef_to_ned_at(&wgs84) };
 // the plane's orientation in NED is really a rotation and translation in ECEF
 let pose_in_ecef = ecef_to_plane_ned * orientation_in_ned;
 // that rotation and translation is exactly equal to the FRD of the plane
 // we could also have just constructed this rotation directly instead of an `Orientation`
-let ecef_to_frd = pose_in_ecef.map_as_zero_in::<PlaneFrd>();
+// SAFETY: `PlaneNed` is the orientation of the plane's FRD body axes (ie, `PlaneFrd`).
+let ecef_to_frd = unsafe { pose_in_ecef.map_as_zero_in::<PlaneFrd>() };
 // and we can apply that transform to the original observation to get it in ECEF
 let observation_in_ecef: Coordinate<Ecef> = ecef_to_frd * observation;
 // which we can then turn into WGS84 lat/lon/altitude!
