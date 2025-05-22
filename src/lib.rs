@@ -20,6 +20,57 @@
 //! easier-to-grasp types like [`Pose`](engineering::Pose) and
 //! [`Orientation`](engineering::Orientation).
 //!
+//! # Primer on coordinate systems
+//!
+//! If you're new to working with coordinate systems and frames of reference, you may wonder what
+//! coordinate systems there are in the first place, and how they differ. There are a wide variety
+//! of ways to describe the locations of objects in space, all of which have their own slight
+//! peculiarities about representation and conversion. At the time of writing, the four coordinate
+//! systems this crate supports are: [WGS84] (latitude and longitude), [ECEF] ("Earth-centered,
+//! Earth-fixed"), [NED] ("North, East, Down"), and [FRD] ("Front, Right, Down").
+//!
+//! [WGS84] ([`Wgs84`](systems::Wgs84)) and [ECEF] ([`Ecef`](systems::Ecef)) are both Earth-bound
+//! coordinate systems that describe points in space on or near Earth. They do this by describing
+//! positions relative to Earth's major and minor axes, often by making slightly simplifying
+//! assumptions about the Earth's shape. WGS84 does this by using latitude and longitude (degrees
+//! north/south of the equator and east-west of the prime meridian), while ECEF does it by placing
+//! a coordinate system at the center of the earth and locating [the X, Y, and Z axes][axes]
+//! towards specific points on the Earth's surface. One can convert between them [without too much
+//! trouble][trouble].
+//!
+//! [NED] ([`NedLike`](systems::NedLike)) and [FRD] ([`FrdLike`](systems::FrdLike)) on the other
+//! hand are "local" coordinate systems that are descriptions of relative positions to the location
+//! of the observer. [NED] is still Earth-bound in that it describes positions in terms of how far
+//! North, East, and Down (towards Earth's core) they are relative to the observer. [FRD],
+//! meanwhile, is a "body frame", and just describes positions relative to the observer's concept
+//! of Forward (eg, the direction pointing in the same direction as the nose of a plane), Right
+//! (eg, the direction 90º to the right when viewing along Forward), and Down (eg, down through the
+//! belly of the plane). Converting between [FRD] and [NED] usually requires knowing the
+//! orientation of the observer relative to North, East, and Down, and converting between [NED] and
+//! [ECEF] (or [WGS84]) requires also knowing the position of the observer in Earth-bound
+//! coordinates.
+//!
+//! [WGS84]: https://en.wikipedia.org/wiki/World_Geodetic_System#WGS84
+//! [ECEF]: https://en.wikipedia.org/wiki/Earth-centered,_Earth-fixed_coordinate_system
+//! [NED]: https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates#Local_north,_east,_down_(NED)_coordinates
+//! [FRD]: https://en.wikipedia.org/wiki/Body_relative_direction
+//! [axes]: https://en.wikipedia.org/wiki/Axes_conventions
+//! [trouble]: https://en.wikipedia.org/wiki/Geographic_coordinate_conversion#Coordinate_system_conversion
+//!
+//! # Use of unsafe
+//!
+//! Sguaba requires you to use `unsafe` in order to construct most transformations between
+//! coordinate systems (eg,
+//! [`RigidBodyTransform::ecef_to_ned_at`](math::RigidBodyTransform::ecef_to_ned_at) or
+//! [`Orientation::map_as_zero_in`](engineering::Orientation::map_as_zero_in)). This is because
+//! once one of these transforms have been constructed, they allow you to freely convert between
+//! the _types_ representing each coordinate system. Thus, if a transform is constructed with
+//! incorrect parameters, such as giving a coordinate to `ecef_to_ned_at` that does not correspond
+//! to the location of the origin of the `To` [`NedLike`](systems::NedLike) system, _type_ safety
+//! would be violated. This is a slight abuse of Rust's `unsafe` mechanism, which tends to focus on
+//! memory safety, but has proven to be valuable in highlighting areas where frame of reference
+//! bugs are most likely to manifest.
+//!
 //! # Examples
 //!
 //! Assume that a pilot of a plane observes something out of their window at a given bearing and
