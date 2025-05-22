@@ -98,25 +98,27 @@ system!(struct PlaneNed using NED);
 // what the pilot saw:
 let observation = Coordinate::<PlaneFrd>::from_bearing(
     Bearing::new(
-      Degrees::<f64>::new(20.), // clockwise from forward
-      Degrees::<f64>::new(10.), // upwards from straight-ahead
-    ).expect("elevation is in [-90, 90]"),
-    Meters::<f64>::new(400.), // at this range
+        Angle::new::<degree>(20.), // clockwise from forward
+        Angle::new::<degree>(10.), // upwards from straight-ahead
+    )
+    .expect("elevation is in [-90º, 90º]"),
+    Length::new::<meter>(400.), // at this range
 );
 
 // where the plane was at the time (eg, from GPS):
 let wgs84 = Wgs84::new(
-    Degrees::<f64>::new(12.),
-    Degrees::<f64>::new(30.),
-    Meters::<f64>::new(1000.)
-).expect("latitude is in [-90, 90]");
+    Angle::new::<degree>(12.),
+    Angle::new::<degree>(30.),
+    Length::new::<meter>(1000.),
+)
+.expect("latitude is in [-90º, 90º]");
 
 // where the plane was facing at the time (eg, from instrument panel);
 // expressed in yaw, pitch, roll relative to North-East-Down:
 let orientation_in_ned = Orientation::<PlaneNed>::from_tait_bryan_angles(
-    Degrees::<f64>::new(8.),  // yaw
-    Degrees::<f64>::new(45.), // pitch
-    Degrees::<f64>::new(0.),  // roll
+    Angle::new::<degree>(8.),  // yaw
+    Angle::new::<degree>(45.), // pitch
+    Angle::new::<degree>(0.),  // roll
 );
 ```
 
