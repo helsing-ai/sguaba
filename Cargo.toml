@@ -6,7 +6,7 @@ license = "MIT OR Apache-2.0"
 
 description = "Hard to misuse rigid body transforms (aka \"spatial math\") for engineers with other things to worry about than linear algebra."
 repository = "https://github.com/helsing-ai/sguaba"
-keywords = ["spatial", "rigid body transforms", "coordinate systems"]
+keywords = ["spatial", "rigid-body", "coordinates", "coordinate-systems"]
 categories = ["aerospace", "mathematics"]
 
 [features]
