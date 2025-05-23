@@ -4,6 +4,10 @@ This library provides hard-to-misuse rigid body transforms (aka "spatial
 math") for engineers with other things to worry about than linear
 algebra.
 
+See also [Helsing's announcement blog post][blog].
+
+[blog]: https://blog.helsing.ai/sguaba-hard-to-misuse-rigid-body-transforms-for-engineers-with-other-things-to-worry-about-than-aeaa45af9e0d
+
 ## Naming
 
 In Celtic mythology, Sguaba Tuinne ("Wave-sweeper") is the
