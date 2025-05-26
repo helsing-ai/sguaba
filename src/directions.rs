@@ -16,6 +16,7 @@ use crate::{
     systems::{BearingDefined, FrdLike, NedLike},
     CoordinateSystem,
 };
+use uom::ConstZero;
 
 /// A direction (conceptually represented as a unit vector) in the [`CoordinateSystem`] `In`.
 ///
@@ -27,8 +28,43 @@ use crate::{
 ///
 /// See also [horizontal coordinate systems][azel].
 ///
+/// To construct a bearing, you can either use [a builder] via [`Bearing::builder`] or provide a
+/// [`Components`] to [`Bearing::build`]. The following are equivalent:
+///
+/// ```rust
+/// use sguaba::{Bearing, system};
+/// use uom::si::f64::Angle;
+/// use uom::si::angle::degree;
+///
+/// system!(struct PlaneFrd using FRD);
+///
+/// Bearing::<PlaneFrd>::builder()
+///     // clockwise from forward
+///     .azimuth(Angle::new::<degree>(20.))
+///     // upwards from straight-ahead
+///     .elevation(Angle::new::<degree>(10.))
+///     .expect("elevation is in [-90º, 90º]")
+///     .build();
+/// ```
+///
+/// ```rust
+/// use sguaba::{Bearing, system, builder::bearing::Components};
+/// use uom::si::f64::Angle;
+/// use uom::si::angle::degree;
+///
+/// system!(struct PlaneFrd using FRD);
+///
+/// Bearing::<PlaneFrd>::build(Components {
+///   // clockwise from forward
+///   azimuth: Angle::new::<degree>(20.),
+///   // upwards from straight-ahead
+///   elevation: Angle::new::<degree>(10.),
+/// }).expect("elevation is in [-90º, 90º]");
+/// ```
+///
 /// [bearing]: https://en.wikipedia.org/wiki/Bearing_%28navigation%29
 /// [azel]: https://en.wikipedia.org/wiki/Horizontal_coordinate_system
+/// [a builder]: https://rust-unofficial.github.io/patterns/patterns/creational/builder.html
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 // don't require In: Serialize/Deserialize since we skip it anyway
@@ -38,7 +74,7 @@ pub struct Bearing<In> {
     elevation: Angle,
 
     #[cfg_attr(feature = "serde", serde(skip))]
-    phantom_data: PhantomData<In>,
+    system: PhantomData<In>,
 }
 
 // manual impls of Clone and Copy to avoid requiring In: Copy + Clone
@@ -55,19 +91,41 @@ impl<In> Bearing<In> {
     ///
     /// The elevation must be in [-90°,90°] % 360°. If it is not, this function returns `None`.
     #[must_use]
-    pub fn new(azimuth: impl Into<Angle>, elevation: impl Into<Angle>) -> Option<Self> {
-        let elevation = elevation.into();
-        let elevation_signed = BoundedAngle::new(elevation).to_signed_range();
-        if !(-std::f64::consts::FRAC_PI_2..=std::f64::consts::FRAC_PI_2).contains(&elevation_signed)
-        {
-            None
-        } else {
-            Some(Self {
-                azimuth: azimuth.into(),
-                elevation,
-                phantom_data: PhantomData,
-            })
+    pub fn build(Components { azimuth, elevation }: Components) -> Option<Self> {
+        Some(
+            Self::builder()
+                .azimuth(azimuth)
+                .elevation(elevation)?
+                .build(),
+        )
+    }
+
+    /// Provides a constructor for a bearing in the [`CoordinateSystem`] `In`.
+    pub fn builder() -> Builder<In, MissingAzimuth, MissingElevation> {
+        Builder {
+            under_construction: Bearing {
+                azimuth: Angle::ZERO,
+                elevation: Angle::ZERO,
+                system: PhantomData,
+            },
+            has: (PhantomData, PhantomData),
         }
+    }
+
+    /// Constructs a bearing towards the given azimuth and elevation in the [`CoordinateSystem`]
+    /// `In`.
+    ///
+    /// Prefer [`Bearing::build`] or [`Bearing::builder`] to avoid risk of argument order
+    /// confusion. This function will be removed in a future version of Sguaba in favor of those.
+    ///
+    /// The elevation must be in [-90°,90°] % 360°. If it is not, this function returns `None`.
+    #[must_use]
+    #[deprecated = "prefer `Bearing::build` or `Bearing::builder` to avoid risk of argument order confusion"]
+    pub fn new(azimuth: impl Into<Angle>, elevation: impl Into<Angle>) -> Option<Self> {
+        Self::build(Components {
+            azimuth: azimuth.into(),
+            elevation: elevation.into(),
+        })
     }
 
     /// Returns the azimuthal angle of this bearing.
@@ -164,12 +222,91 @@ impl<In> RelativeEq for Bearing<In> {
     }
 }
 
+/// Argument type for [`Bearing::build`].
+#[derive(Debug, Default)]
+#[must_use]
+pub struct Components {
+    /// The azimuthal angle of the proposed [`Bearing`].
+    pub azimuth: Angle,
+
+    /// The elevation angle of the proposed [`Bearing`].
+    ///
+    /// The elevation must be in [-90°,90°] % 360° to form a valid [`Bearing`].
+    pub elevation: Angle,
+}
+
+/// Used to indicate that a partially-constructed [`Bearing`] is missing the azimuthal component.
+pub struct MissingAzimuth;
+/// Used to indicate that a partially-constructed [`Bearing`] has the azimuthal component set.
+pub struct HasAzimuth;
+/// Used to indicate that a partially-constructed [`Bearing`] is missing the elevation component.
+pub struct MissingElevation;
+/// Used to indicate that a partially-constructed [`Bearing`] has the elevation component set.
+pub struct HasElevation;
+
+/// [Builder] for a [`Bearing`].
+///
+/// Construct one through [`Bearing::builder`], and finalize with [`Builder::build`].
+///
+/// [Builder]: https://rust-unofficial.github.io/patterns/patterns/creational/builder.html
+#[derive(Debug)]
+#[must_use]
+pub struct Builder<In, Azimuth, Elevation> {
+    under_construction: Bearing<In>,
+    has: (PhantomData<Azimuth>, PhantomData<Elevation>),
+}
+
+// manual impls of Clone and Copy to avoid requiring In: Copy + Clone
+impl<In, H1, H2> Clone for Builder<In, H1, H2> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<In, H1, H2> Copy for Builder<In, H1, H2> {}
+
+impl<In, H1, H2> Builder<In, H1, H2> {
+    /// Sets the azimuthal angle of the [`Bearing`]-to-be.
+    pub fn azimuth(mut self, angle: impl Into<Angle>) -> Builder<In, HasAzimuth, H2> {
+        self.under_construction.azimuth = angle.into();
+        Builder {
+            under_construction: self.under_construction,
+            has: (PhantomData::<HasAzimuth>, self.has.1),
+        }
+    }
+
+    /// Sets the elevation angle of the [`Bearing`]-to-be.
+    ///
+    /// The elevation must be in [-90°,90°] % 360°. If it is not, this function returns `None`.
+    pub fn elevation(mut self, angle: impl Into<Angle>) -> Option<Builder<In, H1, HasElevation>> {
+        let elevation = angle.into();
+        let elevation_signed = BoundedAngle::new(elevation).to_signed_range();
+        if !(-std::f64::consts::FRAC_PI_2..=std::f64::consts::FRAC_PI_2).contains(&elevation_signed)
+        {
+            None
+        } else {
+            self.under_construction.elevation = elevation;
+            Some(Builder {
+                under_construction: self.under_construction,
+                has: (self.has.0, PhantomData::<HasElevation>),
+            })
+        }
+    }
+}
+
+impl<In> Builder<In, HasAzimuth, HasElevation> {
+    #[must_use]
+    pub fn build(self) -> Bearing<In> {
+        self.under_construction
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::coordinate_systems::Frd;
     use crate::coordinates::Coordinate;
-    use crate::directions::Bearing;
+    use crate::directions::{Bearing, Components};
     use crate::util::BoundedAngle;
+    use crate::{coordinate, vector};
     use approx::{assert_abs_diff_eq, assert_relative_eq};
     use quickcheck::quickcheck;
     use rstest::rstest;
@@ -201,13 +338,14 @@ mod tests {
     #[case(180.0, -90.0, [0.0, 0.0, 1.0])]
     #[case(270.0, -90.0, [0.0, 0.0, 1.0])]
     fn to_unit_vector(#[case] azimuth: f64, #[case] elevation: f64, #[case] expected: [f64; 3]) {
-        use crate::Vector;
-
         assert_relative_eq!(
-            Bearing::<Frd>::new(d(azimuth), d(elevation))
-                .unwrap()
-                .to_unit_vector(),
-            Vector::<Frd>::from_cartesian(m(expected[0]), m(expected[1]), m(expected[2]),)
+            Bearing::<Frd>::build(Components {
+                azimuth: d(azimuth),
+                elevation: d(elevation)
+            })
+            .unwrap()
+            .to_unit_vector(),
+            vector!(f = m(expected[0]), r = m(expected[1]), d = m(expected[2]))
         );
     }
 
@@ -238,7 +376,7 @@ mod tests {
                 azimuth: uom::si::f64::Angle::new::<uom::si::angle::radian>(
                     azimuth.rem_euclid(std::f64::consts::TAU),
                 ),
-                phantom_data: std::marker::PhantomData,
+                system: std::marker::PhantomData,
             }
         }
 
@@ -246,7 +384,7 @@ mod tests {
             let Self {
                 azimuth,
                 elevation,
-                phantom_data,
+                system: phantom_data,
             } = *self;
             if azimuth.get::<uom::si::angle::radian>() == 0. {
                 Box::new(
@@ -256,7 +394,7 @@ mod tests {
                         .map(move |el| Self {
                             elevation: uom::si::f64::Angle::new::<uom::si::angle::radian>(el),
                             azimuth,
-                            phantom_data,
+                            system: phantom_data,
                         }),
                 )
             } else {
@@ -267,7 +405,7 @@ mod tests {
                         .map(move |az| Self {
                             elevation,
                             azimuth: uom::si::f64::Angle::new::<uom::si::angle::radian>(az),
-                            phantom_data,
+                            system: phantom_data,
                         }),
                 )
             }
@@ -385,11 +523,12 @@ mod tests {
     // Test the cartesian -> spherical -> cartesian conversion around the origin in a [-100, 100) grid.
     quickcheck! {
         fn azimuth_elevation_range_conversion_works(x: i16, y: i16, z: i16) -> () {
-            let frd_coordinate = Coordinate::<Frd>::from_cartesian(
-                m(x as f64),
-                m(y as f64),
-                m(z as f64),
-            );
+            let frd_coordinate = coordinate! {
+                f = m(x as f64),
+                r = m(y as f64),
+                d = m(z as f64);
+                in Frd
+            };
             let frd_direction = frd_coordinate.bearing_from_origin();
 
             let Some(frd_direction) = frd_direction else {

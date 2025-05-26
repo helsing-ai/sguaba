@@ -215,10 +215,10 @@ impl<In> Orientation<In> {
     /// // plane observes something below it to its right (45° azimuth, -20° elevation),
     /// // at a range of 100m.
     /// let observation = Coordinate::<PlaneFrd>::from_bearing(
-    ///     Bearing::new(
-    ///       Angle::new::<degree>(45.),
-    ///       Angle::new::<degree>(-20.),
-    ///     ).expect("elevation is in-range"),
+    ///     Bearing::builder()
+    ///       .azimuth(Angle::new::<degree>(45.))
+    ///       .elevation(Angle::new::<degree>(-20.)).expect("elevation is in-range")
+    ///       .build(),
     ///     Length::new::<meter>(100.)
     /// );
     ///
@@ -570,10 +570,10 @@ impl<In> Pose<In> {
     /// // plane observes something below it to its right (45° azimuth, -20° elevation),
     /// // at a range of 100m.
     /// let observation = Coordinate::<PlaneFrd>::from_bearing(
-    ///     Bearing::new(
-    ///       Angle::new::<degree>(45.),
-    ///       Angle::new::<degree>(-20.),
-    ///     ).expect("elevation is in-range"),
+    ///     Bearing::builder()
+    ///       .azimuth(Angle::new::<degree>(45.))
+    ///       .elevation(Angle::new::<degree>(-20.)).expect("elevation is in-range")
+    ///       .build(),
     ///     Length::new::<meter>(100.)
     /// );
     ///
@@ -611,7 +611,7 @@ impl<In> Pose<In> {
     /// unnecessary when `EquivalentTo` is implemented.
     ///
     /// ```
-    /// use sguaba::{system, systems::EquivalentTo, Bearing, Coordinate, engineering::{Orientation, Pose}};
+    /// use sguaba::{coordinate, system, systems::EquivalentTo, Bearing, Coordinate, engineering::{Orientation, Pose}};
     /// use uom::si::f64::{Angle, Length};
     /// use uom::si::{angle::degree, length::meter};
     ///
@@ -622,11 +622,12 @@ impl<In> Pose<In> {
     /// unsafe impl EquivalentTo<PlaneNedFromCrate1> for PlaneNedFromCrate2 {}
     /// unsafe impl EquivalentTo<PlaneNedFromCrate2> for PlaneNedFromCrate1 {}
     ///
-    /// let position_in_1 = Coordinate::<PlaneNedFromCrate1>::from_cartesian(
-    ///     Length::new::<meter>(1.),
-    ///     Length::new::<meter>(2.),
-    ///     Length::new::<meter>(3.),
-    /// );
+    /// let position_in_1 = coordinate! {
+    ///     n = Length::new::<meter>(1.),
+    ///     e = Length::new::<meter>(2.),
+    ///     d = Length::new::<meter>(3.);
+    ///     in PlaneNedFromCrate1
+    /// };
     /// let orientation_in_1 = Orientation::<PlaneNedFromCrate1>::from_tait_bryan_angles(
     ///     Angle::new::<degree>(90.),
     ///     Angle::new::<degree>(45.),
@@ -639,11 +640,11 @@ impl<In> Pose<In> {
     ///
     /// assert_eq!(
     ///     Pose::<PlaneNedFromCrate2>::new(
-    ///         Coordinate::<PlaneNedFromCrate2>::from_cartesian(
-    ///             Length::new::<meter>(1.),
-    ///             Length::new::<meter>(2.),
-    ///             Length::new::<meter>(3.),
-    ///         ),
+    ///         coordinate! {
+    ///             n = Length::new::<meter>(1.),
+    ///             e = Length::new::<meter>(2.),
+    ///             d = Length::new::<meter>(3.),
+    ///         },
     ///         Orientation::<PlaneNedFromCrate2>::from_tait_bryan_angles(
     ///             Angle::new::<degree>(90.),
     ///             Angle::new::<degree>(45.),
@@ -775,13 +776,13 @@ impl<From, To> Mul<Pose<To>> for RigidBodyTransform<From, To> {
 mod tests {
     use crate::coordinate_systems::{Ecef, Ned};
     use crate::coordinates::Coordinate;
-    use crate::directions::Bearing;
+    use crate::directions::{Bearing, Components as BearingComponents};
     use crate::engineering::{Orientation, Pose};
-    use crate::geodedic::Wgs84;
+    use crate::geodedic::{Components as Wgs84Components, Wgs84};
     use crate::math::{RigidBodyTransform, Rotation};
     use crate::util::BoundedAngle;
     use crate::vectors::Vector;
-    use crate::Point3;
+    use crate::{coordinate, Point3};
     use approx::assert_relative_eq;
     use approx::{assert_abs_diff_eq, AbsDiffEq};
     use rstest::rstest;
@@ -813,12 +814,21 @@ mod tests {
         // Platform observes point in azimuth, elevation, range of its body coordinate system (FRD).
         // Where is it in WGS84?
         let observation = Coordinate::<PlaneFrd>::from_bearing(
-            Bearing::new(d(20.), d(10.)).expect("elevation is in-range"),
+            Bearing::build(BearingComponents {
+                azimuth: d(20.),
+                elevation: d(10.),
+            })
+            .expect("elevation is in-range"),
             m(400.),
         );
 
         // The pilot also knows where the plane is located given by a GPS device.
-        let wgs84 = Wgs84::new(d(12.), d(30.), m(1000.)).expect("latitude is in-range");
+        let wgs84 = Wgs84::build(Wgs84Components {
+            latitude: d(12.),
+            longitude: d(30.),
+            altitude: m(1000.),
+        })
+        .expect("latitude is in-range");
 
         // The API allows two compatible paths.
         // One for thinking about transformations between coordinate systems.
@@ -891,8 +901,18 @@ mod tests {
         // 2. What is the pose of one airplane with respect to the other?
         // 3. If pilot of plane A looks towards plane B, in which direction does the pilot have to look?
 
-        let position_plane_a = Wgs84::new(d(12.), d(30.2), m(1000.)).expect("latitude is in-range");
-        let position_plane_b = Wgs84::new(d(12.), d(30.), m(1000.)).expect("latitude is in-range");
+        let position_plane_a = Wgs84::build(Wgs84Components {
+            latitude: d(12.),
+            longitude: d(30.2),
+            altitude: m(1000.),
+        })
+        .expect("latitude is in-range");
+        let position_plane_b = Wgs84::build(Wgs84Components {
+            latitude: d(12.),
+            longitude: d(30.),
+            altitude: m(1000.),
+        })
+        .expect("latitude is in-range");
 
         // Pilot A reads plane A instruments.
         let orientation_plane_a_in_ned =
@@ -944,37 +964,37 @@ mod tests {
     #[case(
         Point3::new(10., 0., 0.),
         (d(0.), d(0.), d(0.)),
-        Bearing::new(d(0.), d(0.)).unwrap()
+        Bearing::build(BearingComponents { azimuth: d(0.), elevation: d(0.) }).unwrap()
     )]
     #[case(
         Point3::new(0., 10., 0.),
         (d(0.), d(0.), d(0.)),
-        Bearing::new(d(90.), d(0.)).unwrap()
+        Bearing::build(BearingComponents { azimuth: d(90.), elevation: d(0.) }).unwrap()
     )]
     #[case(
         Point3::new(-10., 0., 0.),
         (d(0.), d(0.), d(0.)),
-        Bearing::new(d(-180.), d(0.)).unwrap()
+        Bearing::build(BearingComponents { azimuth: d(-180.), elevation: d(0.) }).unwrap()
     )]
     #[case(
         Point3::new(0., -10., 0.),
         (d(0.), d(0.), d(0.)),
-        Bearing::new(d(270.), d(0.)).unwrap()
+        Bearing::build(BearingComponents { azimuth: d(270.), elevation: d(0.) }).unwrap()
     )]
     #[case(
         Point3::new(0., 0., 10.),
         (d(0.), d(0.), d(0.)),
-        Bearing::new(d(0.), d(-90.)).unwrap()
+        Bearing::build(BearingComponents { azimuth: d(0.), elevation: d(-90.) }).unwrap()
     )]
     #[case(
         Point3::new(0., -10., 10.),
         (d(0.), d(0.), d(0.)),
-        Bearing::new(d(270.), d(-45.)).unwrap()
+        Bearing::build(BearingComponents { azimuth: d(270.), elevation: d(-45.) }).unwrap()
     )]
     #[case(
         Point3::new(10., 10., -10.),
         (d(0.), d(0.), d(0.)),
-        Bearing::new(d(45.), r((10. / (10_f64.powi(2) * 3.).sqrt()).asin())).unwrap()
+        Bearing::build(BearingComponents { azimuth: d(45.), elevation: r((10. / (10_f64.powi(2) * 3.).sqrt()).asin()) }).unwrap()
     )]
     fn pose_direction_towards(
         #[case] position: Point3,
@@ -1007,10 +1027,10 @@ mod tests {
         };
         let frd_to_ned = ned_to_frd.inverse();
 
-        let frd = Coordinate::<PlaneFrd>::from_cartesian(m(42.), m(69.), m(99.));
+        let frd = coordinate!(f = m(42.), r = m(69.), d = m(99.); in PlaneFrd);
         assert_relative_eq!(ned_to_frd.inverse_transform(frd), frd_to_ned.transform(frd));
 
-        let ned = Coordinate::<PlaneNed>::from_cartesian(m(42.), m(69.), m(99.));
+        let ned = coordinate!(n = m(42.), e = m(69.), d = m(99.); in PlaneNed);
 
         assert_relative_eq!(ned_to_frd.transform(ned), frd_to_ned.inverse_transform(ned));
     }
@@ -1025,7 +1045,12 @@ mod tests {
             )
         };
 
-        let wgs84 = Wgs84::new(d(52.), d(-3.), m(1000.)).expect("latitude is in-range");
+        let wgs84 = Wgs84::build(Wgs84Components {
+            latitude: d(52.),
+            longitude: d(-3.),
+            altitude: m(1000.),
+        })
+        .expect("latitude is in-range");
 
         // Define the pose of a NED at a specific location. This is where altitude comes in.
         let ecef_to_ned = unsafe { RigidBodyTransform::<Ecef, PlaneNed>::ecef_to_ned_at(&wgs84) };
@@ -1033,9 +1058,9 @@ mod tests {
         // Chains both transformations to transform a ECEF coordinate to a Frd Coordinate via NED.
         let ecef_to_frd = ecef_to_ned * ned_to_frd;
 
-        let forward = Coordinate::<PlaneFrd>::from_cartesian(m(1.), m(0.), m(0.));
-        let right = Coordinate::<PlaneFrd>::from_cartesian(m(0.), m(1.), m(0.));
-        let down = Coordinate::<PlaneFrd>::from_cartesian(m(0.), m(0.), m(1.));
+        let forward = coordinate!(f = m(1.), r = m(0.), d = m(0.); in PlaneFrd);
+        let right = coordinate!(f = m(0.), r = m(1.), d = m(0.); in PlaneFrd);
+        let down = coordinate!(f = m(0.), r = m(0.), d = m(1.); in PlaneFrd);
 
         // check that the FRD axis are at the right spots in NED.
         let forward_in_ned = ned_to_frd.inverse_transform(forward);
@@ -1044,16 +1069,10 @@ mod tests {
         // The origin is the same for FRD to NED so these are just rotated.
         assert_relative_eq!(
             forward_in_ned,
-            -Coordinate::<PlaneNed>::from_cartesian(m(0.), m(0.), m(1.))
+            -coordinate!(n = m(0.), e = m(0.), d = m(1.))
         );
-        assert_relative_eq!(
-            right_in_ned,
-            -Coordinate::<PlaneNed>::from_cartesian(m(1.), m(0.), m(0.))
-        );
-        assert_relative_eq!(
-            down_in_ned,
-            Coordinate::<PlaneNed>::from_cartesian(m(0.), m(1.), m(0.))
-        );
+        assert_relative_eq!(right_in_ned, -coordinate!(n = m(1.), e = m(0.), d = m(0.)));
+        assert_relative_eq!(down_in_ned, coordinate!(n = m(0.), e = m(1.), d = m(0.)));
 
         // Turn the NED to ECEF
         let forward_in_ecef = ecef_to_ned.inverse_transform(forward_in_ned);
@@ -1089,8 +1108,8 @@ mod tests {
         );
 
         // The distance between two points should stay the same after transformation.
-        let point_a_frd = Coordinate::<PlaneFrd>::from_cartesian(m(20.), m(-45.), m(10.));
-        let point_b_frd = Coordinate::<PlaneFrd>::from_cartesian(m(100.), m(-200.), m(50.));
+        let point_a_frd = coordinate!(f = m(20.), r = m(-45.), d = m(10.); in PlaneFrd);
+        let point_b_frd = coordinate!(f = m(100.), r = m(-200.), d = m(50.); in PlaneFrd);
 
         assert_relative_eq!(
             (point_b_frd - point_a_frd).magnitude().get::<meter>(),
@@ -1114,7 +1133,12 @@ mod tests {
         // NED of the other FRDs object
         let ecef_to_ned_2 = unsafe {
             RigidBodyTransform::<Ecef, PlaneBNed>::ecef_to_ned_at(
-                &Wgs84::new(d(54.), d(-3.67), m(0.)).expect("latitude is in-range"),
+                &Wgs84::build(Wgs84Components {
+                    latitude: d(54.),
+                    longitude: d(-3.67),
+                    altitude: m(0.),
+                })
+                .expect("latitude is in-range"),
             )
         };
 
