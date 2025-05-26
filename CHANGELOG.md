@@ -9,7 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Several constructors for `Bearing`, `Wgs84`, `Coordinate`, and
+  `Vector` that mitigate the foot-gun that is argument order confusion.
+  See [#8](https://github.com/helsing-ai/sguaba/pull/8) for more
+  details.
+
 ### Changed
+
+- `Bearing::new`, `Wgs84::new`, `Coordinate::from_cartesian`, and
+  `Vector::from_cartesian` have been deprecated in favour of the newly
+  added constructors.
 
 ### Removed
 
