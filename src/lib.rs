@@ -96,19 +96,21 @@
 //!
 //! // what the pilot saw:
 //! let observation = Coordinate::<PlaneFrd>::from_bearing(
-//!     Bearing::new(
-//!       Angle::new::<degree>(20.), // clockwise from forward
-//!       Angle::new::<degree>(10.), // upwards from straight-ahead
-//!     ).expect("elevation is in [-90, 90]"),
+//!     Bearing::builder()
+//!       // clockwise from forward
+//!       .azimuth(Angle::new::<degree>(20.))
+//!       // upwards from straight-ahead
+//!       .elevation(Angle::new::<degree>(10.)).expect("elevation is in [-90, 90]")
+//!       .build(),
 //!     Length::new::<meter>(400.), // at this range
 //! );
 //!
 //! // where the plane was at the time (eg, from GPS):
-//! let wgs84 = Wgs84::new(
-//!     Angle::new::<degree>(12.),
-//!     Angle::new::<degree>(30.),
-//!     Length::new::<meter>(1000.)
-//! ).expect("latitude is in [-90, 90]");
+//! let wgs84 = Wgs84::builder()
+//!     .latitude(Angle::new::<degree>(12.)).expect("latitude is in [-90, 90]")
+//!     .longitude(Angle::new::<degree>(30.))
+//!     .altitude(Length::new::<meter>(1000.))
+//!     .build();
 //!
 //! // where the plane was facing at the time (eg, from instrument panel);
 //! // expressed in yaw, pitch, roll relative to North-East-Down:
@@ -133,23 +135,23 @@
 //! observer's ECEF position to go from NED to ECEF.
 //!
 //! ```
-//! # use sguaba::{system, Bearing, Coordinate, engineering::Orientation, math::RigidBodyTransform, systems::Wgs84};
+//! # use sguaba::{system, Bearing, builder::{bearing::Components as BearingComponents, wgs84::Components as Wgs84Components}, Coordinate, engineering::Orientation, math::RigidBodyTransform, systems::Wgs84};
 //! # use uom::si::f64::{Angle, Length};
 //! # use uom::si::{angle::degree, length::meter};
 //! # system!(struct PlaneFrd using FRD);
 //! # system!(struct PlaneNed using NED);
 //! # let observation = Coordinate::<PlaneFrd>::from_bearing(
-//! #     Bearing::new(
-//! #       Angle::new::<degree>(20.), // clockwise from forward
-//! #       Angle::new::<degree>(10.), // upwards from straight-ahead
-//! #     ).expect("elevation is in [-90, 90]"),
+//! #     Bearing::build(BearingComponents {
+//! #       azimuth: Angle::new::<degree>(20.),
+//! #       elevation: Angle::new::<degree>(10.),
+//! #     }).expect("elevation is in [-90, 90]"),
 //! #     Length::new::<meter>(400.), // at this range
 //! # );
-//! # let wgs84 = Wgs84::new(
-//! #     Angle::new::<degree>(12.),
-//! #     Angle::new::<degree>(30.),
-//! #     Length::new::<meter>(1000.)
-//! # ).expect("latitude is in [-90, 90]");
+//! # let wgs84 = Wgs84::build(Wgs84Components {
+//! #     latitude: Angle::new::<degree>(12.),
+//! #     longitude: Angle::new::<degree>(30.),
+//! #     altitude: Length::new::<meter>(1000.)
+//! # }).expect("latitude is in [-90, 90]");
 //! # let orientation_in_ned = Orientation::<PlaneNed>::from_tait_bryan_angles(
 //! #     Angle::new::<degree>(8.),  // yaw
 //! #     Angle::new::<degree>(45.), // pitch
@@ -185,23 +187,23 @@
 //! coordinate systems and the components of those transforms. For example:
 //!
 //! ```
-//! # use sguaba::{system, Bearing, Coordinate, engineering::Orientation, math::RigidBodyTransform, systems::{Ecef, Wgs84}};
+//! # use sguaba::{system, Bearing, builder::{bearing::Components as BearingComponents, wgs84::Components as Wgs84Components}, Coordinate, engineering::Orientation, math::RigidBodyTransform, systems::{Ecef, Wgs84}};
 //! # use uom::si::f64::{Angle, Length};
 //! # use uom::si::{angle::degree, length::meter};
 //! # system!(struct PlaneFrd using FRD);
 //! # system!(struct PlaneNed using NED);
 //! # let observation = Coordinate::<PlaneFrd>::from_bearing(
-//! #     Bearing::new(
-//! #       Angle::new::<degree>(20.), // clockwise from forward
-//! #       Angle::new::<degree>(10.), // upwards from straight-ahead
-//! #     ).expect("elevation is in [-90, 90]"),
+//! #     Bearing::build(BearingComponents {
+//! #       azimuth: Angle::new::<degree>(20.),
+//! #       elevation: Angle::new::<degree>(10.),
+//! #     }).expect("elevation is in [-90, 90]"),
 //! #     Length::new::<meter>(400.), // at this range
 //! # );
-//! # let wgs84 = Wgs84::new(
-//! #     Angle::new::<degree>(12.),
-//! #     Angle::new::<degree>(30.),
-//! #     Length::new::<meter>(1000.)
-//! # ).expect("latitude is in [-90, 90]");
+//! # let wgs84 = Wgs84::build(Wgs84Components {
+//! #     latitude: Angle::new::<degree>(12.),
+//! #     longitude: Angle::new::<degree>(30.),
+//! #     altitude: Length::new::<meter>(1000.)
+//! # }).expect("latitude is in [-90, 90]");
 //! # let orientation_in_ned = Orientation::<PlaneNed>::from_tait_bryan_angles(
 //! #     Angle::new::<degree>(8.),  // yaw
 //! #     Angle::new::<degree>(45.), // pitch
@@ -250,9 +252,39 @@ pub mod systems {
     pub use super::coordinate_systems::{
         BearingDefined, Ecef, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike,
     };
+    pub use super::coordinate_systems::{
+        FrdComponents, HasComponents, NedComponents, XyzComponents,
+    };
     pub use super::geodedic::Wgs84;
 }
 pub use coordinate_systems::CoordinateSystem;
 pub use coordinates::Coordinate;
 pub use directions::Bearing;
+pub mod builder {
+    /// Used to indicate that a partially-constructed value is missing a given component.
+    #[derive(Debug, Clone, Copy)]
+    pub struct Unset;
+
+    /// Used to indicate that a partially-constructed value has a given component set.
+    #[derive(Debug, Clone, Copy)]
+    pub struct Set;
+
+    pub mod vector {
+        pub use crate::vectors::Builder;
+    }
+    pub mod coordinate {
+        pub use crate::coordinates::Builder;
+    }
+    pub mod bearing {
+        pub use crate::directions::{
+            Builder, Components, HasAzimuth, HasElevation, MissingAzimuth, MissingElevation,
+        };
+    }
+    pub mod wgs84 {
+        pub use crate::geodedic::{
+            Builder, Components, HasAltitude, HasLatitude, HasLongitude, MissingAltitude,
+            MissingLatitude, MissingLongitude,
+        };
+    }
+}
 pub use vectors::Vector;

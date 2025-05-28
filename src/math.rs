@@ -786,11 +786,11 @@ impl<From, To> RigidBodyTransform<From, To> {
     ///
     /// // we can construct a transform from ECEF to PlaneNed
     /// // (we can construct the ECEF from a WGS84 lat/lon)
-    /// let location = Wgs84::new(
-    ///     Angle::new::<degree>(0.),
-    ///     Angle::new::<degree>(10.),
-    ///     Length::new::<meter>(0.)
-    /// ).expect("latitude is in-range");
+    /// let location = Wgs84::builder()
+    ///     .latitude(Angle::new::<degree>(0.)).expect("latitude is in-range")
+    ///     .longitude(Angle::new::<degree>(10.))
+    ///     .altitude(Length::new::<meter>(0.))
+    ///     .build();
     ///
     /// // SAFETY: we're claiming that `location` is the location of `PlaneNed`'s origin.
     /// let ecef_to_ned = unsafe { RigidBodyTransform::ecef_to_ned_at(&location) };
@@ -1164,15 +1164,16 @@ impl<From, To> RelativeEq for RigidBodyTransform<From, To> {
 
 #[cfg(test)]
 mod tests {
+    use crate::builder::bearing::Components;
     use crate::coordinate_systems::{Ecef, Frd, Ned};
     use crate::coordinates::Coordinate;
     use crate::geodedic::Wgs84;
     use crate::math::{RigidBodyTransform, Rotation};
     use crate::util::BoundedAngle;
     use crate::vectors::Vector;
-    use crate::Point3;
-    use crate::Vector3;
+    use crate::{coordinate, Point3};
     use crate::{system, Bearing};
+    use crate::{vector, Vector3};
     use approx::assert_abs_diff_eq;
     use approx::assert_relative_eq;
     use rstest::rstest;
@@ -1387,9 +1388,9 @@ mod tests {
         // Chains both transformations to transform a ECEF coordinate to a Frd Coordinate via NED.
         let ecef_to_frd = ecef_to_ned * ned_to_frd;
 
-        let forward = Coordinate::<PlaneFrd>::from_cartesian(m(1.), m(0.), m(0.));
-        let right = Coordinate::<PlaneFrd>::from_cartesian(m(0.), m(1.), m(0.));
-        let down = Coordinate::<PlaneFrd>::from_cartesian(m(0.), m(0.), m(1.));
+        let forward = coordinate!(f = m(1.), r = m(0.), d = m(0.); in PlaneFrd);
+        let right = coordinate!(f = m(0.), r = m(1.), d = m(0.); in PlaneFrd);
+        let down = coordinate!(f = m(0.), r = m(0.), d = m(1.); in PlaneFrd);
 
         // check that the FRD axis are at the right spots in NED.
         let forward_in_ned = ned_to_frd.inverse_transform(forward);
@@ -1398,16 +1399,10 @@ mod tests {
 
         assert_relative_eq!(
             forward_in_ned,
-            -Coordinate::<PlaneNed>::from_cartesian(m(0.), m(0.), m(1.))
+            -coordinate!(n = m(0.), e = m(0.), d = m(1.))
         );
-        assert_relative_eq!(
-            right_in_ned,
-            -Coordinate::<PlaneNed>::from_cartesian(m(1.), m(0.), m(0.))
-        );
-        assert_relative_eq!(
-            down_in_ned,
-            Coordinate::<PlaneNed>::from_cartesian(m(0.), m(1.), m(0.))
-        );
+        assert_relative_eq!(right_in_ned, -coordinate!(n = m(1.), e = m(0.), d = m(0.)));
+        assert_relative_eq!(down_in_ned, coordinate!(n = m(0.), e = m(1.), d = m(0.)));
 
         // Turn the NED to ECEF
         let forward_in_ecef = ecef_to_ned.inverse_transform(forward_in_ned);
@@ -1472,7 +1467,7 @@ mod tests {
 
     impl From<&nav_types::ECEF<f64>> for Coordinate<Ecef> {
         fn from(value: &nav_types::ECEF<f64>) -> Self {
-            Self::from_cartesian(m(value.x()), m(value.y()), m(value.z()))
+            coordinate!(x = m(value.x()), y = m(value.y()), z = m(value.z()))
         }
     }
 
@@ -1550,7 +1545,12 @@ mod tests {
         // This time the translation should be in there as well, so we can compare directly to nav_types output.
         let pose = unsafe {
             RigidBodyTransform::<Ecef, PlaneNed>::ecef_to_ned_at(
-                &Wgs84::new(lat, long, alt).expect("latitude is in-range"),
+                &Wgs84::builder()
+                    .latitude(lat)
+                    .expect("latitude is in-range")
+                    .longitude(long)
+                    .altitude(alt)
+                    .build(),
             )
         };
 
@@ -1568,7 +1568,7 @@ mod tests {
     fn pose_serde() {
         let pose = unsafe {
             RigidBodyTransform::new(
-                Vector::<PlaneNed>::from_cartesian(m(50.), m(45.), m(10.)),
+                vector!(n = m(50.), e = m(45.), d = m(10.)),
                 Rotation::<PlaneNed, PlaneFrd>::from_tait_bryan_angles(d(15.), d(0.), d(1.)),
             )
         };
@@ -1588,27 +1588,63 @@ mod tests {
         // a bearing pointing East should have an azimuth of 0° to forward
         // and since the plane has no pitch relative to horizon, elevation shouldn't change
         assert_relative_eq!(
-            Bearing::<Ned>::new(d(90.), d(45.)).unwrap() * ned_to_frd,
-            Bearing::<Frd>::new(d(0.), d(45.)).unwrap()
+            Bearing::<Ned>::build(Components {
+                azimuth: d(90.),
+                elevation: d(45.)
+            })
+            .unwrap()
+                * ned_to_frd,
+            Bearing::<Frd>::build(Components {
+                azimuth: d(0.),
+                elevation: d(45.)
+            })
+            .unwrap()
         );
 
         // a bearing pointing South should have an azimuth of 90° to forward
         // elevation still shouldn't change
         assert_relative_eq!(
-            Bearing::<Ned>::new(d(180.), d(45.)).unwrap() * ned_to_frd,
-            Bearing::<Frd>::new(d(90.), d(45.)).unwrap()
+            Bearing::<Ned>::build(Components {
+                azimuth: d(180.),
+                elevation: d(45.)
+            })
+            .unwrap()
+                * ned_to_frd,
+            Bearing::<Frd>::build(Components {
+                azimuth: d(90.),
+                elevation: d(45.)
+            })
+            .unwrap()
         );
 
         // conversely, a bearing pointing Forward should have an azimuth of 90° to North
         assert_relative_eq!(
-            ned_to_frd * Bearing::<Frd>::new(d(0.), d(45.)).unwrap(),
-            Bearing::<Ned>::new(d(90.), d(45.)).unwrap()
+            ned_to_frd
+                * Bearing::<Frd>::build(Components {
+                    azimuth: d(0.),
+                    elevation: d(45.)
+                })
+                .unwrap(),
+            Bearing::<Ned>::build(Components {
+                azimuth: d(90.),
+                elevation: d(45.)
+            })
+            .unwrap()
         );
 
         // and one pointing backwards should have an azimuth of -90° to North
         assert_relative_eq!(
-            ned_to_frd * Bearing::<Frd>::new(d(180.), d(45.)).unwrap(),
-            Bearing::<Ned>::new(d(-90.), d(45.)).unwrap()
+            ned_to_frd
+                * Bearing::<Frd>::build(Components {
+                    azimuth: d(180.),
+                    elevation: d(45.)
+                })
+                .unwrap(),
+            Bearing::<Ned>::build(Components {
+                azimuth: d(-90.),
+                elevation: d(45.)
+            })
+            .unwrap()
         );
 
         // if the plane is pitched, elevation _does_ change
@@ -1618,24 +1654,60 @@ mod tests {
 
         // along the horizon should be seen as -45° compared to FR-plane
         assert_relative_eq!(
-            Bearing::<Ned>::new(d(0.), d(0.)).unwrap() * ned_to_frd,
-            Bearing::<Frd>::new(d(0.), d(-45.)).unwrap()
+            Bearing::<Ned>::build(Components {
+                azimuth: d(0.),
+                elevation: d(0.)
+            })
+            .unwrap()
+                * ned_to_frd,
+            Bearing::<Frd>::build(Components {
+                azimuth: d(0.),
+                elevation: d(-45.)
+            })
+            .unwrap()
         );
 
         // 45° to the horizon should be parallel to FR-plane
         assert_relative_eq!(
-            Bearing::<Ned>::new(d(0.), d(45.)).unwrap() * ned_to_frd,
-            Bearing::<Frd>::new(d(0.), d(0.)).unwrap()
+            Bearing::<Ned>::build(Components {
+                azimuth: d(0.),
+                elevation: d(45.)
+            })
+            .unwrap()
+                * ned_to_frd,
+            Bearing::<Frd>::build(Components {
+                azimuth: d(0.),
+                elevation: d(0.)
+            })
+            .unwrap()
         );
 
         // and vice-versa
         assert_relative_eq!(
-            ned_to_frd * Bearing::<Frd>::new(d(0.), d(-45.)).unwrap(),
-            Bearing::<Ned>::new(d(0.), d(0.)).unwrap()
+            ned_to_frd
+                * Bearing::<Frd>::build(Components {
+                    azimuth: d(0.),
+                    elevation: d(-45.)
+                })
+                .unwrap(),
+            Bearing::<Ned>::build(Components {
+                azimuth: d(0.),
+                elevation: d(0.)
+            })
+            .unwrap()
         );
         assert_relative_eq!(
-            ned_to_frd * Bearing::<Frd>::new(d(0.), d(0.)).unwrap(),
-            Bearing::<Ned>::new(d(0.), d(45.)).unwrap()
+            ned_to_frd
+                * Bearing::<Frd>::build(Components {
+                    azimuth: d(0.),
+                    elevation: d(0.)
+                })
+                .unwrap(),
+            Bearing::<Ned>::build(Components {
+                azimuth: d(0.),
+                elevation: d(45.)
+            })
+            .unwrap()
         );
 
         // since rotations are intrinsic, things get weird with yaw/azimuth _plus_ elevation
@@ -1654,48 +1726,117 @@ mod tests {
 
         // sanity-check: directly in front should match orientation of plane
         assert_relative_eq!(
-            ned_to_frd * Bearing::<Frd>::new(d(0.), d(0.)).unwrap(),
-            Bearing::<Ned>::new(d(180.), d(45.)).unwrap()
+            ned_to_frd
+                * Bearing::<Frd>::build(Components {
+                    azimuth: d(0.),
+                    elevation: d(0.)
+                })
+                .unwrap(),
+            Bearing::<Ned>::build(Components {
+                azimuth: d(180.),
+                elevation: d(45.)
+            })
+            .unwrap()
         );
         // directly behind should be North and "flip" pitch
         assert_relative_eq!(
-            ned_to_frd * Bearing::<Frd>::new(d(180.), d(0.)).unwrap(),
-            Bearing::<Ned>::new(d(0.), d(-45.)).unwrap()
+            ned_to_frd
+                * Bearing::<Frd>::build(Components {
+                    azimuth: d(180.),
+                    elevation: d(0.)
+                })
+                .unwrap(),
+            Bearing::<Ned>::build(Components {
+                azimuth: d(0.),
+                elevation: d(-45.)
+            })
+            .unwrap()
         );
         // and vice-versa
         assert_relative_eq!(
-            Bearing::<Ned>::new(d(180.), d(45.)).unwrap() * ned_to_frd,
-            Bearing::<Frd>::new(d(0.), d(0.)).unwrap()
+            Bearing::<Ned>::build(Components {
+                azimuth: d(180.),
+                elevation: d(45.)
+            })
+            .unwrap()
+                * ned_to_frd,
+            Bearing::<Frd>::build(Components {
+                azimuth: d(0.),
+                elevation: d(0.)
+            })
+            .unwrap()
         );
         assert_relative_eq!(
-            Bearing::<Ned>::new(d(0.), d(-45.)).unwrap() * ned_to_frd,
-            Bearing::<Frd>::new(d(180.), d(0.)).unwrap()
+            Bearing::<Ned>::build(Components {
+                azimuth: d(0.),
+                elevation: d(-45.)
+            })
+            .unwrap()
+                * ned_to_frd,
+            Bearing::<Frd>::build(Components {
+                azimuth: d(180.),
+                elevation: d(0.)
+            })
+            .unwrap()
         );
 
         // an observation to the left with zero elevation should be East
         // and should _also_ have zero elevation
         assert_relative_eq!(
-            ned_to_frd * Bearing::<Frd>::new(d(-90.), d(0.)).unwrap(),
-            Bearing::<Ned>::new(d(90.), d(0.)).unwrap()
+            ned_to_frd
+                * Bearing::<Frd>::build(Components {
+                    azimuth: d(-90.),
+                    elevation: d(0.)
+                })
+                .unwrap(),
+            Bearing::<Ned>::build(Components {
+                azimuth: d(90.),
+                elevation: d(0.)
+            })
+            .unwrap()
         );
         assert_relative_eq!(
-            Bearing::<Ned>::new(d(90.), d(0.)).unwrap() * ned_to_frd,
-            Bearing::<Frd>::new(d(-90.), d(0.)).unwrap()
+            Bearing::<Ned>::build(Components {
+                azimuth: d(90.),
+                elevation: d(0.)
+            })
+            .unwrap()
+                * ned_to_frd,
+            Bearing::<Frd>::build(Components {
+                azimuth: d(-90.),
+                elevation: d(0.)
+            })
+            .unwrap()
         );
 
         // an observation directly below us should have our pitch but flipped, and should have an
         // azimuth of _South_ since it's _not_ aligned with NED's Z axis (which would make it get
         // set to 0).
         assert_relative_eq!(
-            ned_to_frd * Bearing::<Frd>::new(d(0.), d(-90.)).unwrap(),
-            Bearing::<Ned>::new(d(180.), d(-45.)).unwrap()
+            ned_to_frd
+                * Bearing::<Frd>::build(Components {
+                    azimuth: d(0.),
+                    elevation: d(-90.)
+                })
+                .unwrap(),
+            Bearing::<Ned>::build(Components {
+                azimuth: d(180.),
+                elevation: d(-45.)
+            })
+            .unwrap()
         );
         // and vice-versa
         // although here we have to be forgiving with the azimuth because we end up with a bearing
         // that points straight down (-90°) in FRD, in which case the azimuth is unpredictable.
         assert_relative_eq!(
             BoundedAngle::new(
-                (Bearing::<Ned>::new(d(180.), d(-45.)).unwrap() * ned_to_frd).elevation()
+                (Bearing::<Ned>::build(Components {
+                    azimuth: d(180.),
+                    elevation: d(-45.)
+                })
+                .unwrap()
+                    * ned_to_frd)
+                    .elevation()
             ),
             BoundedAngle::new(d(-90.))
         );
@@ -1713,46 +1854,115 @@ mod tests {
 
         // directly in front should still match orientation of plane
         assert_relative_eq!(
-            ned_to_frd * Bearing::<Frd>::new(d(0.), d(0.)).unwrap(),
-            Bearing::<Ned>::new(d(180.), d(45.)).unwrap()
+            ned_to_frd
+                * Bearing::<Frd>::build(Components {
+                    azimuth: d(0.),
+                    elevation: d(0.)
+                })
+                .unwrap(),
+            Bearing::<Ned>::build(Components {
+                azimuth: d(180.),
+                elevation: d(45.)
+            })
+            .unwrap()
         );
         // directly behind should still be North and "flip" pitch
         assert_relative_eq!(
-            ned_to_frd * Bearing::<Frd>::new(d(180.), d(0.)).unwrap(),
-            Bearing::<Ned>::new(d(0.), d(-45.)).unwrap()
+            ned_to_frd
+                * Bearing::<Frd>::build(Components {
+                    azimuth: d(180.),
+                    elevation: d(0.)
+                })
+                .unwrap(),
+            Bearing::<Ned>::build(Components {
+                azimuth: d(0.),
+                elevation: d(-45.)
+            })
+            .unwrap()
         );
         // and vice-versa
         assert_relative_eq!(
-            Bearing::<Ned>::new(d(180.), d(45.)).unwrap() * ned_to_frd,
-            Bearing::<Frd>::new(d(0.), d(0.)).unwrap()
+            Bearing::<Ned>::build(Components {
+                azimuth: d(180.),
+                elevation: d(45.)
+            })
+            .unwrap()
+                * ned_to_frd,
+            Bearing::<Frd>::build(Components {
+                azimuth: d(0.),
+                elevation: d(0.)
+            })
+            .unwrap()
         );
         assert_relative_eq!(
-            Bearing::<Ned>::new(d(0.), d(-45.)).unwrap() * ned_to_frd,
-            Bearing::<Frd>::new(d(180.), d(0.)).unwrap()
+            Bearing::<Ned>::build(Components {
+                azimuth: d(0.),
+                elevation: d(-45.)
+            })
+            .unwrap()
+                * ned_to_frd,
+            Bearing::<Frd>::build(Components {
+                azimuth: d(180.),
+                elevation: d(0.)
+            })
+            .unwrap()
         );
 
         // an observation to the left with zero elevation should now be West
         // and should _also_ have zero elevation
         assert_relative_eq!(
-            ned_to_frd * Bearing::<Frd>::new(d(-90.), d(0.)).unwrap(),
-            Bearing::<Ned>::new(d(-90.), d(0.)).unwrap()
+            ned_to_frd
+                * Bearing::<Frd>::build(Components {
+                    azimuth: d(-90.),
+                    elevation: d(0.)
+                })
+                .unwrap(),
+            Bearing::<Ned>::build(Components {
+                azimuth: d(-90.),
+                elevation: d(0.)
+            })
+            .unwrap()
         );
         assert_relative_eq!(
-            Bearing::<Ned>::new(d(-90.), d(0.)).unwrap() * ned_to_frd,
-            Bearing::<Frd>::new(d(-90.), d(0.)).unwrap()
+            Bearing::<Ned>::build(Components {
+                azimuth: d(-90.),
+                elevation: d(0.)
+            })
+            .unwrap()
+                * ned_to_frd,
+            Bearing::<Frd>::build(Components {
+                azimuth: d(-90.),
+                elevation: d(0.)
+            })
+            .unwrap()
         );
 
         // an observation directly below us now _actually_ points "up" by the same amount as our
         // pitch. it also has an azimuth that is flipped (ie, North not South) since the inverse of
         // the pitch crosses the XZ plane.
         assert_relative_eq!(
-            ned_to_frd * Bearing::<Frd>::new(d(0.), d(-90.)).unwrap(),
-            Bearing::<Ned>::new(d(0.), d(45.)).unwrap()
+            ned_to_frd
+                * Bearing::<Frd>::build(Components {
+                    azimuth: d(0.),
+                    elevation: d(-90.)
+                })
+                .unwrap(),
+            Bearing::<Ned>::build(Components {
+                azimuth: d(0.),
+                elevation: d(45.)
+            })
+            .unwrap()
         );
         // and vice-versa, though again we have to be forgiving about azimuth
         assert_relative_eq!(
             BoundedAngle::new(
-                (Bearing::<Ned>::new(d(0.), d(45.)).unwrap() * ned_to_frd).elevation()
+                (Bearing::<Ned>::build(Components {
+                    azimuth: d(0.),
+                    elevation: d(45.)
+                })
+                .unwrap()
+                    * ned_to_frd)
+                    .elevation()
             ),
             BoundedAngle::new(d(-90.))
         );

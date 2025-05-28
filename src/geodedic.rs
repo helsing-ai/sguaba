@@ -11,6 +11,8 @@ use uom::si::{
 use approx::{AbsDiffEq, RelativeEq};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
+use uom::ConstZero;
 
 // Parameters required for WGS84 ellipsoid
 // https://nsgreg.nga.mil/doc/view?i=4085 table 3.1
@@ -54,25 +56,57 @@ impl Wgs84 {
     /// Constructs a world location from latitude, longitude, and altitude.
     ///
     /// The latitude must be in [-90°,90°] % 360°. If it is not, this function returns `None`.
+    ///
+    /// The altitude is measured as distance above the WGS84 datum reference ellipsoid.
     #[must_use]
+    pub fn build(
+        Components {
+            latitude,
+            longitude,
+            altitude,
+        }: Components,
+    ) -> Option<Self> {
+        Some(
+            Self::builder()
+                .latitude(latitude)?
+                .longitude(longitude)
+                .altitude(altitude)
+                .build(),
+        )
+    }
+
+    /// Provides a constructor for a [`Wgs84`] coordinate.
+    pub fn builder() -> Builder<MissingLatitude, MissingLongitude, MissingAltitude> {
+        Builder {
+            under_construction: Wgs84 {
+                latitude: Angle::ZERO,
+                longitude: Angle::ZERO,
+                altitude: Length::ZERO,
+            },
+            has: (PhantomData, PhantomData, PhantomData),
+        }
+    }
+
+    /// Constructs a world location from latitude, longitude, and altitude.
+    ///
+    /// Prefer [`Wgs84::build`] or [`Wgs84::builder`] to avoid risk of argument order confusion.
+    /// This function will be removed in a future version of Sguaba in favor of those.
+    ///
+    /// The latitude must be in [-90°,90°] % 360°. If it is not, this function returns `None`.
+    ///
+    /// The altitude is measured as distance above the WGS84 datum reference ellipsoid.
+    #[must_use]
+    #[deprecated = "prefer `Wgs84::build` or `Wgs84::builder` to avoid risk of argument order confusion"]
     pub fn new(
         latitude: impl Into<Angle>,
         longitude: impl Into<Angle>,
         altitude: impl Into<Length>,
     ) -> Option<Self> {
-        let latitude = latitude.into();
-        let latitude_in_signed_radians = BoundedAngle::new(latitude).to_signed_range();
-        if !(-std::f64::consts::FRAC_PI_2..=std::f64::consts::FRAC_PI_2)
-            .contains(&latitude_in_signed_radians)
-        {
-            None
-        } else {
-            Some(Self {
-                latitude,
-                longitude: longitude.into(),
-                altitude: altitude.into(),
-            })
-        }
+        Self::build(Components {
+            latitude: latitude.into(),
+            longitude: longitude.into(),
+            altitude: altitude.into(),
+        })
     }
 
     /// Computes the [great-circle distance] between the two locations on the surface of
@@ -236,12 +270,12 @@ impl Coordinate<Ecef> {
         let lat = ((a * p * self.point.z) / (b * q * r)).atan();
         let altitude = k * ((b2 * r2 / p.powi(2)) + (a2 * z2 / q.powi(2))).sqrt();
 
-        let wgs84 = Wgs84::new(
-            Angle::new::<radian>(lat),
-            Angle::new::<radian>(lon),
-            Length::new::<meter>(altitude),
-        )
-        .expect("produces lat in [-pi/2,pi/2]");
+        let wgs84 = Wgs84::builder()
+            .latitude(Angle::new::<radian>(lat))
+            .expect("produces lat in [-pi/2,pi/2]")
+            .longitude(Angle::new::<radian>(lon))
+            .altitude(Length::new::<meter>(altitude))
+            .build();
 
         #[cfg(all(debug_assertions, any(test, feature = "approx")))]
         {
@@ -336,11 +370,116 @@ impl RelativeEq for Wgs84 {
     }
 }
 
+/// Argument type for [`Wgs84::build`].
+#[derive(Debug, Default)]
+#[must_use]
+pub struct Components {
+    /// The latitude angle of the proposed [`Wgs84`] coordinate.
+    ///
+    /// The latitude must be in [-90°,90°] % 360°. If it is not, this function returns `None`.
+    pub latitude: Angle,
+
+    /// The longitude angle of the proposed [`Wgs84`] coordinate.
+    pub longitude: Angle,
+
+    /// The altitude of the proposed [`Wgs84`] coordinate.
+    ///
+    /// The altitude is measured as distance above the WGS84 datum reference ellipsoid.
+    pub altitude: Length,
+}
+
+/// Used to indicate that a partially-constructed [`Wgs84`] is missing the latitude component.
+pub struct MissingLatitude;
+/// Used to indicate that a partially-constructed [`Wgs84`] has the latitude component set.
+pub struct HasLatitude;
+/// Used to indicate that a partially-constructed [`Wgs84`] is missing the longitude component.
+pub struct MissingLongitude;
+/// Used to indicate that a partially-constructed [`Wgs84`] has the longitude component set.
+pub struct HasLongitude;
+/// Used to indicate that a partially-constructed [`Wgs84`] is missing the altitude component.
+pub struct MissingAltitude;
+/// Used to indicate that a partially-constructed [`Wgs84`] has the altitude component set.
+pub struct HasAltitude;
+
+/// [Builder] for a [`Wgs84`] coordinate.
+///
+/// Construct one through [`Wgs84::builder`], and finalize with [`Builder::build`].
+///
+/// [Builder]: https://rust-unofficial.github.io/patterns/patterns/creational/builder.html
+#[derive(Debug)]
+#[must_use]
+pub struct Builder<Latitude, Longitude, Altitude> {
+    under_construction: Wgs84,
+    has: (
+        PhantomData<Latitude>,
+        PhantomData<Longitude>,
+        PhantomData<Altitude>,
+    ),
+}
+
+// manual impls of Clone and Copy to avoid requiring In: Copy + Clone
+impl<L1, L2, A> Clone for Builder<L1, L2, A> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<L1, L2, A> Copy for Builder<L1, L2, A> {}
+
+impl<L1, L2, A> Builder<L1, L2, A> {
+    /// Sets the latitudal angle of the [`Wgs84`]-to-be.
+    ///
+    /// The latitude must be in [-90°,90°] % 360°. If it is not, this function returns `None`.
+    pub fn latitude(mut self, latitude: impl Into<Angle>) -> Option<Builder<HasLatitude, L2, A>> {
+        let latitude = latitude.into();
+        let latitude_in_signed_radians = BoundedAngle::new(latitude).to_signed_range();
+        if !(-std::f64::consts::FRAC_PI_2..=std::f64::consts::FRAC_PI_2)
+            .contains(&latitude_in_signed_radians)
+        {
+            None
+        } else {
+            self.under_construction.latitude = latitude;
+            Some(Builder {
+                under_construction: self.under_construction,
+                has: (PhantomData::<HasLatitude>, self.has.1, self.has.2),
+            })
+        }
+    }
+
+    /// Sets the longitudal angle of the [`Wgs84`]-to-be.
+    pub fn longitude(mut self, longitude: impl Into<Angle>) -> Builder<L1, HasLongitude, A> {
+        self.under_construction.longitude = longitude.into();
+        Builder {
+            under_construction: self.under_construction,
+            has: (self.has.0, PhantomData::<HasLongitude>, self.has.2),
+        }
+    }
+
+    /// Sets the altitude of the [`Wgs84`]-to-be.
+    ///
+    /// The altitude is measured as distance above the WGS84 datum reference ellipsoid.
+    pub fn altitude(mut self, altitude: impl Into<Length>) -> Builder<L1, L2, HasAltitude> {
+        self.under_construction.altitude = altitude.into();
+        Builder {
+            under_construction: self.under_construction,
+            has: (self.has.0, self.has.1, PhantomData::<HasAltitude>),
+        }
+    }
+}
+
+impl Builder<HasLatitude, HasLongitude, HasAltitude> {
+    #[must_use]
+    pub fn build(self) -> Wgs84 {
+        self.under_construction
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Wgs84;
+    use crate::coordinate;
     use crate::coordinate_systems::Ecef;
     use crate::coordinates::Coordinate;
+    use crate::geodedic::Components;
     use crate::util::BoundedAngle;
     use approx::{assert_relative_eq, AbsDiffEq};
     use quickcheck::quickcheck;
@@ -429,9 +568,17 @@ mod tests {
     #[rstest]
     #[case(d(90.9948211), d(7.8211606), m(1000.))]
     #[case(d(190.112282), d(19.880389), m(0.))]
-    fn wgs_fails_with_bad_lat(#[case] lat: Angle, #[case] long: Angle, #[case] alt: Length) {
+    fn wgs_fails_with_bad_lat(
+        #[case] latitude: Angle,
+        #[case] longitude: Angle,
+        #[case] altitude: Length,
+    ) {
         assert_eq!(
-            Wgs84::new(lat, long, alt),
+            Wgs84::build(Components {
+                latitude,
+                longitude,
+                altitude
+            }),
             None,
             "WGS84 position with lat in (90,-90) should be bad"
         );
@@ -447,7 +594,12 @@ mod tests {
             (35.3619, -138.7280, 2294.0),
             (-35.3619, -138.7280, 2294.0),
         ] {
-            insta::assert_snapshot!(Wgs84::new(d(lat), d(lon), m(alt)).unwrap());
+            insta::assert_snapshot!(Wgs84::build(Components {
+                latitude: d(lat),
+                longitude: d(lon),
+                altitude: m(alt)
+            })
+            .unwrap());
         }
     }
 
@@ -476,11 +628,21 @@ mod tests {
 
         // also double-check that rotations of 360° are fine
         for rot in [-720., -360., 360., 720.] {
-            let wgs84_rot = Wgs84::new(d(lat + rot), d(lon), alt).unwrap();
+            let wgs84_rot = Wgs84::build(Components {
+                latitude: d(lat + rot),
+                longitude: d(lon),
+                altitude: alt,
+            })
+            .unwrap();
             let ecef_rot = Coordinate::<Ecef>::from_wgs84(&wgs84_rot);
             assert_relative_eq!(ecef, ecef_rot, epsilon = Wgs84::default_epsilon());
 
-            let wgs84_rot = Wgs84::new(d(lat), d(lon + rot), alt).unwrap();
+            let wgs84_rot = Wgs84::build(Components {
+                latitude: d(lat),
+                longitude: d(lon + rot),
+                altitude: alt,
+            })
+            .unwrap();
             let ecef_rot = Coordinate::<Ecef>::from_wgs84(&wgs84_rot);
             assert_relative_eq!(ecef, ecef_rot, epsilon = Wgs84::default_epsilon());
         }
@@ -510,7 +672,14 @@ mod tests {
     #[case(d(89.999999), d(-179.99999), m(1000.))]
     #[case(d(-89.999999), d(-179.99999), m(1000.))]
     fn hard_wgs_to_ecef(#[case] lat: Angle, #[case] long: Angle, #[case] alt: Length) {
-        try_wgs_ecef_roundtrip(Wgs84::new(lat, long, alt).expect("lat in [-90,90]"));
+        try_wgs_ecef_roundtrip(
+            Wgs84::build(Components {
+                latitude: lat,
+                longitude: long,
+                altitude: alt,
+            })
+            .expect("lat in [-90,90]"),
+        );
     }
 
     #[test]
@@ -529,9 +698,14 @@ mod tests {
         ] {
             let (lat, lon, alt) = wgs;
             let (x, y, z) = ecef;
-            let wgs84 = Wgs84::new(d(lat), d(lon), m(alt)).unwrap();
+            let wgs84 = Wgs84::build(Components {
+                latitude: d(lat),
+                longitude: d(lon),
+                altitude: m(alt),
+            })
+            .unwrap();
             let ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
-            assert_relative_eq!(ecef, Coordinate::<Ecef>::from_cartesian(m(x), m(y), m(z)),);
+            assert_relative_eq!(ecef, coordinate!(x = m(x), y = m(y), z = m(z)),);
         }
     }
 }

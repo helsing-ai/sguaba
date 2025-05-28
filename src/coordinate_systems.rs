@@ -1,5 +1,5 @@
 use crate::Bearing;
-use uom::si::f64::Angle;
+use uom::si::f64::{Angle, Length};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -17,6 +17,12 @@ use crate::{Coordinate, Vector};
 pub trait CoordinateSystem {
     /// What standard coordinate system convention this coordinate system conforms to.
     type Convention;
+}
+
+/// Links a coordinate system convention to the type holding the constituent parts under proper
+/// names.
+pub trait HasComponents {
+    type Components: Into<[Length; 3]>;
 }
 
 /// Indicates that the implementing coordinate system is exactly equivalent to
@@ -100,6 +106,27 @@ pub trait BearingDefined: Sized {
 /// <https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates#Local_north,_east,_down_(NED)_coordinates>
 pub struct NedLike;
 
+/// Components for Cartesian points in an [`NedLike`] coordinate system.
+///
+/// Usually provided to methods like [`Coordinate::build`] or [`Vector::build`].
+#[derive(Debug, Clone, Copy)]
+#[must_use]
+pub struct NedComponents {
+    pub north: Length,
+    pub east: Length,
+    pub down: Length,
+}
+
+impl From<NedComponents> for [Length; 3] {
+    fn from(c: NedComponents) -> [Length; 3] {
+        [c.north, c.east, c.down]
+    }
+}
+
+impl HasComponents for NedLike {
+    type Components = NedComponents;
+}
+
 /// Marks an FRD-like coordinate system where the axes are Front (or "Forward"), Right, and Down.
 ///
 /// FRDs are right-handed coordinate systems, and have observer bounded axes:
@@ -130,12 +157,55 @@ pub struct NedLike;
 /// <https://en.wikipedia.org/wiki/Aircraft_principal_axes>
 pub struct FrdLike;
 
+/// Components for Cartesian points in an [`FrdLike`] coordinate system.
+///
+/// Usually provided to methods like [`Coordinate::build`] or [`Vector::build`].
+#[derive(Debug, Clone, Copy)]
+#[must_use]
+pub struct FrdComponents {
+    pub front: Length,
+    pub right: Length,
+    pub down: Length,
+}
+
+impl From<FrdComponents> for [Length; 3] {
+    fn from(c: FrdComponents) -> [Length; 3] {
+        [c.front, c.right, c.down]
+    }
+}
+
+impl HasComponents for FrdLike {
+    type Components = FrdComponents;
+}
+
 /// Marks a coordinate system whose axes are simply named X, Y, and Z.
 ///
 /// Unlike [`NedLike`] and [`FrdLike`], there is no intrinsic relationship between XYZ-like
 /// coordinate systems. While two XYZ-like coordinate systems _may_ share definitions of X, Y, and
 /// Z, that shared meaning is not communicated through this type.
 pub struct RightHandedXyzLike;
+
+/// Components for Cartesian points in an coordinate system without specific names for X, Y, and Z,
+/// like [`RightHandedXyzLike`].
+///
+/// Usually provided to methods like [`Coordinate::build`] or [`Vector::build`].
+#[derive(Debug, Clone, Copy)]
+#[must_use]
+pub struct XyzComponents {
+    pub x: Length,
+    pub y: Length,
+    pub z: Length,
+}
+
+impl From<XyzComponents> for [Length; 3] {
+    fn from(c: XyzComponents) -> [Length; 3] {
+        [c.x, c.y, c.z]
+    }
+}
+
+impl HasComponents for RightHandedXyzLike {
+    type Components = XyzComponents;
+}
 
 /// Defines a new coordinate system and its conventions.
 ///
@@ -223,7 +293,7 @@ macro_rules! system {
                 #[allow(clippy::redundant_locals)]
                 let azimuth = azimuth.into();
 
-                $crate::Bearing::new(azimuth, elevation)
+                Some($crate::Bearing::builder().azimuth(azimuth).elevation(elevation)?.build())
             }
         }
     };

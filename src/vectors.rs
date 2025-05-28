@@ -1,3 +1,4 @@
+use crate::builder::{Set, Unset};
 use crate::directions::Bearing;
 use crate::Vector3;
 use crate::{
@@ -20,18 +21,29 @@ use {
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+use crate::coordinate_systems::HasComponents;
 #[cfg(doc)]
 use crate::{math::RigidBodyTransform, systems::BearingDefined};
 
 /// Defines a vector (ie, direction with magnitude) in the coordinate system specified by `In`.
 ///
-/// You can construct one using [cartesian](Vector::from_cartesian) or
+/// You can construct one using [Cartesian](Vector::build) or
 /// [spherical](Vector::from_spherical) components, or using [bearing +
-/// range](Vector::from_bearing).
+/// range](Vector::from_bearing). You can also use the [`vector!`](crate::vector) macro
+/// for a concise constructor with named arguments.
 ///
 /// Depending on the convention of the coordinate system (eg, [`NedLike`], [`FrdLike`], or
 /// [`RightHandedXyzLike`]), you'll have different appropriately-named accessors for the vector's
 /// cartesian components like [`Vector::ned_north`] or [`Vector::frd_front`].
+///
+/// <div class="warning">
+///
+/// Note that this type implements `Deserialize` despite having `unsafe` constructors -- this is
+/// because doing otherwise would be extremely unergonomic. However, when deserializing, the
+/// coordinate system of the deserialized value is _not_ checked, so this is a foot-gun to be
+/// mindful of.
+///
+/// </div>
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 // don't require In: Serialize/Deserialize since we skip it anyway
@@ -53,6 +65,104 @@ impl<In> Clone for Vector<In> {
 }
 impl<In> Copy for Vector<In> {}
 
+/// Quickly construct a [`Vector`] using named components.
+///
+/// This macro allows constructing [`Vector`]s for a coordinate system by naming the arguments
+/// according to its [`CoordinateSystem::Convention`]. Using the wrong named arguments (eg, trying
+/// to make a [`NedLike`] [`Vector`] using `f = `) will produce an error at compile-time.
+///
+/// For [`NedLike`], use:
+///
+/// ```rust
+/// # use sguaba::{vector, system, Vector};
+/// # use uom::si::f64::Length;
+/// # use uom::si::length::meter;
+/// # system!(struct Ned using NED);
+/// # let _: Vector<Ned> =
+/// vector! {
+///     n = Length::new::<meter>(1.),
+///     e = Length::new::<meter>(2.),
+///     d = Length::new::<meter>(3.),
+/// }
+/// # ;
+/// ```
+///
+/// For [`FrdLike`], use:
+///
+/// ```rust
+/// # use sguaba::{vector, system, Vector};
+/// # use uom::si::f64::Length;
+/// # use uom::si::length::meter;
+/// # system!(struct Frd using FRD);
+/// # let _: Vector<Frd> =
+/// vector! {
+///     f = Length::new::<meter>(1.),
+///     r = Length::new::<meter>(2.),
+///     d = Length::new::<meter>(3.),
+/// }
+/// # ;
+/// ```
+///
+/// For [`RightHandedXyzLike`], use:
+///
+/// ```rust
+/// # use sguaba::{vector, systems::Ecef, Vector};
+/// # use uom::si::f64::Length;
+/// # use uom::si::length::meter;
+/// # let _: Vector<Ecef> =
+/// vector! {
+///     x = Length::new::<meter>(1.),
+///     y = Length::new::<meter>(2.),
+///     z = Length::new::<meter>(3.),
+/// }
+/// # ;
+/// ```
+///
+/// The macro also allows explicitly specifying the coordinate system `In` for the returned
+/// [`Vector`] (which is otherwise inferred) by suffixing the component list with `; in System`,
+/// like so:
+///
+/// ```rust
+/// # use sguaba::{vector, system, Vector};
+/// # use uom::si::f64::Length;
+/// # use uom::si::length::meter;
+/// system!(struct Frd using FRD);
+/// vector! {
+///     f = Length::new::<meter>(1.),
+///     r = Length::new::<meter>(2.),
+///     d = Length::new::<meter>(3.);
+///     in Frd
+/// }
+/// # ;
+/// ```
+#[macro_export]
+macro_rules! vector {
+    ($x:tt = $xx:expr, $y:tt = $yy:expr, $z:tt = $zz:expr $(,)?) => {
+        vector!($x = $xx, $y = $yy, $z = $zz; in _)
+    };
+    (n = $n:expr, e = $e:expr, d = $d:expr; in $in:ty) => {
+        $crate::Vector::<$in>::build($crate::systems::NedComponents {
+            north: $n.into(),
+            east: $e.into(),
+            down: $d.into(),
+        })
+    };
+    (f = $f:expr, r = $r:expr, d = $d:expr; in $in:ty) => {
+        $crate::Vector::<$in>::build($crate::systems::FrdComponents {
+            front: $f.into(),
+            right: $r.into(),
+            down: $d.into(),
+        })
+    };
+    (x = $x:expr, y = $y:expr, z = $z:expr; in $in:ty) => {
+        $crate::Vector::<$in>::build($crate::systems::XyzComponents {
+            x: $x.into(),
+            y: $y.into(),
+            z: $z.into(),
+        })
+    };
+}
+
 impl<In> Vector<In> {
     pub(crate) fn from_nalgebra_vector(value: Vector3) -> Self {
         Self {
@@ -61,12 +171,38 @@ impl<In> Vector<In> {
         }
     }
 
+    /// Constructs a [`Vector`] at the given (x, y, z) Cartesian point in the [`CoordinateSystem`]
+    /// `In`.
+    pub fn build(components: <In::Convention as HasComponents>::Components) -> Self
+    where
+        In: CoordinateSystem,
+        In::Convention: HasComponents,
+    {
+        let [x, y, z] = components.into();
+        #[allow(deprecated)]
+        Self::from_cartesian(x, y, z)
+    }
+
+    /// Provides a constructor for a [`Coordinate`] in the [`CoordinateSystem`] `In`.
+    pub fn builder() -> Builder<In, Unset, Unset, Unset>
+    where
+        In: CoordinateSystem,
+    {
+        Builder::default()
+    }
+
     /// Constructs a vector with the given (x, y, z) cartesian components in the
     /// [`CoordinateSystem`] `In`.
+    ///
+    /// Prefer [`Vector::builder`], [`Vector::build`], or [`vector`] to avoid risk of argument
+    /// order confusion. This function will be removed in a future version of Sguaba in favor of
+    /// those.
     ///
     /// The meaning of `x`, `y`, and `z` is dictated by the "convention" of `In`. For example, in
     /// [`NedLike`], `x` is North, `y` is East, and `z` is "down" (ie, in the direction of
     /// gravity).
+    #[deprecated = "prefer `Vector::builder` to avoid risk of argument order confusion"]
+    // TODO(jon): make this private
     pub fn from_cartesian(
         x: impl Into<Length>,
         y: impl Into<Length>,
@@ -112,7 +248,7 @@ impl<In> Vector<In> {
     ///
     /// ```rust
     /// use approx::assert_relative_eq;
-    /// use sguaba::{system, Vector};
+    /// use sguaba::{system, vector, Vector};
     /// use uom::si::f64::{Angle, Length};
     /// use uom::si::{angle::degree, length::meter};
     ///
@@ -122,15 +258,15 @@ impl<In> Vector<In> {
     /// let unit = Length::new::<meter>(1.);
     /// assert_relative_eq!(
     ///     Vector::<Ned>::from_spherical(unit, Angle::new::<degree>(0.), Angle::new::<degree>(0.)),
-    ///     Vector::<Ned>::from_cartesian(zero, zero, unit),
+    ///     vector!(n = zero, e = zero, d = unit),
     /// );
     /// assert_relative_eq!(
     ///     Vector::<Ned>::from_spherical(unit, Angle::new::<degree>(90.), Angle::new::<degree>(0.)),
-    ///     Vector::<Ned>::from_cartesian(unit, zero, zero),
+    ///     vector!(n = unit, e = zero, d = zero),
     /// );
     /// assert_relative_eq!(
     ///     Vector::<Ned>::from_spherical(unit, Angle::new::<degree>(90.), Angle::new::<degree>(90.)),
-    ///     Vector::<Ned>::from_cartesian(zero, unit, zero),
+    ///     vector!(n = zero, e = unit, d = zero),
     /// );
     /// ```
     ///
@@ -148,6 +284,7 @@ impl<In> Vector<In> {
         let y = radius * polar.sin() * azimuth.sin();
         let z = radius * polar.cos();
 
+        #[allow(deprecated)]
         Self::from_cartesian(x, y, z)
     }
 
@@ -168,7 +305,7 @@ impl<In> Vector<In> {
     ///
     /// ```rust
     /// use approx::assert_relative_eq;
-    /// use sguaba::{system, Bearing, Vector};
+    /// use sguaba::{system, vector, Bearing, Vector};
     /// use uom::si::f64::{Angle, Length};
     /// use uom::si::{angle::degree, length::meter};
     ///
@@ -177,25 +314,34 @@ impl<In> Vector<In> {
     /// let zero = Length::new::<meter>(0.);
     /// let unit = Length::new::<meter>(1.);
     /// assert_relative_eq!(
-    ///     Vector::<Ned>::from_bearing(Bearing::new(
-    ///       Angle::new::<degree>(0.),
-    ///       Angle::new::<degree>(0.),
-    ///     ).expect("elevation is in-range"), unit),
-    ///     Vector::<Ned>::from_cartesian(unit, zero, zero),
+    ///     Vector::<Ned>::from_bearing(
+    ///       Bearing::builder()
+    ///         .azimuth(Angle::new::<degree>(0.))
+    ///         .elevation(Angle::new::<degree>(0.)).expect("elevation is in-range")
+    ///         .build(),
+    ///       unit
+    ///     ),
+    ///     vector!(n = unit, e = zero, d = zero),
     /// );
     /// assert_relative_eq!(
-    ///     Vector::<Ned>::from_bearing(Bearing::new(
-    ///       Angle::new::<degree>(90.),
-    ///       Angle::new::<degree>(0.),
-    ///     ).expect("elevation is in-range"), unit),
-    ///     Vector::<Ned>::from_cartesian(zero, unit, zero),
+    ///     Vector::<Ned>::from_bearing(
+    ///       Bearing::builder()
+    ///         .azimuth(Angle::new::<degree>(90.))
+    ///         .elevation(Angle::new::<degree>(0.)).expect("elevation is in-range")
+    ///         .build(),
+    ///       unit
+    ///     ),
+    ///     vector!(n = zero, e = unit, d = zero),
     /// );
     /// assert_relative_eq!(
-    ///     Vector::<Ned>::from_bearing(Bearing::new(
-    ///       Angle::new::<degree>(90.),
-    ///       Angle::new::<degree>(90.),
-    ///     ).expect("elevation is in-range"), unit),
-    ///     Vector::<Ned>::from_cartesian(zero, zero, -unit),
+    ///     Vector::<Ned>::from_bearing(
+    ///       Bearing::builder()
+    ///         .azimuth(Angle::new::<degree>(90.))
+    ///         .elevation(Angle::new::<degree>(90.)).expect("elevation is in-range")
+    ///         .build(),
+    ///       unit
+    ///     ),
+    ///     vector!(n = zero, e = zero, d = -unit),
     /// );
     /// ```
     ///
@@ -230,7 +376,7 @@ impl<In> Vector<In> {
     /// equal to:
     ///
     /// ```
-    /// use sguaba::{system, Bearing, Vector};
+    /// use sguaba::{system, vector, Bearing, Vector};
     /// use uom::si::f64::{Angle, Length};
     /// use uom::si::{angle::degree, length::meter};
     ///
@@ -239,14 +385,15 @@ impl<In> Vector<In> {
     ///
     /// let zero = Length::new::<meter>(0.);
     /// let unit = Length::new::<meter>(1.);
-    /// let vector_in_1 = Vector::<PlaneNedFromCrate1>::from_cartesian(unit, zero, unit);
+    /// let vector_in_1 = vector!(n = unit, e = zero, d = unit; in PlaneNedFromCrate1);
     ///
     /// assert_eq!(
-    ///     Vector::<PlaneNedFromCrate2>::from_cartesian(
-    ///       vector_in_1.ned_north(),
-    ///       vector_in_1.ned_east(),
-    ///       vector_in_1.ned_down(),
-    ///     ),
+    ///     vector! {
+    ///       n = vector_in_1.ned_north(),
+    ///       e = vector_in_1.ned_east(),
+    ///       d = vector_in_1.ned_down();
+    ///       in PlaneNedFromCrate2
+    ///     },
     ///     vector_in_1.with_same_components_in::<PlaneNedFromCrate2>()
     /// );
     /// ```
@@ -267,7 +414,7 @@ impl<In> Vector<In> {
     /// unnecessary when `EquivalentTo` is implemented.
     ///
     /// ```
-    /// use sguaba::{system, systems::EquivalentTo, Vector};
+    /// use sguaba::{system, vector, systems::EquivalentTo, Vector};
     /// use uom::si::{f64::Length, length::meter};
     ///
     /// system!(struct PlaneNedFromCrate1 using NED);
@@ -279,14 +426,15 @@ impl<In> Vector<In> {
     ///
     /// let zero = Length::new::<meter>(0.);
     /// let unit = Length::new::<meter>(1.);
-    /// let vector_in_1 = Vector::<PlaneNedFromCrate1>::from_cartesian(unit, zero, unit);
+    /// let vector_in_1 = vector!(n = unit, e = zero, d = unit; in PlaneNedFromCrate1);
     ///
     /// assert_eq!(
-    ///     Vector::<PlaneNedFromCrate2>::from_cartesian(
-    ///       vector_in_1.ned_north(),
-    ///       vector_in_1.ned_east(),
-    ///       vector_in_1.ned_down(),
-    ///     ),
+    ///     vector! {
+    ///       n = vector_in_1.ned_north(),
+    ///       e = vector_in_1.ned_east(),
+    ///       d = vector_in_1.ned_down();
+    ///       in PlaneNedFromCrate2
+    ///     },
     ///     vector_in_1.cast::<PlaneNedFromCrate2>()
     /// );
     /// ```
@@ -568,6 +716,74 @@ impl<In> RelativeEq for Vector<In> {
         self.inner.relative_eq(&other.inner, epsilon, max_relative)
     }
 }
+
+/// [Builder] for a [`Vector`].
+///
+/// Construct one through [`Vector::builder`], and finalize with [`Builder::build`].
+///
+/// [Builder]: https://rust-unofficial.github.io/patterns/patterns/creational/builder.html
+#[derive(Debug)]
+#[must_use]
+pub struct Builder<In, X, Y, Z> {
+    under_construction: Vector<In>,
+    set: (PhantomData<X>, PhantomData<Y>, PhantomData<Z>),
+}
+impl<In> Default for Builder<In, Unset, Unset, Unset> {
+    fn default() -> Self {
+        Self {
+            under_construction: Vector::default(),
+            set: (PhantomData, PhantomData, PhantomData),
+        }
+    }
+}
+
+impl<In> Builder<In, Set, Set, Set> {
+    /// Constructs a [`Vector`] at the currently set (x, y, z) Cartesian point in the
+    /// [`CoordinateSystem`] `In`.
+    #[must_use]
+    pub fn build(self) -> Vector<In> {
+        self.under_construction
+    }
+}
+
+macro_rules! constructor {
+    ($like:ident, [$x:ident, $y:ident, $z:ident]) => {
+        impl<In, X, Y, Z> Builder<In, X, Y, Z>
+        where
+            In: CoordinateSystem<Convention = $like>,
+        {
+            /// Sets the X component of this [`Vector`]-to-be.
+            pub fn $x(mut self, length: impl Into<Length>) -> Builder<In, Set, Y, Z> {
+                self.under_construction.inner.x = length.into().get::<meter>();
+                Builder {
+                    under_construction: self.under_construction,
+                    set: (PhantomData::<Set>, self.set.1, self.set.2),
+                }
+            }
+
+            /// Sets the Y component of this [`Vector`]-to-be.
+            pub fn $y(mut self, length: impl Into<Length>) -> Builder<In, X, Set, Z> {
+                self.under_construction.inner.y = length.into().get::<meter>();
+                Builder {
+                    under_construction: self.under_construction,
+                    set: (self.set.0, PhantomData::<Set>, self.set.2),
+                }
+            }
+
+            /// Sets the Z component of this [`Vector`]-to-be.
+            pub fn $z(mut self, length: impl Into<Length>) -> Builder<In, X, Y, Set> {
+                self.under_construction.inner.z = length.into().get::<meter>();
+                Builder {
+                    under_construction: self.under_construction,
+                    set: (self.set.0, self.set.1, PhantomData::<Set>),
+                }
+            }
+        }
+    };
+}
+constructor!(RightHandedXyzLike, [x, y, z]);
+constructor!(NedLike, [ned_north, ned_east, ned_down]);
+constructor!(FrdLike, [frd_front, frd_right, frd_down]);
 
 #[cfg(test)]
 mod tests {}

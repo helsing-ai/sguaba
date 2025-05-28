@@ -23,21 +23,23 @@ fn main() {
 
     // what the pilot saw:
     let observation = Coordinate::<PlaneFrd>::from_bearing(
-        Bearing::new(
-            Angle::new::<degree>(20.), // clockwise from forward
-            Angle::new::<degree>(10.), // upwards from straight-ahead
-        )
-        .expect("elevation is in [-90º, 90º]"),
+        Bearing::builder()
+            // clockwise from forward
+            .azimuth(Angle::new::<degree>(20.))
+            // upwards from straight-ahead
+            .elevation(Angle::new::<degree>(10.))
+            .expect("elevation is in [-90º, 90º]")
+            .build(),
         Length::new::<meter>(400.), // at this range
     );
 
     // where the plane was at the time (eg, from GPS):
-    let wgs84 = Wgs84::new(
-        Angle::new::<degree>(12.),
-        Angle::new::<degree>(30.),
-        Length::new::<meter>(1000.),
-    )
-    .expect("latitude is in [-90º, 90º]");
+    let wgs84 = Wgs84::builder()
+        .latitude(Angle::new::<degree>(12.))
+        .expect("latitude is in [-90º, 90º]")
+        .longitude(Angle::new::<degree>(30.))
+        .altitude(Length::new::<meter>(1000.))
+        .build();
 
     // where the plane was facing at the time (eg, from instrument panel);
     // expressed in yaw, pitch, roll relative to North-East-Down:
