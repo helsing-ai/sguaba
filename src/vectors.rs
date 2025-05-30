@@ -886,18 +886,10 @@ mod tests {
         // All three constructors should produce the same result
         #[allow(deprecated)]
         let vector1 = Vector::<Ned>::from_cartesian(x, y, z);
-        
-        let vector2 = Vector::<Ned>::builder()
-            .x(x)
-            .y(y)
-            .z(z)
-            .build();
-        
-        let vector3 = Vector::<Ned>::from_components(VectorComponents {
-            x,
-            y,
-            z,
-        });
+
+        let vector2 = Vector::<Ned>::builder().x(x).y(y).z(z).build();
+
+        let vector3 = Vector::<Ned>::from_components(VectorComponents { x, y, z });
 
         assert_relative_eq!(vector1, vector2);
         assert_relative_eq!(vector2, vector3);

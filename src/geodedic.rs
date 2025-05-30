@@ -173,7 +173,10 @@ impl<Lat, Alt> Wgs84Builder<Lat, (), Alt> {
     /// let builder = Wgs84::builder()
     ///     .longitude(Angle::new::<degree>(-74.0060));
     /// ```
-    pub fn longitude(mut self, longitude: impl Into<Angle>) -> Wgs84Builder<Lat, LongitudeSet, Alt> {
+    pub fn longitude(
+        mut self,
+        longitude: impl Into<Angle>,
+    ) -> Wgs84Builder<Lat, LongitudeSet, Alt> {
         self.longitude = Some(longitude.into());
         Wgs84Builder {
             latitude: self.latitude,
@@ -342,7 +345,11 @@ impl Wgs84 {
     #[must_use]
     pub fn from_components(components: Wgs84Components) -> Option<Self> {
         #[allow(deprecated)]
-        Self::new(components.latitude, components.longitude, components.altitude)
+        Self::new(
+            components.latitude,
+            components.longitude,
+            components.altitude,
+        )
     }
 
     /// Computes the [great-circle distance] between the two locations on the surface of
@@ -704,8 +711,7 @@ mod tests {
         #[allow(deprecated)]
         let result = Wgs84::new(lat, long, alt);
         assert_eq!(
-            result,
-            None,
+            result, None,
             "WGS84 position with lat in (90,-90) should be bad"
         );
     }
@@ -878,19 +884,20 @@ mod tests {
         // All three constructors should produce the same result
         #[allow(deprecated)]
         let location1 = Wgs84::new(latitude, longitude, altitude).unwrap();
-        
+
         let location2 = Wgs84::builder()
             .latitude(latitude)
             .longitude(longitude)
             .altitude(altitude)
             .build()
             .unwrap();
-        
+
         let location3 = Wgs84::from_components(Wgs84Components {
             latitude,
             longitude,
             altitude,
-        }).unwrap();
+        })
+        .unwrap();
 
         assert_relative_eq!(location1, location2);
         assert_relative_eq!(location2, location3);

@@ -691,17 +691,15 @@ mod tests {
         // All three constructors should produce the same result
         #[allow(deprecated)]
         let bearing1 = Bearing::<Frd>::new(azimuth, elevation).unwrap();
-        
+
         let bearing2 = Bearing::<Frd>::builder()
             .azimuth(azimuth)
             .elevation(elevation)
             .build()
             .unwrap();
-        
-        let bearing3 = Bearing::<Frd>::from_components(BearingComponents {
-            azimuth,
-            elevation,
-        }).unwrap();
+
+        let bearing3 =
+            Bearing::<Frd>::from_components(BearingComponents { azimuth, elevation }).unwrap();
 
         assert_eq!(bearing1.azimuth(), bearing2.azimuth());
         assert_eq!(bearing1.elevation(), bearing2.elevation());

@@ -301,7 +301,7 @@ pub use vectors::{Vector, VectorComponents};
 /// # use sguaba::{coordinate!, coordinate_systems::Ned};
 /// # use uom::si::length::meter;
 /// # use uom::si::f64::Length;
-/// let coord = coordinate!(Ned, 
+/// let coord = coordinate!(Ned,
 ///     n = Length::new::<meter>(100.0),
 ///     e = Length::new::<meter>(50.0),
 ///     d = Length::new::<meter>(-10.0)
@@ -312,7 +312,7 @@ macro_rules! coordinate {
     // NED-like systems
     ($sys:ty, n = $n:expr, e = $e:expr, d = $d:expr) => {{
         #[allow(unused_imports)]
-        use $crate::{CoordinateSystem, systems::NedLike};
+        use $crate::{systems::NedLike, CoordinateSystem};
         fn _assert_ned_like<T: CoordinateSystem<Convention = NedLike>>() {}
         _assert_ned_like::<$sys>();
         $crate::Coordinate::<$sys>::builder()
@@ -324,7 +324,7 @@ macro_rules! coordinate {
     // FRD-like systems
     ($sys:ty, f = $f:expr, r = $r:expr, d = $d:expr) => {{
         #[allow(unused_imports)]
-        use $crate::{CoordinateSystem, systems::FrdLike};
+        use $crate::{systems::FrdLike, CoordinateSystem};
         fn _assert_frd_like<T: CoordinateSystem<Convention = FrdLike>>() {}
         _assert_frd_like::<$sys>();
         $crate::Coordinate::<$sys>::builder()
@@ -336,7 +336,7 @@ macro_rules! coordinate {
     // XYZ-like systems
     ($sys:ty, x = $x:expr, y = $y:expr, z = $z:expr) => {{
         #[allow(unused_imports)]
-        use $crate::{CoordinateSystem, systems::RightHandedXyzLike};
+        use $crate::{systems::RightHandedXyzLike, CoordinateSystem};
         fn _assert_xyz_like<T: CoordinateSystem<Convention = RightHandedXyzLike>>() {}
         _assert_xyz_like::<$sys>();
         $crate::Coordinate::<$sys>::builder()
@@ -384,7 +384,7 @@ macro_rules! coordinate {
 /// # use sguaba::{vector!, coordinate_systems::Ned};
 /// # use uom::si::length::meter;
 /// # use uom::si::f64::Length;
-/// let vec = vector!(Ned, 
+/// let vec = vector!(Ned,
 ///     n = Length::new::<meter>(100.0),
 ///     e = Length::new::<meter>(50.0),
 ///     d = Length::new::<meter>(-10.0)
@@ -395,38 +395,26 @@ macro_rules! vector {
     // NED-like systems
     ($sys:ty, n = $n:expr, e = $e:expr, d = $d:expr) => {{
         #[allow(unused_imports)]
-        use $crate::{CoordinateSystem, systems::NedLike};
+        use $crate::{systems::NedLike, CoordinateSystem};
         fn _assert_ned_like<T: CoordinateSystem<Convention = NedLike>>() {}
         _assert_ned_like::<$sys>();
-        $crate::Vector::<$sys>::builder()
-            .x($n)
-            .y($e)
-            .z($d)
-            .build()
+        $crate::Vector::<$sys>::builder().x($n).y($e).z($d).build()
     }};
     // FRD-like systems
     ($sys:ty, f = $f:expr, r = $r:expr, d = $d:expr) => {{
         #[allow(unused_imports)]
-        use $crate::{CoordinateSystem, systems::FrdLike};
+        use $crate::{systems::FrdLike, CoordinateSystem};
         fn _assert_frd_like<T: CoordinateSystem<Convention = FrdLike>>() {}
         _assert_frd_like::<$sys>();
-        $crate::Vector::<$sys>::builder()
-            .x($f)
-            .y($r)
-            .z($d)
-            .build()
+        $crate::Vector::<$sys>::builder().x($f).y($r).z($d).build()
     }};
     // XYZ-like systems
     ($sys:ty, x = $x:expr, y = $y:expr, z = $z:expr) => {{
         #[allow(unused_imports)]
-        use $crate::{CoordinateSystem, systems::RightHandedXyzLike};
+        use $crate::{systems::RightHandedXyzLike, CoordinateSystem};
         fn _assert_xyz_like<T: CoordinateSystem<Convention = RightHandedXyzLike>>() {}
         _assert_xyz_like::<$sys>();
-        $crate::Vector::<$sys>::builder()
-            .x($x)
-            .y($y)
-            .z($z)
-            .build()
+        $crate::Vector::<$sys>::builder().x($x).y($y).z($z).build()
     }};
 }
 
@@ -453,7 +441,12 @@ mod tests {
         assert_relative_eq!(coord1, coord2);
 
         // Test with explicit Length values
-        let coord3 = coordinate!(Ned, n = Length::new::<meter>(100.), e = Length::new::<meter>(50.), d = Length::new::<meter>(-10.));
+        let coord3 = coordinate!(
+            Ned,
+            n = Length::new::<meter>(100.),
+            e = Length::new::<meter>(50.),
+            d = Length::new::<meter>(-10.)
+        );
         assert_relative_eq!(coord1, coord3);
     }
 
@@ -468,7 +461,12 @@ mod tests {
         assert_relative_eq!(coord1, coord2);
 
         // Test with explicit Length values
-        let coord3 = coordinate!(Frd, f = Length::new::<meter>(100.), r = Length::new::<meter>(50.), d = Length::new::<meter>(-10.));
+        let coord3 = coordinate!(
+            Frd,
+            f = Length::new::<meter>(100.),
+            r = Length::new::<meter>(50.),
+            d = Length::new::<meter>(-10.)
+        );
         assert_relative_eq!(coord1, coord3);
     }
 
@@ -483,7 +481,12 @@ mod tests {
         assert_relative_eq!(coord1, coord2);
 
         // Test with explicit Length values
-        let coord3 = coordinate!(Ecef, x = Length::new::<meter>(100.), y = Length::new::<meter>(50.), z = Length::new::<meter>(-10.));
+        let coord3 = coordinate!(
+            Ecef,
+            x = Length::new::<meter>(100.),
+            y = Length::new::<meter>(50.),
+            z = Length::new::<meter>(-10.)
+        );
         assert_relative_eq!(coord1, coord3);
     }
 
@@ -498,7 +501,12 @@ mod tests {
         assert_relative_eq!(vec1, vec2);
 
         // Test with explicit Length values
-        let vec3 = vector!(Ned, n = Length::new::<meter>(100.), e = Length::new::<meter>(50.), d = Length::new::<meter>(-10.));
+        let vec3 = vector!(
+            Ned,
+            n = Length::new::<meter>(100.),
+            e = Length::new::<meter>(50.),
+            d = Length::new::<meter>(-10.)
+        );
         assert_relative_eq!(vec1, vec3);
     }
 
@@ -513,7 +521,12 @@ mod tests {
         assert_relative_eq!(vec1, vec2);
 
         // Test with explicit Length values
-        let vec3 = vector!(Frd, f = Length::new::<meter>(100.), r = Length::new::<meter>(50.), d = Length::new::<meter>(-10.));
+        let vec3 = vector!(
+            Frd,
+            f = Length::new::<meter>(100.),
+            r = Length::new::<meter>(50.),
+            d = Length::new::<meter>(-10.)
+        );
         assert_relative_eq!(vec1, vec3);
     }
 
@@ -528,7 +541,12 @@ mod tests {
         assert_relative_eq!(vec1, vec2);
 
         // Test with explicit Length values
-        let vec3 = vector!(Ecef, x = Length::new::<meter>(100.), y = Length::new::<meter>(50.), z = Length::new::<meter>(-10.));
+        let vec3 = vector!(
+            Ecef,
+            x = Length::new::<meter>(100.),
+            y = Length::new::<meter>(50.),
+            z = Length::new::<meter>(-10.)
+        );
         assert_relative_eq!(vec1, vec3);
     }
 

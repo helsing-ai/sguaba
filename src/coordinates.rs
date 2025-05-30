@@ -888,7 +888,7 @@ impl<In> SubAssign<Vector<In>> for Coordinate<In> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Length, CoordinateComponents};
+    use super::{CoordinateComponents, Length};
     use crate::coordinate_systems::{Ecef, Frd, Ned};
     use crate::coordinates::Coordinate;
     use crate::Point3;
@@ -979,18 +979,10 @@ mod tests {
         // All three constructors should produce the same result
         #[allow(deprecated)]
         let coord1 = Coordinate::<Ned>::from_cartesian(x, y, z);
-        
-        let coord2 = Coordinate::<Ned>::builder()
-            .x(x)
-            .y(y)
-            .z(z)
-            .build();
-        
-        let coord3 = Coordinate::<Ned>::from_components(CoordinateComponents {
-            x,
-            y,
-            z,
-        });
+
+        let coord2 = Coordinate::<Ned>::builder().x(x).y(y).z(z).build();
+
+        let coord3 = Coordinate::<Ned>::from_components(CoordinateComponents { x, y, z });
 
         assert_relative_eq!(coord1, coord2);
         assert_relative_eq!(coord2, coord3);
