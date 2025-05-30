@@ -215,10 +215,10 @@ impl<In> Orientation<In> {
     /// // plane observes something below it to its right (45° azimuth, -20° elevation),
     /// // at a range of 100m.
     /// let observation = Coordinate::<PlaneFrd>::from_bearing(
-    ///     Bearing::new(
-    ///       Angle::new::<degree>(45.),
-    ///       Angle::new::<degree>(-20.),
-    ///     ).expect("elevation is in-range"),
+    ///     Bearing::<PlaneFrd>::builder()
+    ///       .azimuth(Angle::new::<degree>(45.))
+    ///       .elevation(Angle::new::<degree>(-20.))
+    ///       .build(),
     ///     Length::new::<meter>(100.)
     /// );
     ///
@@ -570,10 +570,10 @@ impl<In> Pose<In> {
     /// // plane observes something below it to its right (45° azimuth, -20° elevation),
     /// // at a range of 100m.
     /// let observation = Coordinate::<PlaneFrd>::from_bearing(
-    ///     Bearing::new(
-    ///       Angle::new::<degree>(45.),
-    ///       Angle::new::<degree>(-20.),
-    ///     ).expect("elevation is in-range"),
+    ///     Bearing::<PlaneFrd>::builder()
+    ///       .azimuth(Angle::new::<degree>(45.))
+    ///       .elevation(Angle::new::<degree>(-20.))
+    ///       .build(),
     ///     Length::new::<meter>(100.)
     /// );
     ///

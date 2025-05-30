@@ -786,7 +786,7 @@ impl<From, To> RigidBodyTransform<From, To> {
     ///
     /// // we can construct a transform from ECEF to PlaneNed
     /// // (we can construct the ECEF from a WGS84 lat/lon)
-    /// let location = Wgs84::new(
+    /// let location = Wgs84::try_new(
     ///     Angle::new::<degree>(0.),
     ///     Angle::new::<degree>(10.),
     ///     Length::new::<meter>(0.)

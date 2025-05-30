@@ -62,6 +62,188 @@ impl<In> Clone for Coordinate<In> {
 }
 impl<In> Copy for Coordinate<In> {}
 
+/// Components for constructing a [`Coordinate`].
+///
+/// This struct provides named fields to avoid confusion about argument order
+/// when constructing a coordinate.
+///
+/// # Example
+///
+/// ```
+/// use sguaba::{Coordinate, coordinate_systems::Ned};
+/// use sguaba::coordinates::CoordinateComponents;
+/// use uom::si::length::meter;
+/// use uom::si::f64::Length;
+///
+/// let components = CoordinateComponents {
+///     x: Length::new::<meter>(100.0),
+///     y: Length::new::<meter>(50.0),
+///     z: Length::new::<meter>(-10.0),
+/// };
+/// let coord = Coordinate::<Ned>::from_components(components);
+/// ```
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct CoordinateComponents {
+    /// The x component of the coordinate.
+    pub x: Length,
+    /// The y component of the coordinate.
+    pub y: Length,
+    /// The z component of the coordinate.
+    pub z: Length,
+}
+
+/// Builder for constructing a [`Coordinate`] with named parameters.
+///
+/// This builder uses the type-state pattern to ensure x, y, and z
+/// are all set before the coordinate can be built.
+///
+/// # Example
+///
+/// ```
+/// use sguaba::{Coordinate, coordinate_systems::Ned};
+/// use uom::si::length::meter;
+/// use uom::si::f64::Length;
+///
+/// let coord = Coordinate::<Ned>::builder()
+///     .x(Length::new::<meter>(100.0))
+///     .y(Length::new::<meter>(50.0))
+///     .z(Length::new::<meter>(-10.0))
+///     .build();
+/// ```
+#[derive(Debug)]
+pub struct CoordinateBuilder<In, XSet = (), YSet = (), ZSet = ()> {
+    x: Option<Length>,
+    y: Option<Length>,
+    z: Option<Length>,
+    _phantom: PhantomData<(In, XSet, YSet, ZSet)>,
+}
+
+/// Marker type indicating that x has been set in the builder.
+#[derive(Debug)]
+pub struct XSet;
+
+/// Marker type indicating that y has been set in the builder.
+#[derive(Debug)]
+pub struct YSet;
+
+/// Marker type indicating that z has been set in the builder.
+#[derive(Debug)]
+pub struct ZSet;
+
+impl<In> CoordinateBuilder<In, (), (), ()> {
+    fn new() -> Self {
+        Self {
+            x: None,
+            y: None,
+            z: None,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<In, Y, Z> CoordinateBuilder<In, (), Y, Z> {
+    /// Sets the x component for the coordinate.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Coordinate, coordinate_systems::Ned};
+    /// use uom::si::length::meter;
+    /// use uom::si::f64::Length;
+    ///
+    /// let builder = Coordinate::<Ned>::builder()
+    ///     .x(Length::new::<meter>(100.0));
+    /// ```
+    pub fn x(mut self, x: impl Into<Length>) -> CoordinateBuilder<In, XSet, Y, Z> {
+        self.x = Some(x.into());
+        CoordinateBuilder {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<In, X, Z> CoordinateBuilder<In, X, (), Z> {
+    /// Sets the y component for the coordinate.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Coordinate, coordinate_systems::Ned};
+    /// use uom::si::length::meter;
+    /// use uom::si::f64::Length;
+    ///
+    /// let builder = Coordinate::<Ned>::builder()
+    ///     .y(Length::new::<meter>(50.0));
+    /// ```
+    pub fn y(mut self, y: impl Into<Length>) -> CoordinateBuilder<In, X, YSet, Z> {
+        self.y = Some(y.into());
+        CoordinateBuilder {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<In, X, Y> CoordinateBuilder<In, X, Y, ()> {
+    /// Sets the z component for the coordinate.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Coordinate, coordinate_systems::Ned};
+    /// use uom::si::length::meter;
+    /// use uom::si::f64::Length;
+    ///
+    /// let builder = Coordinate::<Ned>::builder()
+    ///     .z(Length::new::<meter>(-10.0));
+    /// ```
+    pub fn z(mut self, z: impl Into<Length>) -> CoordinateBuilder<In, X, Y, ZSet> {
+        self.z = Some(z.into());
+        CoordinateBuilder {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<In> CoordinateBuilder<In, XSet, YSet, ZSet> {
+    /// Builds the [`Coordinate`] from the configured values.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Coordinate, coordinate_systems::Ned};
+    /// use uom::si::length::meter;
+    /// use uom::si::f64::Length;
+    ///
+    /// let coord = Coordinate::<Ned>::builder()
+    ///     .x(Length::new::<meter>(100.0))
+    ///     .y(Length::new::<meter>(50.0))
+    ///     .z(Length::new::<meter>(-10.0))
+    ///     .build();
+    ///
+    /// assert_eq!(coord.ned_north().get::<meter>(), 100.0);
+    /// assert_eq!(coord.ned_east().get::<meter>(), 50.0);
+    /// assert_eq!(coord.ned_down().get::<meter>(), -10.0);
+    /// ```
+    #[must_use]
+    pub fn build(self) -> Coordinate<In> {
+        Coordinate::from_nalgebra_point(Point3::new(
+            self.x.unwrap().get::<meter>(),
+            self.y.unwrap().get::<meter>(),
+            self.z.unwrap().get::<meter>(),
+        ))
+    }
+}
+
 impl<In> Coordinate<In> {
     pub(crate) fn from_nalgebra_point(p: Point3) -> Self {
         Self {
@@ -76,6 +258,28 @@ impl<In> Coordinate<In> {
     /// The meaning of `x`, `y`, and `z` is dictated by the [`CoordinateSystem::Convention`] of
     /// `In`. For example, in [`NedLike`], `x` is North, `y` is East, and `z` is "down" (ie,
     /// orthogonal to the earth's surface).
+    ///
+    /// **Note**: This constructor is deprecated. Use [`Coordinate::builder`] or
+    /// [`Coordinate::from_components`] instead to avoid confusion about argument order.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Coordinate, coordinate_systems::Ned};
+    /// use uom::si::length::meter;
+    /// use uom::si::f64::Length;
+    ///
+    /// #[allow(deprecated)]
+    /// let coord = Coordinate::<Ned>::from_cartesian(
+    ///     Length::new::<meter>(100.0),  // North
+    ///     Length::new::<meter>(50.0),   // East
+    ///     Length::new::<meter>(-10.0)   // Down
+    /// );
+    /// ```
+    #[deprecated(
+        since = "0.10.0",
+        note = "Use `Coordinate::builder()` or `Coordinate::from_components()` instead to avoid confusion about argument order"
+    )]
     pub fn from_cartesian(
         x: impl Into<Length>,
         y: impl Into<Length>,
@@ -86,6 +290,57 @@ impl<In> Coordinate<In> {
             y.into().get::<meter>(),
             z.into().get::<meter>(),
         ))
+    }
+
+    /// Creates a new builder for constructing a [`Coordinate`].
+    ///
+    /// This builder ensures that x, y, and z are explicitly set
+    /// before the coordinate can be built, preventing confusion about argument order.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Coordinate, coordinate_systems::Ned};
+    /// use uom::si::length::meter;
+    /// use uom::si::f64::Length;
+    ///
+    /// let coord = Coordinate::<Ned>::builder()
+    ///     .x(Length::new::<meter>(100.0))
+    ///     .y(Length::new::<meter>(50.0))
+    ///     .z(Length::new::<meter>(-10.0))
+    ///     .build();
+    /// ```
+    pub fn builder() -> CoordinateBuilder<In, (), (), ()> {
+        CoordinateBuilder::new()
+    }
+
+    /// Constructs a coordinate from a [`CoordinateComponents`] struct.
+    ///
+    /// This constructor ensures that x, y, and z are explicitly named,
+    /// preventing confusion about argument order.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Coordinate, coordinate_systems::Ned};
+    /// use sguaba::coordinates::CoordinateComponents;
+    /// use uom::si::length::meter;
+    /// use uom::si::f64::Length;
+    ///
+    /// let coord = Coordinate::<Ned>::from_components(CoordinateComponents {
+    ///     x: Length::new::<meter>(100.0),
+    ///     y: Length::new::<meter>(50.0),
+    ///     z: Length::new::<meter>(-10.0),
+    /// });
+    ///
+    /// assert_eq!(coord.ned_north().get::<meter>(), 100.0);
+    /// assert_eq!(coord.ned_east().get::<meter>(), 50.0);
+    /// assert_eq!(coord.ned_down().get::<meter>(), -10.0);
+    /// ```
+    #[must_use]
+    pub fn from_components(components: CoordinateComponents) -> Self {
+        #[allow(deprecated)]
+        Self::from_cartesian(components.x, components.y, components.z)
     }
 
     /// Constructs a coordinate at the given (r, θ, φ) spherical point in the [`CoordinateSystem`]
@@ -129,6 +384,8 @@ impl<In> Coordinate<In> {
     ///
     /// let zero = Length::new::<meter>(0.);
     /// let unit = Length::new::<meter>(1.);
+    /// #[allow(deprecated)]
+    /// {
     /// assert_relative_eq!(
     ///     Coordinate::<Ned>::from_spherical(unit, Angle::new::<degree>(0.), Angle::new::<degree>(0.)),
     ///     Coordinate::<Ned>::from_cartesian(zero, zero, unit),
@@ -141,6 +398,7 @@ impl<In> Coordinate<In> {
     ///     Coordinate::<Ned>::from_spherical(unit, Angle::new::<degree>(90.), Angle::new::<degree>(90.)),
     ///     Coordinate::<Ned>::from_cartesian(zero, unit, zero),
     /// );
+    /// }
     /// ```
     ///
     /// [sph]: https://en.wikipedia.org/wiki/Spherical_coordinate_system
@@ -178,27 +436,30 @@ impl<In> Coordinate<In> {
     ///
     /// let zero = Length::new::<meter>(0.);
     /// let unit = Length::new::<meter>(1.);
+    /// #[allow(deprecated)]
+    /// {
     /// assert_relative_eq!(
-    ///     Coordinate::<Ned>::from_bearing(Bearing::new(
-    ///       Angle::new::<degree>(0.),
-    ///       Angle::new::<degree>(0.),
-    ///     ).expect("elevation is in-range"), unit),
+    ///     Coordinate::<Ned>::from_bearing(Bearing::<Ned>::builder()
+    ///       .azimuth(Angle::new::<degree>(0.))
+    ///       .elevation(Angle::new::<degree>(0.))
+    ///       .build(), unit),
     ///     Coordinate::<Ned>::from_cartesian(unit, zero, zero),
     /// );
     /// assert_relative_eq!(
-    ///     Coordinate::<Ned>::from_bearing(Bearing::new(
-    ///       Angle::new::<degree>(90.),
-    ///       Angle::new::<degree>(0.),
-    ///     ).expect("elevation is in-range"), unit),
+    ///     Coordinate::<Ned>::from_bearing(Bearing::<Ned>::builder()
+    ///       .azimuth(Angle::new::<degree>(90.))
+    ///       .elevation(Angle::new::<degree>(0.))
+    ///       .build(), unit),
     ///     Coordinate::<Ned>::from_cartesian(zero, unit, zero),
     /// );
     /// assert_relative_eq!(
-    ///     Coordinate::<Ned>::from_bearing(Bearing::new(
-    ///       Angle::new::<degree>(90.),
-    ///       Angle::new::<degree>(90.),
-    ///     ).expect("elevation is in-range"), unit),
+    ///     Coordinate::<Ned>::from_bearing(Bearing::<Ned>::builder()
+    ///       .azimuth(Angle::new::<degree>(90.))
+    ///       .elevation(Angle::new::<degree>(90.))
+    ///       .build(), unit),
     ///     Coordinate::<Ned>::from_cartesian(zero, zero, -unit),
     /// );
+    /// }
     /// ```
     ///
     /// [bearing]: https://en.wikipedia.org/wiki/Bearing_%28navigation%29
@@ -223,6 +484,7 @@ impl<In> Coordinate<In> {
     /// system!(struct Ned using NED);
     ///
     /// let zero = Length::new::<meter>(0.);
+    /// #[allow(deprecated)]
     /// assert_eq!(
     ///     Coordinate::<Ned>::origin(),
     ///     Coordinate::<Ned>::from_cartesian(zero, zero, zero),
@@ -278,6 +540,7 @@ impl<In> Coordinate<In> {
     /// system!(struct PlaneCenteredEcef using right-handed XYZ);
     ///
     /// // plane position in ECEF
+    /// #[allow(deprecated)]
     /// let position = Coordinate::<Ecef>::from_cartesian(
     ///     Length::new::<meter>(30_000.),
     ///     Length::new::<meter>(25_000.),
@@ -286,6 +549,7 @@ impl<In> Coordinate<In> {
     ///
     ///
     /// // plane observes something at a particular ECEF coordinate
+    /// #[allow(deprecated)]
     /// let observation = Coordinate::<PlaneCenteredEcef>::from_cartesian(
     ///     Length::new::<meter>(1_000.),
     ///     Length::new::<meter>(6_000.),
@@ -332,8 +596,10 @@ impl<In> Coordinate<In> {
     ///
     /// let zero = Length::new::<meter>(0.);
     /// let unit = Length::new::<meter>(1.);
+    /// #[allow(deprecated)]
     /// let coordinate_in_1 = Coordinate::<PlaneNedFromCrate1>::from_cartesian(unit, zero, unit);
     ///
+    /// #[allow(deprecated)]
     /// assert_eq!(
     ///     Coordinate::<PlaneNedFromCrate2>::from_cartesian(
     ///       coordinate_in_1.ned_north(),
@@ -436,6 +702,7 @@ impl<In> Coordinate<In> {
     ///
     /// let zero = Length::new::<meter>(0.);
     /// let unit = Length::new::<meter>(1.);
+    /// #[allow(deprecated)]
     /// let p = Coordinate::<Ecef>::from_cartesian(unit, unit, zero);
     /// assert_eq!(
     ///     p.distance_from_origin(),
@@ -460,6 +727,7 @@ impl<In> Coordinate<In> {
     ///
     /// let zero = Length::new::<meter>(0.);
     /// let unit = Length::new::<meter>(1.);
+    /// #[allow(deprecated)]
     /// let p = Coordinate::<Ecef>::from_cartesian(unit, unit, zero);
     /// assert_eq!(
     ///     p.distance_from(&Coordinate::<Ecef>::origin()),
@@ -620,12 +888,13 @@ impl<In> SubAssign<Vector<In>> for Coordinate<In> {
 
 #[cfg(test)]
 mod tests {
-    use super::Length;
+    use super::{Length, CoordinateComponents};
     use crate::coordinate_systems::{Ecef, Frd, Ned};
     use crate::coordinates::Coordinate;
     use crate::Point3;
     use approx::assert_relative_eq;
     use rstest::rstest;
+    use uom::si::length::meter;
 
     fn m(meters: f64) -> Length {
         Length::new::<uom::si::length::meter>(meters)
@@ -644,6 +913,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn neg_works() {
         let frd = Coordinate::<Frd>::from_cartesian(m(10.), m(-5.), m(3.5));
         let ned = Coordinate::<Ned>::from_cartesian(m(10.), m(-5.), m(3.5));
@@ -663,5 +933,66 @@ mod tests {
             -ecef,
             Coordinate::<Ecef>::from_cartesian(m(-10.), m(5.), m(-3.5))
         );
+    }
+
+    #[test]
+    fn test_coordinate_builder() {
+        // Test successful construction
+        let coord = Coordinate::<Ned>::builder()
+            .x(m(100.))
+            .y(m(50.))
+            .z(m(-10.))
+            .build();
+        assert_eq!(coord.ned_north().get::<meter>(), 100.);
+        assert_eq!(coord.ned_east().get::<meter>(), 50.);
+        assert_eq!(coord.ned_down().get::<meter>(), -10.);
+
+        // Test order independence
+        let coord2 = Coordinate::<Ned>::builder()
+            .z(m(-10.))
+            .x(m(100.))
+            .y(m(50.))
+            .build();
+        assert_relative_eq!(coord, coord2);
+    }
+
+    #[test]
+    fn test_coordinate_from_components() {
+        // Test successful construction
+        let components = CoordinateComponents {
+            x: m(100.),
+            y: m(50.),
+            z: m(-10.),
+        };
+        let coord = Coordinate::<Ned>::from_components(components);
+        assert_eq!(coord.ned_north().get::<meter>(), 100.);
+        assert_eq!(coord.ned_east().get::<meter>(), 50.);
+        assert_eq!(coord.ned_down().get::<meter>(), -10.);
+    }
+
+    #[test]
+    fn test_coordinate_constructors_equivalence() {
+        let x = m(100.);
+        let y = m(50.);
+        let z = m(-10.);
+
+        // All three constructors should produce the same result
+        #[allow(deprecated)]
+        let coord1 = Coordinate::<Ned>::from_cartesian(x, y, z);
+        
+        let coord2 = Coordinate::<Ned>::builder()
+            .x(x)
+            .y(y)
+            .z(z)
+            .build();
+        
+        let coord3 = Coordinate::<Ned>::from_components(CoordinateComponents {
+            x,
+            y,
+            z,
+        });
+
+        assert_relative_eq!(coord1, coord2);
+        assert_relative_eq!(coord2, coord3);
     }
 }

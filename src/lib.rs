@@ -96,19 +96,21 @@
 //!
 //! // what the pilot saw:
 //! let observation = Coordinate::<PlaneFrd>::from_bearing(
-//!     Bearing::new(
-//!       Angle::new::<degree>(20.), // clockwise from forward
-//!       Angle::new::<degree>(10.), // upwards from straight-ahead
-//!     ).expect("elevation is in [-90, 90]"),
+//!     Bearing::builder()
+//!       .azimuth(Angle::new::<degree>(20.)) // clockwise from forward
+//!       .elevation(Angle::new::<degree>(10.)) // upwards from straight-ahead
+//!       .build()
+//!       .expect("elevation is in [-90, 90]"),
 //!     Length::new::<meter>(400.), // at this range
 //! );
 //!
 //! // where the plane was at the time (eg, from GPS):
-//! let wgs84 = Wgs84::new(
-//!     Angle::new::<degree>(12.),
-//!     Angle::new::<degree>(30.),
-//!     Length::new::<meter>(1000.)
-//! ).expect("latitude is in [-90, 90]");
+//! let wgs84 = Wgs84::builder()
+//!     .latitude(Angle::new::<degree>(12.))
+//!     .longitude(Angle::new::<degree>(30.))
+//!     .altitude(Length::new::<meter>(1000.))
+//!     .build()
+//!     .expect("latitude is in [-90, 90]");
 //!
 //! // where the plane was facing at the time (eg, from instrument panel);
 //! // expressed in yaw, pitch, roll relative to North-East-Down:
@@ -139,17 +141,19 @@
 //! # system!(struct PlaneFrd using FRD);
 //! # system!(struct PlaneNed using NED);
 //! # let observation = Coordinate::<PlaneFrd>::from_bearing(
-//! #     Bearing::new(
-//! #       Angle::new::<degree>(20.), // clockwise from forward
-//! #       Angle::new::<degree>(10.), // upwards from straight-ahead
-//! #     ).expect("elevation is in [-90, 90]"),
+//! #     Bearing::builder()
+//! #       .azimuth(Angle::new::<degree>(20.)) // clockwise from forward
+//! #       .elevation(Angle::new::<degree>(10.)) // upwards from straight-ahead
+//! #       .build()
+//! #       .expect("elevation is in [-90, 90]"),
 //! #     Length::new::<meter>(400.), // at this range
 //! # );
-//! # let wgs84 = Wgs84::new(
-//! #     Angle::new::<degree>(12.),
-//! #     Angle::new::<degree>(30.),
-//! #     Length::new::<meter>(1000.)
-//! # ).expect("latitude is in [-90, 90]");
+//! # let wgs84 = Wgs84::builder()
+//! #     .latitude(Angle::new::<degree>(12.))
+//! #     .longitude(Angle::new::<degree>(30.))
+//! #     .altitude(Length::new::<meter>(1000.))
+//! #     .build()
+//! #     .expect("latitude is in [-90, 90]");
 //! # let orientation_in_ned = Orientation::<PlaneNed>::from_tait_bryan_angles(
 //! #     Angle::new::<degree>(8.),  // yaw
 //! #     Angle::new::<degree>(45.), // pitch
@@ -191,17 +195,19 @@
 //! # system!(struct PlaneFrd using FRD);
 //! # system!(struct PlaneNed using NED);
 //! # let observation = Coordinate::<PlaneFrd>::from_bearing(
-//! #     Bearing::new(
-//! #       Angle::new::<degree>(20.), // clockwise from forward
-//! #       Angle::new::<degree>(10.), // upwards from straight-ahead
-//! #     ).expect("elevation is in [-90, 90]"),
+//! #     Bearing::builder()
+//! #       .azimuth(Angle::new::<degree>(20.)) // clockwise from forward
+//! #       .elevation(Angle::new::<degree>(10.)) // upwards from straight-ahead
+//! #       .build()
+//! #       .expect("elevation is in [-90, 90]"),
 //! #     Length::new::<meter>(400.), // at this range
 //! # );
-//! # let wgs84 = Wgs84::new(
-//! #     Angle::new::<degree>(12.),
-//! #     Angle::new::<degree>(30.),
-//! #     Length::new::<meter>(1000.)
-//! # ).expect("latitude is in [-90, 90]");
+//! # let wgs84 = Wgs84::builder()
+//! #     .latitude(Angle::new::<degree>(12.))
+//! #     .longitude(Angle::new::<degree>(30.))
+//! #     .altitude(Length::new::<meter>(1000.))
+//! #     .build()
+//! #     .expect("latitude is in [-90, 90]");
 //! # let orientation_in_ned = Orientation::<PlaneNed>::from_tait_bryan_angles(
 //! #     Angle::new::<degree>(8.),  // yaw
 //! #     Angle::new::<degree>(45.), // pitch
@@ -253,6 +259,292 @@ pub mod systems {
     pub use super::geodedic::Wgs84;
 }
 pub use coordinate_systems::CoordinateSystem;
-pub use coordinates::Coordinate;
-pub use directions::Bearing;
-pub use vectors::Vector;
+pub use coordinates::{Coordinate, CoordinateComponents};
+pub use directions::{Bearing, BearingComponents};
+pub use geodedic::Wgs84Components;
+pub use vectors::{Vector, VectorComponents};
+
+/// Creates a [`Coordinate`] with named components that are validated against the coordinate system.
+///
+/// This macro allows you to construct coordinates using single-character component names that
+/// match the coordinate system convention. The macro will fail to compile if the component names
+/// don't match the target coordinate system.
+///
+/// # Syntax
+///
+/// For NED-like coordinate systems:
+/// ```
+/// # use sguaba::{coordinate!, coordinate_systems::Ned};
+/// # use uom::si::length::meter;
+/// # use uom::si::f64::Length;
+/// let coord = coordinate!(Ned, n = 100, e = 50, d = -10);
+/// ```
+///
+/// For FRD-like coordinate systems:
+/// ```
+/// # use sguaba::{coordinate!, coordinate_systems::Frd};
+/// # use uom::si::length::meter;
+/// # use uom::si::f64::Length;
+/// let coord = coordinate!(Frd, f = 100, r = 50, d = -10);
+/// ```
+///
+/// For XYZ-like coordinate systems:
+/// ```
+/// # use sguaba::{coordinate!, coordinate_systems::Ecef};
+/// # use uom::si::length::meter;
+/// # use uom::si::f64::Length;
+/// let coord = coordinate!(Ecef, x = 100, y = 50, z = -10);
+/// ```
+///
+/// You can also use Length values:
+/// ```
+/// # use sguaba::{coordinate!, coordinate_systems::Ned};
+/// # use uom::si::length::meter;
+/// # use uom::si::f64::Length;
+/// let coord = coordinate!(Ned, 
+///     n = Length::new::<meter>(100.0),
+///     e = Length::new::<meter>(50.0),
+///     d = Length::new::<meter>(-10.0)
+/// );
+/// ```
+#[macro_export]
+macro_rules! coordinate {
+    // NED-like systems
+    ($sys:ty, n = $n:expr, e = $e:expr, d = $d:expr) => {{
+        #[allow(unused_imports)]
+        use $crate::{CoordinateSystem, systems::NedLike};
+        fn _assert_ned_like<T: CoordinateSystem<Convention = NedLike>>() {}
+        _assert_ned_like::<$sys>();
+        $crate::Coordinate::<$sys>::builder()
+            .x($n)
+            .y($e)
+            .z($d)
+            .build()
+    }};
+    // FRD-like systems
+    ($sys:ty, f = $f:expr, r = $r:expr, d = $d:expr) => {{
+        #[allow(unused_imports)]
+        use $crate::{CoordinateSystem, systems::FrdLike};
+        fn _assert_frd_like<T: CoordinateSystem<Convention = FrdLike>>() {}
+        _assert_frd_like::<$sys>();
+        $crate::Coordinate::<$sys>::builder()
+            .x($f)
+            .y($r)
+            .z($d)
+            .build()
+    }};
+    // XYZ-like systems
+    ($sys:ty, x = $x:expr, y = $y:expr, z = $z:expr) => {{
+        #[allow(unused_imports)]
+        use $crate::{CoordinateSystem, systems::RightHandedXyzLike};
+        fn _assert_xyz_like<T: CoordinateSystem<Convention = RightHandedXyzLike>>() {}
+        _assert_xyz_like::<$sys>();
+        $crate::Coordinate::<$sys>::builder()
+            .x($x)
+            .y($y)
+            .z($z)
+            .build()
+    }};
+}
+
+/// Creates a [`Vector`] with named components that are validated against the coordinate system.
+///
+/// This macro allows you to construct vectors using single-character component names that
+/// match the coordinate system convention. The macro will fail to compile if the component names
+/// don't match the target coordinate system.
+///
+/// # Syntax
+///
+/// For NED-like coordinate systems:
+/// ```
+/// # use sguaba::{vector!, coordinate_systems::Ned};
+/// # use uom::si::length::meter;
+/// # use uom::si::f64::Length;
+/// let vec = vector!(Ned, n = 100, e = 50, d = -10);
+/// ```
+///
+/// For FRD-like coordinate systems:
+/// ```
+/// # use sguaba::{vector!, coordinate_systems::Frd};
+/// # use uom::si::length::meter;
+/// # use uom::si::f64::Length;
+/// let vec = vector!(Frd, f = 100, r = 50, d = -10);
+/// ```
+///
+/// For XYZ-like coordinate systems:
+/// ```
+/// # use sguaba::{vector!, coordinate_systems::Ecef};
+/// # use uom::si::length::meter;
+/// # use uom::si::f64::Length;
+/// let vec = vector!(Ecef, x = 100, y = 50, z = -10);
+/// ```
+///
+/// You can also use Length values:
+/// ```
+/// # use sguaba::{vector!, coordinate_systems::Ned};
+/// # use uom::si::length::meter;
+/// # use uom::si::f64::Length;
+/// let vec = vector!(Ned, 
+///     n = Length::new::<meter>(100.0),
+///     e = Length::new::<meter>(50.0),
+///     d = Length::new::<meter>(-10.0)
+/// );
+/// ```
+#[macro_export]
+macro_rules! vector {
+    // NED-like systems
+    ($sys:ty, n = $n:expr, e = $e:expr, d = $d:expr) => {{
+        #[allow(unused_imports)]
+        use $crate::{CoordinateSystem, systems::NedLike};
+        fn _assert_ned_like<T: CoordinateSystem<Convention = NedLike>>() {}
+        _assert_ned_like::<$sys>();
+        $crate::Vector::<$sys>::builder()
+            .x($n)
+            .y($e)
+            .z($d)
+            .build()
+    }};
+    // FRD-like systems
+    ($sys:ty, f = $f:expr, r = $r:expr, d = $d:expr) => {{
+        #[allow(unused_imports)]
+        use $crate::{CoordinateSystem, systems::FrdLike};
+        fn _assert_frd_like<T: CoordinateSystem<Convention = FrdLike>>() {}
+        _assert_frd_like::<$sys>();
+        $crate::Vector::<$sys>::builder()
+            .x($f)
+            .y($r)
+            .z($d)
+            .build()
+    }};
+    // XYZ-like systems
+    ($sys:ty, x = $x:expr, y = $y:expr, z = $z:expr) => {{
+        #[allow(unused_imports)]
+        use $crate::{CoordinateSystem, systems::RightHandedXyzLike};
+        fn _assert_xyz_like<T: CoordinateSystem<Convention = RightHandedXyzLike>>() {}
+        _assert_xyz_like::<$sys>();
+        $crate::Vector::<$sys>::builder()
+            .x($x)
+            .y($y)
+            .z($z)
+            .build()
+    }};
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::coordinate_systems::{Ecef, Frd, Ned};
+    use approx::assert_relative_eq;
+    use uom::si::f64::Length;
+    use uom::si::length::meter;
+
+    fn m(meters: f64) -> Length {
+        Length::new::<meter>(meters)
+    }
+
+    #[test]
+    fn test_coordinate_macro_ned() {
+        let coord1 = coordinate!(Ned, n = m(100.), e = m(50.), d = m(-10.));
+        let coord2 = Coordinate::<Ned>::builder()
+            .x(m(100.))
+            .y(m(50.))
+            .z(m(-10.))
+            .build();
+        assert_relative_eq!(coord1, coord2);
+
+        // Test with explicit Length values
+        let coord3 = coordinate!(Ned, n = Length::new::<meter>(100.), e = Length::new::<meter>(50.), d = Length::new::<meter>(-10.));
+        assert_relative_eq!(coord1, coord3);
+    }
+
+    #[test]
+    fn test_coordinate_macro_frd() {
+        let coord1 = coordinate!(Frd, f = m(100.), r = m(50.), d = m(-10.));
+        let coord2 = Coordinate::<Frd>::builder()
+            .x(m(100.))
+            .y(m(50.))
+            .z(m(-10.))
+            .build();
+        assert_relative_eq!(coord1, coord2);
+
+        // Test with explicit Length values
+        let coord3 = coordinate!(Frd, f = Length::new::<meter>(100.), r = Length::new::<meter>(50.), d = Length::new::<meter>(-10.));
+        assert_relative_eq!(coord1, coord3);
+    }
+
+    #[test]
+    fn test_coordinate_macro_ecef() {
+        let coord1 = coordinate!(Ecef, x = m(100.), y = m(50.), z = m(-10.));
+        let coord2 = Coordinate::<Ecef>::builder()
+            .x(m(100.))
+            .y(m(50.))
+            .z(m(-10.))
+            .build();
+        assert_relative_eq!(coord1, coord2);
+
+        // Test with explicit Length values
+        let coord3 = coordinate!(Ecef, x = Length::new::<meter>(100.), y = Length::new::<meter>(50.), z = Length::new::<meter>(-10.));
+        assert_relative_eq!(coord1, coord3);
+    }
+
+    #[test]
+    fn test_vector_macro_ned() {
+        let vec1 = vector!(Ned, n = m(100.), e = m(50.), d = m(-10.));
+        let vec2 = Vector::<Ned>::builder()
+            .x(m(100.))
+            .y(m(50.))
+            .z(m(-10.))
+            .build();
+        assert_relative_eq!(vec1, vec2);
+
+        // Test with explicit Length values
+        let vec3 = vector!(Ned, n = Length::new::<meter>(100.), e = Length::new::<meter>(50.), d = Length::new::<meter>(-10.));
+        assert_relative_eq!(vec1, vec3);
+    }
+
+    #[test]
+    fn test_vector_macro_frd() {
+        let vec1 = vector!(Frd, f = m(100.), r = m(50.), d = m(-10.));
+        let vec2 = Vector::<Frd>::builder()
+            .x(m(100.))
+            .y(m(50.))
+            .z(m(-10.))
+            .build();
+        assert_relative_eq!(vec1, vec2);
+
+        // Test with explicit Length values
+        let vec3 = vector!(Frd, f = Length::new::<meter>(100.), r = Length::new::<meter>(50.), d = Length::new::<meter>(-10.));
+        assert_relative_eq!(vec1, vec3);
+    }
+
+    #[test]
+    fn test_vector_macro_ecef() {
+        let vec1 = vector!(Ecef, x = m(100.), y = m(50.), z = m(-10.));
+        let vec2 = Vector::<Ecef>::builder()
+            .x(m(100.))
+            .y(m(50.))
+            .z(m(-10.))
+            .build();
+        assert_relative_eq!(vec1, vec2);
+
+        // Test with explicit Length values
+        let vec3 = vector!(Ecef, x = Length::new::<meter>(100.), y = Length::new::<meter>(50.), z = Length::new::<meter>(-10.));
+        assert_relative_eq!(vec1, vec3);
+    }
+
+    // These tests verify that using wrong component names fails to compile
+    // They are commented out because they should fail compilation
+    /*
+    #[test]
+    fn test_coordinate_macro_wrong_components_ned() {
+        // This should fail to compile - using FRD components for NED system
+        let coord = coordinate!(Ned, f = 100, r = 50, d = -10);
+    }
+
+    #[test]
+    fn test_coordinate_macro_wrong_components_frd() {
+        // This should fail to compile - using NED components for FRD system
+        let coord = coordinate!(Frd, n = 100, e = 50, d = -10);
+    }
+    */
+}

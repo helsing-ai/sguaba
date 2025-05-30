@@ -223,7 +223,10 @@ macro_rules! system {
                 #[allow(clippy::redundant_locals)]
                 let azimuth = azimuth.into();
 
-                $crate::Bearing::new(azimuth, elevation)
+                $crate::Bearing::from_components($crate::directions::BearingComponents {
+                    azimuth,
+                    elevation,
+                })
             }
         }
     };

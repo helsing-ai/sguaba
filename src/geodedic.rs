@@ -50,11 +50,225 @@ pub struct Wgs84 {
     altitude: uom::si::f64::Length,
 }
 
+/// Components for constructing a [`Wgs84`] location.
+///
+/// This struct provides named fields to avoid confusion about argument order
+/// when constructing a WGS84 location.
+///
+/// # Example
+///
+/// ```
+/// use sguaba::Wgs84;
+/// use sguaba::geodedic::Wgs84Components;
+/// use uom::si::angle::degree;
+/// use uom::si::length::meter;
+/// use uom::si::f64::{Angle, Length};
+///
+/// let components = Wgs84Components {
+///     latitude: Angle::new::<degree>(40.7128),   // New York City
+///     longitude: Angle::new::<degree>(-74.0060),
+///     altitude: Length::new::<meter>(10.0),
+/// };
+/// let location = Wgs84::from_components(components)
+///     .expect("latitude is within valid range");
+/// ```
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Wgs84Components {
+    /// The latitude in degrees. Must be in the range [-90°, 90°].
+    pub latitude: Angle,
+    /// The longitude in degrees.
+    pub longitude: Angle,
+    /// The altitude in meters above the WGS84 ellipsoid.
+    pub altitude: Length,
+}
+
+/// Builder for constructing a [`Wgs84`] location with named parameters.
+///
+/// This builder uses the type-state pattern to ensure latitude, longitude,
+/// and altitude are all set before the location can be built.
+///
+/// # Example
+///
+/// ```
+/// use sguaba::Wgs84;
+/// use uom::si::angle::degree;
+/// use uom::si::length::meter;
+/// use uom::si::f64::{Angle, Length};
+///
+/// let location = Wgs84::builder()
+///     .latitude(Angle::new::<degree>(40.7128))   // New York City
+///     .longitude(Angle::new::<degree>(-74.0060))
+///     .altitude(Length::new::<meter>(10.0))
+///     .build()
+///     .expect("latitude is within valid range");
+/// ```
+#[derive(Debug)]
+pub struct Wgs84Builder<LatitudeSet = (), LongitudeSet = (), AltitudeSet = ()> {
+    latitude: Option<Angle>,
+    longitude: Option<Angle>,
+    altitude: Option<Length>,
+    _phantom: std::marker::PhantomData<(LatitudeSet, LongitudeSet, AltitudeSet)>,
+}
+
+/// Marker type indicating that latitude has been set in the builder.
+#[derive(Debug)]
+pub struct LatitudeSet;
+
+/// Marker type indicating that longitude has been set in the builder.
+#[derive(Debug)]
+pub struct LongitudeSet;
+
+/// Marker type indicating that altitude has been set in the builder.
+#[derive(Debug)]
+pub struct AltitudeSet;
+
+impl Wgs84Builder<(), (), ()> {
+    fn new() -> Self {
+        Self {
+            latitude: None,
+            longitude: None,
+            altitude: None,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<Lon, Alt> Wgs84Builder<(), Lon, Alt> {
+    /// Sets the latitude for the WGS84 location.
+    ///
+    /// The latitude must be in the range [-90°, 90°].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::Wgs84;
+    /// use uom::si::angle::degree;
+    /// use uom::si::f64::Angle;
+    ///
+    /// let builder = Wgs84::builder()
+    ///     .latitude(Angle::new::<degree>(40.7128));
+    /// ```
+    pub fn latitude(mut self, latitude: impl Into<Angle>) -> Wgs84Builder<LatitudeSet, Lon, Alt> {
+        self.latitude = Some(latitude.into());
+        Wgs84Builder {
+            latitude: self.latitude,
+            longitude: self.longitude,
+            altitude: self.altitude,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<Lat, Alt> Wgs84Builder<Lat, (), Alt> {
+    /// Sets the longitude for the WGS84 location.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::Wgs84;
+    /// use uom::si::angle::degree;
+    /// use uom::si::f64::Angle;
+    ///
+    /// let builder = Wgs84::builder()
+    ///     .longitude(Angle::new::<degree>(-74.0060));
+    /// ```
+    pub fn longitude(mut self, longitude: impl Into<Angle>) -> Wgs84Builder<Lat, LongitudeSet, Alt> {
+        self.longitude = Some(longitude.into());
+        Wgs84Builder {
+            latitude: self.latitude,
+            longitude: self.longitude,
+            altitude: self.altitude,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<Lat, Lon> Wgs84Builder<Lat, Lon, ()> {
+    /// Sets the altitude for the WGS84 location.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::Wgs84;
+    /// use uom::si::length::meter;
+    /// use uom::si::f64::Length;
+    ///
+    /// let builder = Wgs84::builder()
+    ///     .altitude(Length::new::<meter>(10.0));
+    /// ```
+    pub fn altitude(mut self, altitude: impl Into<Length>) -> Wgs84Builder<Lat, Lon, AltitudeSet> {
+        self.altitude = Some(altitude.into());
+        Wgs84Builder {
+            latitude: self.latitude,
+            longitude: self.longitude,
+            altitude: self.altitude,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl Wgs84Builder<LatitudeSet, LongitudeSet, AltitudeSet> {
+    /// Builds the [`Wgs84`] location from the configured values.
+    ///
+    /// Returns `None` if the latitude is not in the range [-90°, 90°].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::Wgs84;
+    /// use uom::si::angle::degree;
+    /// use uom::si::length::meter;
+    /// use uom::si::f64::{Angle, Length};
+    ///
+    /// let location = Wgs84::builder()
+    ///     .latitude(Angle::new::<degree>(40.7128))
+    ///     .longitude(Angle::new::<degree>(-74.0060))
+    ///     .altitude(Length::new::<meter>(10.0))
+    ///     .build()
+    ///     .expect("latitude is within valid range");
+    ///
+    /// assert_eq!(location.latitude().get::<degree>(), 40.7128);
+    /// assert_eq!(location.longitude().get::<degree>(), -74.0060);
+    /// assert_eq!(location.altitude().get::<meter>(), 10.0);
+    /// ```
+    #[must_use]
+    pub fn build(self) -> Option<Wgs84> {
+        Wgs84::new(
+            self.latitude.unwrap(),
+            self.longitude.unwrap(),
+            self.altitude.unwrap(),
+        )
+    }
+}
+
 impl Wgs84 {
     /// Constructs a world location from latitude, longitude, and altitude.
     ///
     /// The latitude must be in [-90°,90°] % 360°. If it is not, this function returns `None`.
+    ///
+    /// **Note**: This constructor is deprecated. Use [`Wgs84::builder`] or
+    /// [`Wgs84::from_components`] instead to avoid confusion about argument order.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::Wgs84;
+    /// use uom::si::angle::degree;
+    /// use uom::si::length::meter;
+    /// use uom::si::f64::{Angle, Length};
+    ///
+    /// let location = Wgs84::try_new(
+    ///     Angle::new::<degree>(40.7128),   // latitude
+    ///     Angle::new::<degree>(-74.0060),  // longitude
+    ///     Length::new::<meter>(10.0)       // altitude
+    /// ).expect("latitude is within valid range");
+    /// ```
     #[must_use]
+    #[deprecated(
+        since = "0.10.0",
+        note = "Use `Wgs84::builder()` or `Wgs84::from_components()` instead to avoid confusion about argument order"
+    )]
     pub fn new(
         latitude: impl Into<Angle>,
         longitude: impl Into<Angle>,
@@ -73,6 +287,62 @@ impl Wgs84 {
                 altitude: altitude.into(),
             })
         }
+    }
+
+    /// Creates a new builder for constructing a [`Wgs84`] location.
+    ///
+    /// This builder ensures that latitude, longitude, and altitude are explicitly set
+    /// before the location can be built, preventing confusion about argument order.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::Wgs84;
+    /// use uom::si::angle::degree;
+    /// use uom::si::length::meter;
+    /// use uom::si::f64::{Angle, Length};
+    ///
+    /// let location = Wgs84::builder()
+    ///     .latitude(Angle::new::<degree>(40.7128))
+    ///     .longitude(Angle::new::<degree>(-74.0060))
+    ///     .altitude(Length::new::<meter>(10.0))
+    ///     .build()
+    ///     .expect("latitude is within valid range");
+    /// ```
+    pub fn builder() -> Wgs84Builder<(), (), ()> {
+        Wgs84Builder::new()
+    }
+
+    /// Constructs a WGS84 location from a [`Wgs84Components`] struct.
+    ///
+    /// This constructor ensures that latitude, longitude, and altitude are explicitly named,
+    /// preventing confusion about argument order.
+    ///
+    /// Returns `None` if the latitude is not in the range [-90°, 90°].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::Wgs84;
+    /// use sguaba::geodedic::Wgs84Components;
+    /// use uom::si::angle::degree;
+    /// use uom::si::length::meter;
+    /// use uom::si::f64::{Angle, Length};
+    ///
+    /// let location = Wgs84::from_components(Wgs84Components {
+    ///     latitude: Angle::new::<degree>(40.7128),
+    ///     longitude: Angle::new::<degree>(-74.0060),
+    ///     altitude: Length::new::<meter>(10.0),
+    /// }).expect("latitude is within valid range");
+    ///
+    /// assert_eq!(location.latitude().get::<degree>(), 40.7128);
+    /// assert_eq!(location.longitude().get::<degree>(), -74.0060);
+    /// assert_eq!(location.altitude().get::<meter>(), 10.0);
+    /// ```
+    #[must_use]
+    pub fn from_components(components: Wgs84Components) -> Option<Self> {
+        #[allow(deprecated)]
+        Self::new(components.latitude, components.longitude, components.altitude)
     }
 
     /// Computes the [great-circle distance] between the two locations on the surface of
@@ -236,6 +506,7 @@ impl Coordinate<Ecef> {
         let lat = ((a * p * self.point.z) / (b * q * r)).atan();
         let altitude = k * ((b2 * r2 / p.powi(2)) + (a2 * z2 / q.powi(2))).sqrt();
 
+        #[allow(deprecated)]
         let wgs84 = Wgs84::new(
             Angle::new::<radian>(lat),
             Angle::new::<radian>(lon),
@@ -338,7 +609,7 @@ impl RelativeEq for Wgs84 {
 
 #[cfg(test)]
 mod tests {
-    use super::Wgs84;
+    use super::{Wgs84, Wgs84Components};
     use crate::coordinate_systems::Ecef;
     use crate::coordinates::Coordinate;
     use crate::util::BoundedAngle;
@@ -430,8 +701,10 @@ mod tests {
     #[case(d(90.9948211), d(7.8211606), m(1000.))]
     #[case(d(190.112282), d(19.880389), m(0.))]
     fn wgs_fails_with_bad_lat(#[case] lat: Angle, #[case] long: Angle, #[case] alt: Length) {
+        #[allow(deprecated)]
+        let result = Wgs84::new(lat, long, alt);
         assert_eq!(
-            Wgs84::new(lat, long, alt),
+            result,
             None,
             "WGS84 position with lat in (90,-90) should be bad"
         );
@@ -447,7 +720,9 @@ mod tests {
             (35.3619, -138.7280, 2294.0),
             (-35.3619, -138.7280, 2294.0),
         ] {
-            insta::assert_snapshot!(Wgs84::new(d(lat), d(lon), m(alt)).unwrap());
+            #[allow(deprecated)]
+            let wgs = Wgs84::new(d(lat), d(lon), m(alt)).unwrap();
+            insta::assert_snapshot!(wgs);
         }
     }
 
@@ -476,10 +751,12 @@ mod tests {
 
         // also double-check that rotations of 360° are fine
         for rot in [-720., -360., 360., 720.] {
+            #[allow(deprecated)]
             let wgs84_rot = Wgs84::new(d(lat + rot), d(lon), alt).unwrap();
             let ecef_rot = Coordinate::<Ecef>::from_wgs84(&wgs84_rot);
             assert_relative_eq!(ecef, ecef_rot, epsilon = Wgs84::default_epsilon());
 
+            #[allow(deprecated)]
             let wgs84_rot = Wgs84::new(d(lat), d(lon + rot), alt).unwrap();
             let ecef_rot = Coordinate::<Ecef>::from_wgs84(&wgs84_rot);
             assert_relative_eq!(ecef, ecef_rot, epsilon = Wgs84::default_epsilon());
@@ -510,7 +787,9 @@ mod tests {
     #[case(d(89.999999), d(-179.99999), m(1000.))]
     #[case(d(-89.999999), d(-179.99999), m(1000.))]
     fn hard_wgs_to_ecef(#[case] lat: Angle, #[case] long: Angle, #[case] alt: Length) {
-        try_wgs_ecef_roundtrip(Wgs84::new(lat, long, alt).expect("lat in [-90,90]"));
+        #[allow(deprecated)]
+        let wgs = Wgs84::new(lat, long, alt).expect("lat in [-90,90]");
+        try_wgs_ecef_roundtrip(wgs);
     }
 
     #[test]
@@ -529,9 +808,91 @@ mod tests {
         ] {
             let (lat, lon, alt) = wgs;
             let (x, y, z) = ecef;
+            #[allow(deprecated)]
             let wgs84 = Wgs84::new(d(lat), d(lon), m(alt)).unwrap();
             let ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
             assert_relative_eq!(ecef, Coordinate::<Ecef>::from_cartesian(m(x), m(y), m(z)),);
         }
+    }
+
+    #[test]
+    fn test_wgs84_builder() {
+        // Test successful construction
+        let location = Wgs84::builder()
+            .latitude(d(40.7128))
+            .longitude(d(-74.0060))
+            .altitude(m(10.))
+            .build()
+            .unwrap();
+        assert_relative_eq!(location.latitude().get::<degree>(), 40.7128);
+        assert_relative_eq!(location.longitude().get::<degree>(), -74.0060);
+        assert_relative_eq!(location.altitude().get::<meter>(), 10.);
+
+        // Test latitude validation
+        let invalid = Wgs84::builder()
+            .latitude(d(100.)) // Invalid latitude
+            .longitude(d(-74.0060))
+            .altitude(m(10.))
+            .build();
+        assert!(invalid.is_none());
+
+        // Test order independence
+        let location2 = Wgs84::builder()
+            .altitude(m(10.))
+            .longitude(d(-74.0060))
+            .latitude(d(40.7128))
+            .build()
+            .unwrap();
+        assert_relative_eq!(location, location2);
+    }
+
+    #[test]
+    fn test_wgs84_from_components() {
+        // Test successful construction
+        let components = Wgs84Components {
+            latitude: d(40.7128),
+            longitude: d(-74.0060),
+            altitude: m(10.),
+        };
+        let location = Wgs84::from_components(components).unwrap();
+        assert_relative_eq!(location.latitude().get::<degree>(), 40.7128);
+        assert_relative_eq!(location.longitude().get::<degree>(), -74.0060);
+        assert_relative_eq!(location.altitude().get::<meter>(), 10.);
+
+        // Test latitude validation
+        let invalid_components = Wgs84Components {
+            latitude: d(100.), // Invalid latitude
+            longitude: d(-74.0060),
+            altitude: m(10.),
+        };
+        let invalid = Wgs84::from_components(invalid_components);
+        assert!(invalid.is_none());
+    }
+
+    #[test]
+    fn test_wgs84_constructors_equivalence() {
+        let latitude = d(40.7128);
+        let longitude = d(-74.0060);
+        let altitude = m(10.);
+
+        // All three constructors should produce the same result
+        #[allow(deprecated)]
+        let location1 = Wgs84::new(latitude, longitude, altitude).unwrap();
+        
+        let location2 = Wgs84::builder()
+            .latitude(latitude)
+            .longitude(longitude)
+            .altitude(altitude)
+            .build()
+            .unwrap();
+        
+        let location3 = Wgs84::from_components(Wgs84Components {
+            latitude,
+            longitude,
+            altitude,
+        }).unwrap();
+
+        assert_relative_eq!(location1, location2);
+        assert_relative_eq!(location2, location3);
     }
 }

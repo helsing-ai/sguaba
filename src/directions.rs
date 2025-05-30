@@ -49,12 +49,179 @@ impl<In> Clone for Bearing<In> {
 }
 impl<In> Copy for Bearing<In> {}
 
+/// Components for constructing a [`Bearing`].
+///
+/// This struct provides named fields to avoid confusion about argument order
+/// when constructing a bearing.
+///
+/// # Example
+///
+/// ```
+/// use sguaba::{Bearing, coordinate_systems::Ned};
+/// use sguaba::directions::BearingComponents;
+/// use uom::si::angle::degree;
+/// use uom::si::f64::Angle;
+///
+/// let components = BearingComponents {
+///     azimuth: Angle::new::<degree>(45.0),
+///     elevation: Angle::new::<degree>(30.0),
+/// };
+/// let bearing = Bearing::<Ned>::from_components(components)
+///     .expect("elevation is within valid range");
+/// ```
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct BearingComponents {
+    /// The azimuthal angle.
+    pub azimuth: Angle,
+    /// The elevation angle. Must be in the range [-90°, 90°].
+    pub elevation: Angle,
+}
+
+/// Builder for constructing a [`Bearing`] with named parameters.
+///
+/// This builder uses the type-state pattern to ensure both azimuth and elevation
+/// are set before the bearing can be built.
+///
+/// # Example
+///
+/// ```
+/// use sguaba::{Bearing, coordinate_systems::Ned};
+/// use uom::si::angle::degree;
+/// use uom::si::f64::Angle;
+///
+/// let bearing = Bearing::<Ned>::builder()
+///     .azimuth(Angle::new::<degree>(45.0))
+///     .elevation(Angle::new::<degree>(30.0))
+///     .build()
+///     .expect("elevation is within valid range");
+/// ```
+#[derive(Debug)]
+pub struct BearingBuilder<In, AzimuthSet = (), ElevationSet = ()> {
+    azimuth: Option<Angle>,
+    elevation: Option<Angle>,
+    _phantom: PhantomData<(In, AzimuthSet, ElevationSet)>,
+}
+
+/// Marker type indicating that azimuth has been set in the builder.
+#[derive(Debug)]
+pub struct AzimuthSet;
+
+/// Marker type indicating that elevation has been set in the builder.
+#[derive(Debug)]
+pub struct ElevationSet;
+
+impl<In> BearingBuilder<In, (), ()> {
+    fn new() -> Self {
+        Self {
+            azimuth: None,
+            elevation: None,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<In, E> BearingBuilder<In, (), E> {
+    /// Sets the azimuth angle for the bearing.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Bearing, coordinate_systems::Ned};
+    /// use uom::si::angle::degree;
+    /// use uom::si::f64::Angle;
+    ///
+    /// let builder = Bearing::<Ned>::builder()
+    ///     .azimuth(Angle::new::<degree>(45.0));
+    /// ```
+    pub fn azimuth(mut self, azimuth: impl Into<Angle>) -> BearingBuilder<In, AzimuthSet, E> {
+        self.azimuth = Some(azimuth.into());
+        BearingBuilder {
+            azimuth: self.azimuth,
+            elevation: self.elevation,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<In, A> BearingBuilder<In, A, ()> {
+    /// Sets the elevation angle for the bearing.
+    ///
+    /// The elevation must be in the range [-90°, 90°].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Bearing, coordinate_systems::Ned};
+    /// use uom::si::angle::degree;
+    /// use uom::si::f64::Angle;
+    ///
+    /// let builder = Bearing::<Ned>::builder()
+    ///     .elevation(Angle::new::<degree>(30.0));
+    /// ```
+    pub fn elevation(mut self, elevation: impl Into<Angle>) -> BearingBuilder<In, A, ElevationSet> {
+        self.elevation = Some(elevation.into());
+        BearingBuilder {
+            azimuth: self.azimuth,
+            elevation: self.elevation,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<In> BearingBuilder<In, AzimuthSet, ElevationSet> {
+    /// Builds the [`Bearing`] from the configured values.
+    ///
+    /// Returns `None` if the elevation is not in the range [-90°, 90°].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Bearing, coordinate_systems::Ned};
+    /// use uom::si::angle::degree;
+    /// use uom::si::f64::Angle;
+    ///
+    /// let bearing = Bearing::<Ned>::builder()
+    ///     .azimuth(Angle::new::<degree>(45.0))
+    ///     .elevation(Angle::new::<degree>(30.0))
+    ///     .build()
+    ///     .expect("elevation is within valid range");
+    ///
+    /// assert_eq!(bearing.azimuth().get::<degree>(), 45.0);
+    /// assert_eq!(bearing.elevation().get::<degree>(), 30.0);
+    /// ```
+    #[must_use]
+    pub fn build(self) -> Option<Bearing<In>> {
+        Bearing::new(self.azimuth.unwrap(), self.elevation.unwrap())
+    }
+}
+
 impl<In> Bearing<In> {
     /// Constructs a bearing towards the given azimuth and elevation in the [`CoordinateSystem`]
     /// `In`.
     ///
     /// The elevation must be in [-90°,90°] % 360°. If it is not, this function returns `None`.
+    ///
+    /// **Note**: This constructor is deprecated. Use [`Bearing::builder`] or
+    /// [`Bearing::from_components`] instead to avoid confusion about argument order.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Bearing, coordinate_systems::Ned};
+    /// use uom::si::angle::degree;
+    /// use uom::si::f64::Angle;
+    ///
+    /// let bearing = Bearing::<Ned>::new(
+    ///     Angle::new::<degree>(45.0),  // azimuth
+    ///     Angle::new::<degree>(30.0)   // elevation
+    /// ).expect("elevation is within valid range");
+    /// ```
     #[must_use]
+    #[deprecated(
+        since = "0.10.0",
+        note = "Use `Bearing::builder()` or `Bearing::from_components()` instead to avoid confusion about argument order"
+    )]
     pub fn new(azimuth: impl Into<Angle>, elevation: impl Into<Angle>) -> Option<Self> {
         let elevation = elevation.into();
         let elevation_signed = BoundedAngle::new(elevation).to_signed_range();
@@ -68,6 +235,57 @@ impl<In> Bearing<In> {
                 phantom_data: PhantomData,
             })
         }
+    }
+
+    /// Creates a new builder for constructing a [`Bearing`].
+    ///
+    /// This builder ensures that both azimuth and elevation are explicitly set
+    /// before the bearing can be built, preventing confusion about argument order.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Bearing, coordinate_systems::Ned};
+    /// use uom::si::angle::degree;
+    /// use uom::si::f64::Angle;
+    ///
+    /// let bearing = Bearing::<Ned>::builder()
+    ///     .azimuth(Angle::new::<degree>(45.0))
+    ///     .elevation(Angle::new::<degree>(30.0))
+    ///     .build()
+    ///     .expect("elevation is within valid range");
+    /// ```
+    pub fn builder() -> BearingBuilder<In, (), ()> {
+        BearingBuilder::new()
+    }
+
+    /// Constructs a bearing from a [`BearingComponents`] struct.
+    ///
+    /// This constructor ensures that azimuth and elevation are explicitly named,
+    /// preventing confusion about argument order.
+    ///
+    /// Returns `None` if the elevation is not in the range [-90°, 90°].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sguaba::{Bearing, coordinate_systems::Ned};
+    /// use sguaba::directions::BearingComponents;
+    /// use uom::si::angle::degree;
+    /// use uom::si::f64::Angle;
+    ///
+    /// let bearing = Bearing::<Ned>::from_components(BearingComponents {
+    ///     azimuth: Angle::new::<degree>(45.0),
+    ///     elevation: Angle::new::<degree>(30.0),
+    /// }).expect("elevation is within valid range");
+    ///
+    /// assert_eq!(bearing.azimuth().get::<degree>(), 45.0);
+    /// assert_eq!(bearing.elevation().get::<degree>(), 30.0);
+    /// ```
+    #[must_use]
+    pub fn from_components(components: BearingComponents) -> Option<Self> {
+        #[allow(deprecated)]
+        Self::new(components.azimuth, components.elevation)
     }
 
     /// Returns the azimuthal angle of this bearing.
@@ -168,7 +386,7 @@ impl<In> RelativeEq for Bearing<In> {
 mod tests {
     use crate::coordinate_systems::Frd;
     use crate::coordinates::Coordinate;
-    use crate::directions::Bearing;
+    use crate::directions::{Bearing, BearingComponents};
     use crate::util::BoundedAngle;
     use approx::{assert_abs_diff_eq, assert_relative_eq};
     use quickcheck::quickcheck;
@@ -203,10 +421,10 @@ mod tests {
     fn to_unit_vector(#[case] azimuth: f64, #[case] elevation: f64, #[case] expected: [f64; 3]) {
         use crate::Vector;
 
+        #[allow(deprecated)]
+        let bearing = Bearing::<Frd>::new(d(azimuth), d(elevation)).unwrap();
         assert_relative_eq!(
-            Bearing::<Frd>::new(d(azimuth), d(elevation))
-                .unwrap()
-                .to_unit_vector(),
+            bearing.to_unit_vector(),
             Vector::<Frd>::from_cartesian(m(expected[0]), m(expected[1]), m(expected[2]),)
         );
     }
@@ -415,5 +633,79 @@ mod tests {
 
             _assert_correct_angles((x, y, z), &frd_direction);
         }
+    }
+
+    #[test]
+    fn test_bearing_builder() {
+        // Test successful construction
+        let bearing = Bearing::<Frd>::builder()
+            .azimuth(d(45.))
+            .elevation(d(30.))
+            .build()
+            .unwrap();
+        assert_relative_eq!(bearing.azimuth().get::<degree>(), 45.);
+        assert_relative_eq!(bearing.elevation().get::<degree>(), 30.);
+
+        // Test elevation validation
+        let invalid = Bearing::<Frd>::builder()
+            .azimuth(d(45.))
+            .elevation(d(100.)) // Invalid elevation
+            .build();
+        assert!(invalid.is_none());
+
+        // Test order independence
+        let bearing2 = Bearing::<Frd>::builder()
+            .elevation(d(30.))
+            .azimuth(d(45.))
+            .build()
+            .unwrap();
+        assert_eq!(bearing.azimuth(), bearing2.azimuth());
+        assert_eq!(bearing.elevation(), bearing2.elevation());
+    }
+
+    #[test]
+    fn test_bearing_from_components() {
+        // Test successful construction
+        let components = BearingComponents {
+            azimuth: d(45.),
+            elevation: d(30.),
+        };
+        let bearing = Bearing::<Frd>::from_components(components).unwrap();
+        assert_relative_eq!(bearing.azimuth().get::<degree>(), 45.);
+        assert_relative_eq!(bearing.elevation().get::<degree>(), 30.);
+
+        // Test elevation validation
+        let invalid_components = BearingComponents {
+            azimuth: d(45.),
+            elevation: d(100.), // Invalid elevation
+        };
+        let invalid = Bearing::<Frd>::from_components(invalid_components);
+        assert!(invalid.is_none());
+    }
+
+    #[test]
+    fn test_bearing_constructors_equivalence() {
+        let azimuth = d(45.);
+        let elevation = d(30.);
+
+        // All three constructors should produce the same result
+        #[allow(deprecated)]
+        let bearing1 = Bearing::<Frd>::new(azimuth, elevation).unwrap();
+        
+        let bearing2 = Bearing::<Frd>::builder()
+            .azimuth(azimuth)
+            .elevation(elevation)
+            .build()
+            .unwrap();
+        
+        let bearing3 = Bearing::<Frd>::from_components(BearingComponents {
+            azimuth,
+            elevation,
+        }).unwrap();
+
+        assert_eq!(bearing1.azimuth(), bearing2.azimuth());
+        assert_eq!(bearing1.elevation(), bearing2.elevation());
+        assert_eq!(bearing2.azimuth(), bearing3.azimuth());
+        assert_eq!(bearing2.elevation(), bearing3.elevation());
     }
 }
