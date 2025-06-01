@@ -63,7 +63,7 @@ impl BoundedAngle {
 /// Every value that can be converted into an [`Angle`] can be converted into [`BoundedAngle`].
 impl<U: Into<Angle>> From<U> for BoundedAngle {
     fn from(value: U) -> Self {
-        BoundedAngle::new(value)
+        Self::new(value)
     }
 }
 

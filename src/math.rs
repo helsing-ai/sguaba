@@ -159,7 +159,7 @@ where
     unsafe fn ecef_to_ned_at(
         latitude: impl Into<Angle>,
         longitude: impl Into<Angle>,
-    ) -> Rotation<Ecef, To> {
+    ) -> Self {
         let phi = latitude.into().get::<radian>();
         let lambda = longitude.into().get::<radian>();
 
@@ -184,7 +184,7 @@ where
         );
         let rot = Rotation3::from_matrix(&matrix);
 
-        Rotation {
+        Self {
             inner: UnitQuaternion::from_rotation_matrix(&rot),
             from: PhantomData,
             to: PhantomData,

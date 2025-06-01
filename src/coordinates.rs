@@ -609,7 +609,7 @@ impl<In> Coordinate<In> {
     /// );
     /// ```
     #[must_use]
-    pub fn distance_from(&self, other: &Coordinate<In>) -> Length {
+    pub fn distance_from(&self, other: &Self) -> Length {
         (*other - *self).magnitude()
     }
 
@@ -723,10 +723,10 @@ impl<In> Sub<Self> for Coordinate<In> {
 }
 
 impl<In> Add<Vector<In>> for Coordinate<In> {
-    type Output = Coordinate<In>;
+    type Output = Self;
 
     fn add(self, rhs: Vector<In>) -> Self::Output {
-        Coordinate {
+        Self {
             point: self.point + rhs.inner,
             system: self.system,
         }
@@ -740,10 +740,10 @@ impl<In> AddAssign<Vector<In>> for Coordinate<In> {
 }
 
 impl<In> Sub<Vector<In>> for Coordinate<In> {
-    type Output = Coordinate<In>;
+    type Output = Self;
 
     fn sub(self, rhs: Vector<In>) -> Self::Output {
-        Coordinate {
+        Self {
             point: self.point - rhs.inner,
             system: self.system,
         }

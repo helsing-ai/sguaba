@@ -78,7 +78,7 @@ impl Wgs84 {
     /// Provides a constructor for a [`Wgs84`] coordinate.
     pub fn builder() -> Builder<MissingLatitude, MissingLongitude, MissingAltitude> {
         Builder {
-            under_construction: Wgs84 {
+            under_construction: Self {
                 latitude: Angle::ZERO,
                 longitude: Angle::ZERO,
                 altitude: Length::ZERO,
@@ -120,7 +120,7 @@ impl Wgs84 {
     /// [using the archaversine]: https://en.wikipedia.org/wiki/Haversine_formula#Formulation
     #[doc(alias = "great_circle_distance")]
     #[must_use]
-    pub fn haversine_distance_on_surface(&self, other: &Wgs84) -> Length {
+    pub fn haversine_distance_on_surface(&self, other: &Self) -> Length {
         let haversine = central_angle_by_inverse_haversine(
             self.latitude,
             other.latitude,
