@@ -156,10 +156,7 @@ where
     /// Furthermore, this function only applies rotation and _not_ translation, and is therefore
     /// not appropriate for turning [`Ecef`] into `To` on its own. See
     /// [`RigidBodyTransform::ecef_to_ned_at`].
-    unsafe fn ecef_to_ned_at(
-        latitude: impl Into<Angle>,
-        longitude: impl Into<Angle>,
-    ) -> Self {
+    unsafe fn ecef_to_ned_at(latitude: impl Into<Angle>, longitude: impl Into<Angle>) -> Self {
         let phi = latitude.into().get::<radian>();
         let lambda = longitude.into().get::<radian>();
 
