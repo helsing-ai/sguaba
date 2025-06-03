@@ -103,7 +103,7 @@ impl<In> Bearing<In> {
     /// Provides a constructor for a bearing in the [`CoordinateSystem`] `In`.
     pub fn builder() -> Builder<In, MissingAzimuth, MissingElevation> {
         Builder {
-            under_construction: Bearing {
+            under_construction: Self {
                 azimuth: Angle::ZERO,
                 elevation: Angle::ZERO,
                 system: PhantomData,

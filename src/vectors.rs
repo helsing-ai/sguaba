@@ -597,36 +597,36 @@ impl<In> Neg for Vector<In> {
     }
 }
 
-impl<In> Add<Vector<In>> for Vector<In> {
-    type Output = Vector<In>;
+impl<In> Add<Self> for Vector<In> {
+    type Output = Self;
 
-    fn add(self, rhs: Vector<In>) -> Self::Output {
-        Vector {
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
             inner: self.inner + rhs.inner,
             system: self.system,
         }
     }
 }
 
-impl<In> AddAssign<Vector<In>> for Vector<In> {
-    fn add_assign(&mut self, rhs: Vector<In>) {
+impl<In> AddAssign<Self> for Vector<In> {
+    fn add_assign(&mut self, rhs: Self) {
         self.inner += rhs.inner;
     }
 }
 
-impl<In> Sub<Vector<In>> for Vector<In> {
-    type Output = Vector<In>;
+impl<In> Sub<Self> for Vector<In> {
+    type Output = Self;
 
-    fn sub(self, rhs: Vector<In>) -> Self::Output {
-        Vector {
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
             inner: self.inner - rhs.inner,
             system: self.system,
         }
     }
 }
 
-impl<In> SubAssign<Vector<In>> for Vector<In> {
-    fn sub_assign(&mut self, rhs: Vector<In>) {
+impl<In> SubAssign<Self> for Vector<In> {
+    fn sub_assign(&mut self, rhs: Self) {
         self.inner -= rhs.inner;
     }
 }
@@ -660,7 +660,7 @@ impl<In> Div<f64> for Vector<In> {
 }
 
 impl<In> Div<Length> for Vector<In> {
-    type Output = Vector<In>;
+    type Output = Self;
 
     fn div(self, rhs: Length) -> Self::Output {
         self / rhs.get::<meter>()
@@ -668,7 +668,7 @@ impl<In> Div<Length> for Vector<In> {
 }
 
 impl<In> Mul<Length> for Vector<In> {
-    type Output = Vector<In>;
+    type Output = Self;
 
     fn mul(self, rhs: Length) -> Self::Output {
         self * rhs.get::<meter>()
