@@ -22,7 +22,7 @@ use crate::geodedic::Wgs84;
 use crate::systems::EquivalentTo;
 use crate::vectors::Vector;
 use crate::Bearing;
-use crate::{systems::NedLike, CoordinateSystem, Isometry3, UnitQuaternion};
+use crate::{systems::{NedLike, EnuLike}, CoordinateSystem, Isometry3, UnitQuaternion};
 use nalgebra::{Matrix3, Rotation3, Translation3};
 use std::convert::From;
 use std::fmt;
@@ -178,6 +178,61 @@ where
             cos_phi,
             0.,
             -sin_phi,
+        );
+        let rot = Rotation3::from_matrix(&matrix);
+
+        Self {
+            inner: UnitQuaternion::from_rotation_matrix(&rot),
+            from: PhantomData,
+            to: PhantomData,
+        }
+    }
+}
+
+impl<To> Rotation<Ecef, To>
+where
+    To: CoordinateSystem<Convention = EnuLike>,
+{
+    /// Constructs the rotation from [`Ecef`] to [`EnuLike`] at the given latitude and longitude.
+    ///
+    /// The lat/lon is needed because the orientation of East and North with respect to ECEF depends on
+    /// where on the globe you are.
+    ///
+    /// See also
+    /// <https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates#Local_east,_north,_up_(ENU)_coordinates>.
+    ///
+    /// # Safety
+    ///
+    /// This function only produces a valid transform from [`Ecef`] to the ENU-like `To` if
+    /// [`Coordinate::<To>::origin()`](Coordinate::origin) lies at the provided lat/lon. If that is
+    /// not the case, the returned `Rotation` will allow moving from [`Ecef`] to `To` without the
+    /// appropriate transformation of the components of the input, leading to outputs that are
+    /// typed to be in `To` but are in fact not.
+    ///
+    /// Furthermore, this function only applies rotation and _not_ translation, and is therefore
+    /// not appropriate for turning [`Ecef`] into `To` on its own. See
+    /// [`RigidBodyTransform::ecef_to_enu_at`].
+    unsafe fn ecef_to_enu_at(latitude: impl Into<Angle>, longitude: impl Into<Angle>) -> Self {
+        let phi = latitude.into().get::<radian>();
+        let lambda = longitude.into().get::<radian>();
+
+        let sin_phi = phi.sin();
+        let cos_phi = phi.cos();
+        let sin_lambda = lambda.sin();
+        let cos_lambda = lambda.cos();
+
+        // Standard ENU transformation matrix from ECEF coordinates
+        // East, North, Up = E, N, U (no column swapping or negation like NED)
+        let matrix = Matrix3::new(
+            -sin_lambda,
+            -cos_lambda * sin_phi,
+            cos_lambda * cos_phi,
+            cos_lambda,
+            -sin_lambda * sin_phi,
+            sin_lambda * cos_phi,
+            0.,
+            cos_phi,
+            sin_phi,
         );
         let rot = Rotation3::from_matrix(&matrix);
 
@@ -743,6 +798,38 @@ where
     }
 }
 
+impl<To> RigidBodyTransform<Ecef, To>
+where
+    To: CoordinateSystem<Convention = EnuLike>,
+{
+    /// Constructs the transformation from [`Ecef`] to [`EnuLike`] at the given WGS84 position.
+    ///
+    /// The position is needed because the orientation of East and North with respect to ECEF depends on
+    /// where on the globe you are.
+    ///
+    /// See also
+    /// <https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates#Local_east,_north,_up_(ENU)_coordinates>.
+    ///
+    /// # Safety
+    ///
+    /// This function only produces a valid transform from [`Ecef`] to the ENU-like `To` if
+    /// [`Coordinate::<To>::origin()`](Coordinate::origin) lies at the provided position. If that is
+    /// not the case, the returned `RigidBodyTransform` will allow moving from [`Ecef`] to `To`
+    /// without the appropriate transformation of the components of the input, leading to outputs
+    /// that are typed to be in `To` but are in fact not.
+    #[must_use]
+    pub unsafe fn ecef_to_enu_at(position: &Wgs84) -> Self {
+        let ecef = Coordinate::<Ecef>::from_wgs84(position);
+        let translation = Vector::from(ecef);
+
+        // SAFETY: same safety caveat as us + we will also apply the necessary translation.
+        let rotation = unsafe { Rotation::ecef_to_enu_at(position.latitude, position.longitude) };
+
+        // SAFETY: this is indeed a correct transform from ECEF to an ENU at `position`.
+        unsafe { Self::new(translation, rotation) }
+    }
+}
+
 impl<From, To> RigidBodyTransform<From, To> {
     /// Constructs a transform directly from a translation and a rotation.
     ///
@@ -1186,7 +1273,9 @@ mod tests {
 
     system!(struct PlaneFrd using FRD);
     system!(struct PlaneNed using NED);
+    system!(struct PlaneEnu using ENU);
     system!(struct PlaneBNed using NED);
+    system!(struct PlaneBEnu using ENU);
     system!(struct SensorFrd using FRD);
     system!(struct EmitterFrd using FRD);
 
@@ -1963,5 +2052,182 @@ mod tests {
             ),
             BoundedAngle::new(d(-90.))
         );
+    }
+
+    #[rstest]
+    #[case(d(47.9948211), d(7.8211606), m(1000.))]
+    #[case(d(67.112282), d(19.880389), m(0.))]
+    #[case(d(84.883074), d(-29.160550), m(2000.))]
+    #[case(d(-27.270950), d(143.722880), m(100.))]
+    fn orientation_ecef_to_enu_construction(
+        #[case] lat: Angle,
+        #[case] long: Angle,
+        #[case] alt: Length,
+    ) {
+        // Test ECEF to ENU transformations work correctly
+
+        let ecef_to_enu = unsafe { Rotation::<Ecef, PlaneEnu>::ecef_to_enu_at(lat, long) };
+
+        // Test basic ENU axis orientations
+        let point_on_east = Coordinate::<PlaneEnu>::origin() + Vector::<PlaneEnu>::enu_east_axis();
+        let point_on_north = Coordinate::<PlaneEnu>::origin() + Vector::<PlaneEnu>::enu_north_axis();
+        let point_on_up = Coordinate::<PlaneEnu>::origin() + Vector::<PlaneEnu>::enu_up_axis();
+
+        let result_east = ecef_to_enu.inverse_transform(point_on_east);
+        let result_north = ecef_to_enu.inverse_transform(point_on_north);
+        let result_up = ecef_to_enu.inverse_transform(point_on_up);
+
+        // The ENU axes should transform correctly to ECEF
+        // (Note: we're testing the rotation only, so no translation offset)
+        assert_relative_eq!(
+            ecef_to_enu.transform(result_east),
+            point_on_east,
+        );
+        assert_relative_eq!(
+            ecef_to_enu.transform(result_north),
+            point_on_north,
+        );
+        assert_relative_eq!(
+            ecef_to_enu.transform(result_up),
+            point_on_up,
+        );
+
+        // Test that the rigid body transform works correctly
+        let pose = unsafe {
+            RigidBodyTransform::<Ecef, PlaneEnu>::ecef_to_enu_at(
+                &Wgs84::builder()
+                    .latitude(lat)
+                    .expect("latitude is in-range")
+                    .longitude(long)
+                    .altitude(alt)
+                    .build(),
+            )
+        };
+
+        // The pose should include both rotation and translation
+        let transformed_east = pose.inverse_transform(point_on_east);
+        let transformed_north = pose.inverse_transform(point_on_north);
+        let transformed_up = pose.inverse_transform(point_on_up);
+
+        // Transform back should give us the original points
+        assert_relative_eq!(pose.transform(transformed_east), point_on_east);
+        assert_relative_eq!(pose.transform(transformed_north), point_on_north);
+        assert_relative_eq!(pose.transform(transformed_up), point_on_up);
+    }
+
+    #[test] 
+    fn enu_and_frd_coordinate_transforms_work() {
+        // Test transformations between ENU and FRD coordinate systems
+        let yaw = d(45.);
+        let pitch = d(30.);
+        let roll = d(15.);
+
+        let enu_to_frd = unsafe {
+            Rotation::<PlaneEnu, PlaneFrd>::from_tait_bryan_angles(yaw, pitch, roll)
+        };
+
+        // Test some basic coordinate transformations
+        let east_point = coordinate!(e = m(1.), n = m(0.), u = m(0.); in PlaneEnu);
+        let north_point = coordinate!(e = m(0.), n = m(1.), u = m(0.); in PlaneEnu);
+        let up_point = coordinate!(e = m(0.), n = m(0.), u = m(1.); in PlaneEnu);
+
+        let east_in_frd = enu_to_frd.transform(east_point);
+        let north_in_frd = enu_to_frd.transform(north_point);
+        let up_in_frd = enu_to_frd.transform(up_point);
+
+        // Transform back to verify roundtrip
+        assert_relative_eq!(enu_to_frd.inverse_transform(east_in_frd), east_point);
+        assert_relative_eq!(enu_to_frd.inverse_transform(north_in_frd), north_point);
+        assert_relative_eq!(enu_to_frd.inverse_transform(up_in_frd), up_point);
+
+        // Test with rigid body transform (adding translation)
+        let translation = Vector3::new(2., 3., 1.);
+        let enu_pose = unsafe {
+            RigidBodyTransform::<PlaneEnu, PlaneFrd>::new(
+                Vector::from_nalgebra_vector(translation),
+                enu_to_frd,
+            )
+        };
+
+        let east_after_pose = enu_pose.transform(east_point);
+        let east_back = enu_pose.inverse_transform(east_after_pose);
+        assert_relative_eq!(east_point, east_back);
+    }
+
+    #[test]
+    fn enu_ned_conversion_relationship() {
+        // Test the relationship between ENU and NED coordinate systems
+        // ENU: (East, North, Up) vs NED: (North, East, Down)
+        // The relationship should be: ENU(e,n,u) = NED(n,e,-u)
+
+        let lat = d(52.);
+        let long = d(-3.);
+
+        let ecef_to_enu = unsafe { Rotation::<Ecef, PlaneEnu>::ecef_to_enu_at(lat, long) };
+        let ecef_to_ned = unsafe { Rotation::<Ecef, PlaneNed>::ecef_to_ned_at(lat, long) };
+
+        // Create test points in ENU and NED
+        let enu_point = coordinate!(e = m(10.), n = m(20.), u = m(5.); in PlaneEnu);
+        let ned_point = coordinate!(n = m(20.), e = m(10.), d = m(-5.); in PlaneNed);
+
+        // Transform both to ECEF
+        let enu_in_ecef = ecef_to_enu.inverse_transform(enu_point);
+        let ned_in_ecef = ecef_to_ned.inverse_transform(ned_point);
+
+        // They should be the same point in ECEF (since they represent the same physical location)
+        assert_relative_eq!(enu_in_ecef, ned_in_ecef, epsilon = m(1e-10));
+    }
+
+    #[test]
+    fn enu_bearing_transformations() {
+        // Test bearing transformations in ENU coordinate system
+        
+        // Create an ENU to FRD transformation where forward points East
+        let enu_to_frd = unsafe {
+            Rotation::<PlaneEnu, PlaneFrd>::from_tait_bryan_angles(d(0.), d(0.), d(0.))
+        };
+
+        // A bearing pointing East (0° azimuth in ENU) should point forward (0° azimuth in FRD)
+        let east_bearing_enu = Bearing::<PlaneEnu>::build(Components {
+            azimuth: d(0.),    // East in ENU
+            elevation: d(45.), 
+        }).unwrap();
+
+        let east_bearing_frd = east_bearing_enu * enu_to_frd;
+        let expected_frd = Bearing::<PlaneFrd>::build(Components {
+            azimuth: d(0.),    // Forward in FRD
+            elevation: d(-45.), // Note: negative because ENU's +Z (up) maps to FRD's -Z direction
+        }).unwrap();
+
+        assert_relative_eq!(east_bearing_frd, expected_frd);
+
+        // A bearing pointing North (90° azimuth in ENU) should point right (90° azimuth in FRD)
+        let north_bearing_enu = Bearing::<PlaneEnu>::build(Components {
+            azimuth: d(90.),   // North in ENU  
+            elevation: d(30.),
+        }).unwrap();
+
+        let north_bearing_frd = north_bearing_enu * enu_to_frd;
+        let expected_north_frd = Bearing::<PlaneFrd>::build(Components {
+            azimuth: d(90.),   // Right in FRD (not left)
+            elevation: d(-30.), // Note: negative because ENU's +Z (up) maps to FRD's -Z direction
+        }).unwrap();
+
+        assert_relative_eq!(north_bearing_frd, expected_north_frd);
+    }
+
+    #[test] 
+    fn enu_pose_serde() {
+        // Test serialization/deserialization of ENU poses
+        let pose = unsafe {
+            RigidBodyTransform::new(
+                vector!(e = m(50.), n = m(45.), u = m(10.)),
+                Rotation::<PlaneEnu, PlaneFrd>::from_tait_bryan_angles(d(15.), d(0.), d(1.)),
+            )
+        };
+
+        let ser = serde_yaml::to_string(&pose).unwrap();
+        let de = serde_yaml::from_str::<RigidBodyTransform<PlaneEnu, PlaneFrd>>(&ser).unwrap();
+        assert_eq!(pose, de);
     }
 }

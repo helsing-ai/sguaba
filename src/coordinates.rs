@@ -1,5 +1,5 @@
 use crate::coordinate_systems::{
-    CoordinateSystem, FrdLike, HasComponents, NedLike, RightHandedXyzLike,
+    CoordinateSystem, FrdLike, HasComponents, NedLike, RightHandedXyzLike, EnuLike,
 };
 use crate::directions::Bearing;
 use crate::math::RigidBodyTransform;
@@ -146,6 +146,13 @@ macro_rules! coordinate {
             north: $n.into(),
             east: $e.into(),
             down: $d.into(),
+        })
+    };
+    (e = $e:expr, n = $n:expr, u = $u:expr; in $in:ty) => {
+        $crate::Coordinate::<$in>::build($crate::systems::EnuComponents {
+            east: $e.into(),
+            north: $n.into(),
+            up: $u.into(),
         })
     };
     (f = $f:expr, r = $r:expr, d = $d:expr; in $in:ty) => {
@@ -546,6 +553,7 @@ accessors!(RightHandedXyzLike using x, y, z + x_axis, y_axis, z_axis);
 // today (see https://github.com/rust-lang/rfcs/pull/1672).
 accessors!(NedLike using ned_north, ned_east, ned_down + ned_north_axis, ned_east_axis, ned_down_axis);
 accessors!(FrdLike using frd_front, frd_right, frd_down + frd_front_axis, frd_right_axis, frd_down_axis);
+accessors!(EnuLike using enu_east, enu_north, enu_up + enu_east_axis, enu_north_axis, enu_up_axis);
 
 impl<In> Coordinate<In> {
     /// Returns the cartesian components of this coordinate in XYZ order.
@@ -823,6 +831,7 @@ macro_rules! constructor {
 constructor!(RightHandedXyzLike, [x, y, z]);
 constructor!(NedLike, [ned_north, ned_east, ned_down]);
 constructor!(FrdLike, [frd_front, frd_right, frd_down]);
+constructor!(EnuLike, [enu_east, enu_north, enu_up]);
 
 #[cfg(test)]
 mod tests {

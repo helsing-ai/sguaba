@@ -178,6 +178,53 @@ impl HasComponents for FrdLike {
     type Components = FrdComponents;
 }
 
+/// Marks an ENU-like coordinate system where the axes are East, North, and Up.
+///
+/// ENUs are always right-handed coordinate systems, and have earth bounded axes:
+///
+/// - Positive X is East.
+/// - Positive Y is North.
+/// - Positive Z is away from the center of the earth ("Up").
+///
+/// Note that two ENU-like coordinate systems may have different "absolute" Earth-bound coordinates
+/// for their origin. For example, two different aircraft may both define their observations in
+/// ENU-like coordinate systems, but for each aircraft, (0, 0, 0) corresponds to the location of
+/// that aircraft. Thus, an object observed at, say, (10, 20, 30) in one aircraft's local ENU-like
+/// coordinate system will have completely different coordinates in the other aircraft's local
+/// ENU-like coordinate system.
+///
+/// Since ENU has earth bounded axes, two observers that are located in the same place but face in
+/// different directions, they will still have the same ENU-like coordinates to a given emitter.
+///
+/// [Bearing](BearingDefined) in ENU-like coordinate systems are defined as:
+///
+/// - azimuth is the angle counterclockwise as seen from above along the horizontal plane from East; and
+/// - elevation is the angle upwards from the horizontal plane.
+///
+/// <https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates#Local_east,_north,_up_(ENU)_coordinates>
+pub struct EnuLike;
+
+/// Components for Cartesian points in an [`EnuLike`] coordinate system.
+///
+/// Usually provided to methods like [`Coordinate::build`] or [`Vector::build`].
+#[derive(Debug, Clone, Copy)]
+#[must_use]
+pub struct EnuComponents {
+    pub east: Length,
+    pub north: Length,
+    pub up: Length,
+}
+
+impl From<EnuComponents> for [Length; 3] {
+    fn from(c: EnuComponents) -> [Length; 3] {
+        [c.east, c.north, c.up]
+    }
+}
+
+impl HasComponents for EnuLike {
+    type Components = EnuComponents;
+}
+
 /// Marks a coordinate system whose axes are simply named X, Y, and Z.
 ///
 /// Unlike [`NedLike`] and [`FrdLike`], there is no intrinsic relationship between XYZ-like
@@ -222,6 +269,13 @@ impl HasComponents for RightHandedXyzLike {
 /// system!(pub struct SensorNed using NED);
 /// ```
 ///
+/// [`EnuLike`]
+///
+/// ```rust
+/// # use sguaba::system;
+/// system!(pub struct SensorEnu using ENU);
+/// ```
+///
 /// [`FrdLike`]
 ///
 /// ```rust
@@ -258,6 +312,10 @@ macro_rules! system {
         $crate::system!($(#[$attr])* $vis struct $name as FrdLike);
         $crate::system!(_clockwise_from_x_and_negative_z_bearing, $name);
     };
+    ($(#[$attr:meta])* $vis:vis struct $name:ident using ENU) => {
+        $crate::system!($(#[$attr])* $vis struct $name as EnuLike);
+        $crate::system!(_counterclockwise_from_x_and_positive_z_bearing, $name);
+    };
     (_clockwise_from_x_and_negative_z_bearing, $name:ident) => {
         /// For this coordinate system:
         ///
@@ -290,6 +348,42 @@ macro_rules! system {
             ) -> Option<$crate::Bearing<Self>> {
                 // just the inverse of the above
                 let elevation = polar.into() - $crate::AngleForBearingTrait::HALF_TURN/2.;
+                #[allow(clippy::redundant_locals)]
+                let azimuth = azimuth.into();
+
+                Some($crate::Bearing::builder().azimuth(azimuth).elevation(elevation)?.build())
+            }
+        }
+    };
+    (_counterclockwise_from_x_and_positive_z_bearing, $name:ident) => {
+        /// For this coordinate system:
+        ///
+        /// - azimuth is the angle counterclockwise about positive Z along the XY plane from the
+        ///   positive X axis; and
+        /// - elevation is the angle towards _positive_ Z from the XY plane.
+        impl $crate::systems::BearingDefined for $name {
+            fn bearing_to_spherical(bearing: $crate::Bearing<Self>)
+            -> (
+                $crate::AngleForBearingTrait,
+                $crate::AngleForBearingTrait
+            ) {
+                // elevation is just shifted by 90°; the polar angle is with respect to positive Z,
+                // not XY plane, meaning an elevation of 0° is a polar angle of 90°, and an
+                // elevation of 90° (which is towards positive Z) is a polar angle of 0°.
+                let polar = $crate::AngleForBearingTrait::HALF_TURN/2. - bearing.elevation();
+
+                // azimuth is defined the same in spherical coordinates and bearing (both are angle
+                // counterclockwise from positive X in the XY plane).
+                let azimuth = bearing.azimuth();
+
+                (polar, azimuth)
+            }
+            fn spherical_to_bearing(
+                polar: impl Into<$crate::AngleForBearingTrait>,
+                azimuth: impl Into<$crate::AngleForBearingTrait>
+            ) -> Option<$crate::Bearing<Self>> {
+                // just the inverse of the above
+                let elevation = $crate::AngleForBearingTrait::HALF_TURN/2. - polar.into();
                 #[allow(clippy::redundant_locals)]
                 let azimuth = azimuth.into();
 
@@ -344,4 +438,10 @@ system! {
     // ditto for "using FRD"
     #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
     pub(crate) struct Frd using FRD
+}
+
+system! {
+    // ditto for "using ENU"
+    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+    pub(crate) struct Enu using ENU
 }

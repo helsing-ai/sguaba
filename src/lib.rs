@@ -25,9 +25,9 @@
 //! If you're new to working with coordinate systems and frames of reference, you may wonder what
 //! coordinate systems there are in the first place, and how they differ. There are a wide variety
 //! of ways to describe the locations of objects in space, all of which have their own slight
-//! peculiarities about representation and conversion. At the time of writing, the four coordinate
+//! peculiarities about representation and conversion. At the time of writing, the coordinate
 //! systems this crate supports are: [WGS84] (latitude and longitude), [ECEF] ("Earth-centered,
-//! Earth-fixed"), [NED] ("North, East, Down"), and [FRD] ("Front, Right, Down").
+//! Earth-fixed"), [NED] ("North, East, Down"), [ENU] ("East, North, Up"), and [FRD] ("Front, Right, Down").
 //!
 //! [WGS84] ([`Wgs84`](systems::Wgs84)) and [ECEF] ([`Ecef`](systems::Ecef)) are both Earth-bound
 //! coordinate systems that describe points in space on or near Earth. They do this by describing
@@ -38,21 +38,23 @@
 //! towards specific points on the Earth's surface. One can convert between them [without too much
 //! trouble][trouble].
 //!
-//! [NED] ([`NedLike`](systems::NedLike)) and [FRD] ([`FrdLike`](systems::FrdLike)) on the other
+//! [NED] ([`NedLike`](systems::NedLike)), [ENU] ([`EnuLike`](systems::EnuLike)), and [FRD] ([`FrdLike`](systems::FrdLike)) on the other
 //! hand are "local" coordinate systems that are descriptions of relative positions to the location
-//! of the observer. [NED] is still Earth-bound in that it describes positions in terms of how far
-//! North, East, and Down (towards Earth's core) they are relative to the observer. [FRD],
+//! of the observer. [NED] and [ENU] are still Earth-bound in that they describe positions in 
+//! terms of how far North, East, and Down (for NED) or East, North, and Up (for ENU) they are 
+//! relative to the observer. [FRD],
 //! meanwhile, is a "body frame", and just describes positions relative to the observer's concept
 //! of Forward (eg, the direction pointing in the same direction as the nose of a plane), Right
 //! (eg, the direction 90º to the right when viewing along Forward), and Down (eg, down through the
-//! belly of the plane). Converting between [FRD] and [NED] usually requires knowing the
-//! orientation of the observer relative to North, East, and Down, and converting between [NED] and
-//! [ECEF] (or [WGS84]) requires also knowing the position of the observer in Earth-bound
-//! coordinates.
+//! belly of the plane). Converting between [FRD] and [NED] or [ENU] usually requires knowing the
+//! orientation of the observer relative to North, East, and Down/Up, and converting between 
+//! [NED]/[ENU] and [ECEF] (or [WGS84]) requires also knowing the position of the observer in 
+//! Earth-bound coordinates.
 //!
 //! [WGS84]: https://en.wikipedia.org/wiki/World_Geodetic_System#WGS84
 //! [ECEF]: https://en.wikipedia.org/wiki/Earth-centered,_Earth-fixed_coordinate_system
 //! [NED]: https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates#Local_north,_east,_down_(NED)_coordinates
+//! [ENU]: https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates#Local_east,_north,_up_(ENU)_coordinates
 //! [FRD]: https://en.wikipedia.org/wiki/Body_relative_direction
 //! [axes]: https://en.wikipedia.org/wiki/Axes_conventions
 //! [trouble]: https://en.wikipedia.org/wiki/Geographic_coordinate_conversion#Coordinate_system_conversion
@@ -250,10 +252,10 @@ pub type AngleForBearingTrait = uom::si::f64::Angle;
 /// Well-known coordinate systems and conventions.
 pub mod systems {
     pub use super::coordinate_systems::{
-        BearingDefined, Ecef, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike,
+        BearingDefined, Ecef, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike, EnuLike,
     };
     pub use super::coordinate_systems::{
-        FrdComponents, HasComponents, NedComponents, XyzComponents,
+        FrdComponents, HasComponents, NedComponents, XyzComponents, EnuComponents,
     };
     pub use super::geodedic::Wgs84;
 }
