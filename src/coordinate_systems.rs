@@ -198,7 +198,7 @@ impl HasComponents for FrdLike {
 ///
 /// [Bearing](BearingDefined) in ENU-like coordinate systems are defined as:
 ///
-/// - azimuth is the angle counterclockwise as seen from above along the horizontal plane from East; and
+/// - azimuth is the angle clockwise as seen from above along the horizontal plane from North; and
 /// - elevation is the angle upwards from the horizontal plane.
 ///
 /// <https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates#Local_east,_north,_up_(ENU)_coordinates>
@@ -314,7 +314,7 @@ macro_rules! system {
     };
     ($(#[$attr:meta])* $vis:vis struct $name:ident using ENU) => {
         $crate::system!($(#[$attr])* $vis struct $name as EnuLike);
-        $crate::system!(_counterclockwise_from_x_and_positive_z_bearing, $name);
+        $crate::system!(_clockwise_from_y_and_positive_z_bearing, $name);
     };
     (_clockwise_from_x_and_negative_z_bearing, $name:ident) => {
         /// For this coordinate system:
@@ -355,11 +355,11 @@ macro_rules! system {
             }
         }
     };
-    (_counterclockwise_from_x_and_positive_z_bearing, $name:ident) => {
+    (_clockwise_from_y_and_positive_z_bearing, $name:ident) => {
         /// For this coordinate system:
         ///
-        /// - azimuth is the angle counterclockwise about positive Z along the XY plane from the
-        ///   positive X axis; and
+        /// - azimuth is the angle clockwise about positive Z along the XY plane from the
+        ///   positive Y axis; and
         /// - elevation is the angle towards _positive_ Z from the XY plane.
         impl $crate::systems::BearingDefined for $name {
             fn bearing_to_spherical(bearing: $crate::Bearing<Self>)
@@ -372,9 +372,7 @@ macro_rules! system {
                 // elevation of 90° (which is towards positive Z) is a polar angle of 0°.
                 let polar = $crate::AngleForBearingTrait::HALF_TURN/2. - bearing.elevation();
 
-                // azimuth is defined the same in spherical coordinates and bearing (both are angle
-                // counterclockwise from positive X in the XY plane).
-                let azimuth = bearing.azimuth();
+                let azimuth = $crate::AngleForBearingTrait::HALF_TURN/2. - bearing.azimuth();
 
                 (polar, azimuth)
             }
@@ -385,7 +383,7 @@ macro_rules! system {
                 // just the inverse of the above
                 let elevation = $crate::AngleForBearingTrait::HALF_TURN/2. - polar.into();
                 #[allow(clippy::redundant_locals)]
-                let azimuth = azimuth.into();
+                let azimuth = $crate::AngleForBearingTrait::HALF_TURN/2. - azimuth.into();
 
                 Some($crate::Bearing::builder().azimuth(azimuth).elevation(elevation)?.build())
             }

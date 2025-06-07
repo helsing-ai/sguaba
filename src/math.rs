@@ -2187,9 +2187,9 @@ mod tests {
             Rotation::<PlaneEnu, PlaneFrd>::from_tait_bryan_angles(d(0.), d(0.), d(0.))
         };
 
-        // A bearing pointing East (0° azimuth in ENU) should point forward (0° azimuth in FRD)
+        // A bearing pointing East (90° azimuth in ENU) should point forward (0° azimuth in FRD)
         let east_bearing_enu = Bearing::<PlaneEnu>::build(Components {
-            azimuth: d(0.),    // East in ENU
+            azimuth: d(90.),
             elevation: d(45.), 
         }).unwrap();
 
@@ -2201,15 +2201,15 @@ mod tests {
 
         assert_relative_eq!(east_bearing_frd, expected_frd);
 
-        // A bearing pointing North (90° azimuth in ENU) should point right (90° azimuth in FRD)
+        // A bearing pointing North (0° azimuth in ENU) should point right (90° azimuth in FRD)
         let north_bearing_enu = Bearing::<PlaneEnu>::build(Components {
-            azimuth: d(90.),   // North in ENU  
+            azimuth: d(0.),
             elevation: d(30.),
         }).unwrap();
 
         let north_bearing_frd = north_bearing_enu * enu_to_frd;
         let expected_north_frd = Bearing::<PlaneFrd>::build(Components {
-            azimuth: d(90.),   // Right in FRD (not left)
+            azimuth: d(90.),   // Right in FRD
             elevation: d(-30.), // Note: negative because ENU's +Z (up) maps to FRD's -Z direction
         }).unwrap();
 
