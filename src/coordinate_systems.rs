@@ -66,6 +66,11 @@ unsafe impl<System> EquivalentTo<System> for System {}
 /// Note that the "counterclockwise" above is around Z-axis as viewed from positive Z, which in
 /// [`NedLike`] and [`FrdLike`] is _down_, so viewed from "above" positive azimuth will look
 /// clockwise (as expected).
+/// 
+/// And for the [`EnuLike`] coordinate system:
+/// 
+/// - azimuth is the angle clockwise about positive Z along the XY plane from positive Y; and
+/// - elevation is the angle towards positive Z from the XY plane.
 pub trait BearingDefined: Sized {
     /// Returns the spherical-coordinate polar and azimuthal angles equivalent to a bearing.
     fn bearing_to_spherical(bearing: Bearing<Self>) -> (Angle, Angle);
@@ -367,11 +372,13 @@ macro_rules! system {
                 $crate::AngleForBearingTrait,
                 $crate::AngleForBearingTrait
             ) {
-                // elevation is just shifted by 90°; the polar angle is with respect to positive Z,
-                // not XY plane, meaning an elevation of 0° is a polar angle of 90°, and an
-                // elevation of 90° (which is towards positive Z) is a polar angle of 0°.
+                // elevation is flipped and shifted by 90°; the polar angle is with respect to
+                // positive Z, not XY plane, meaning an elevation of 0° is a polar angle of 90°,
+                // and an elevation of 90° (which is towards positive Z) is a polar angle of 0°.
                 let polar = $crate::AngleForBearingTrait::HALF_TURN/2. - bearing.elevation();
 
+                // azimuth is flipped and shifted by 90°; in spherical coordinates azimuth increases
+                // counterclockwise about positive Z along the XY place from the positive X axis.
                 let azimuth = $crate::AngleForBearingTrait::HALF_TURN/2. - bearing.azimuth();
 
                 (polar, azimuth)

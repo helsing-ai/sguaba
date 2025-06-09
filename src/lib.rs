@@ -27,7 +27,8 @@
 //! of ways to describe the locations of objects in space, all of which have their own slight
 //! peculiarities about representation and conversion. At the time of writing, the coordinate
 //! systems this crate supports are: [WGS84] (latitude and longitude), [ECEF] ("Earth-centered,
-//! Earth-fixed"), [NED] ("North, East, Down"), [ENU] ("East, North, Up"), and [FRD] ("Front, Right, Down").
+//! Earth-fixed"), [NED] ("North, East, Down"), [FRD] ("Front, Right, Down"), and [ENU] ("East,
+//! North, Up").
 //!
 //! [WGS84] ([`Wgs84`](systems::Wgs84)) and [ECEF] ([`Ecef`](systems::Ecef)) are both Earth-bound
 //! coordinate systems that describe points in space on or near Earth. They do this by describing
@@ -38,18 +39,18 @@
 //! towards specific points on the Earth's surface. One can convert between them [without too much
 //! trouble][trouble].
 //!
-//! [NED] ([`NedLike`](systems::NedLike)), [ENU] ([`EnuLike`](systems::EnuLike)), and [FRD] ([`FrdLike`](systems::FrdLike)) on the other
-//! hand are "local" coordinate systems that are descriptions of relative positions to the location
-//! of the observer. [NED] and [ENU] are still Earth-bound in that they describe positions in 
-//! terms of how far North, East, and Down (for NED) or East, North, and Up (for ENU) they are 
-//! relative to the observer. [FRD],
-//! meanwhile, is a "body frame", and just describes positions relative to the observer's concept
-//! of Forward (eg, the direction pointing in the same direction as the nose of a plane), Right
-//! (eg, the direction 90º to the right when viewing along Forward), and Down (eg, down through the
-//! belly of the plane). Converting between [FRD] and [NED] or [ENU] usually requires knowing the
-//! orientation of the observer relative to North, East, and Down/Up, and converting between 
-//! [NED]/[ENU] and [ECEF] (or [WGS84]) requires also knowing the position of the observer in 
-//! Earth-bound coordinates.
+//! [NED] ([`NedLike`](systems::NedLike)), [FRD] ([`FrdLike`](systems::FrdLike)), and [ENU]
+//! ([`EnuLike`](systems::EnuLike)) on the other hand are "local" coordinate systems that are
+//! descriptions of relative positions to the location of the observer. [NED] and [ENU] are
+//! Earth-bound in that they describe positions in terms of how far North, East, and Down (for NED)
+//! or East, North, and Up (for ENU) they are relative to the observer. [FRD], meanwhile, is a
+//! "body frame", and just describes positions relative to the observer's concept of Forward (eg,
+//! the direction pointing in the same direction as the nose of a plane), Right (eg, the direction
+//! 90º to the right when viewing along Forward), and Down (eg, down through the belly of the
+//! plane). Converting between [FRD] and [NED] or [ENU] usually requires knowing the orientation of
+//! the observer relative to North, East, and Down/Up, and converting between [NED]/[ENU] and
+//! [ECEF] (or [WGS84]) requires also knowing the position of the observer in Earth-bound
+//! coordinates.
 //!
 //! [WGS84]: https://en.wikipedia.org/wiki/World_Geodetic_System#WGS84
 //! [ECEF]: https://en.wikipedia.org/wiki/Earth-centered,_Earth-fixed_coordinate_system

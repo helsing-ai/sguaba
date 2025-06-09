@@ -1249,7 +1249,7 @@ impl<From, To> RelativeEq for RigidBodyTransform<From, To> {
 #[cfg(test)]
 mod tests {
     use crate::builder::bearing::Components;
-    use crate::coordinate_systems::{Ecef, Frd, Ned};
+    use crate::coordinate_systems::{Ecef, Frd, Ned, Enu};
     use crate::coordinates::Coordinate;
     use crate::geodedic::Wgs84;
     use crate::math::{RigidBodyTransform, Rotation};
@@ -1458,7 +1458,38 @@ mod tests {
         );
         // Check from FRD to NED
         let ned_again_after_pose = ned_pose.inverse_transform(frd_after_pose);
-        assert_relative_eq!(ned, ned_again_after_pose)
+        assert_relative_eq!(ned, ned_again_after_pose);
+
+        // Check that orientation works between ENU and FRD coordinates. These work with the 
+        // same test cases because Rotation::<Ned, Frd> and Rotation::<Enu, Frd> build the 
+        // same quaternions.
+        let enu_orientation =
+            unsafe { Rotation::<Enu, Frd>::from_tait_bryan_angles(yaw, pitch, roll) };
+
+        let enu = Coordinate::<Enu>::from_nalgebra_point(point_in_a);
+        let frd = enu_orientation.transform(enu);
+        let enu_again = enu_orientation.inverse_transform(frd);
+        assert_relative_eq!(frd, Coordinate::<Frd>::from_nalgebra_point(point_in_b));
+        assert_relative_eq!(enu_again, enu);
+
+        // Use the point in b as translation. Could be arbitrary point instead.
+        let translation = Vector3::new(1., 0., 0.);
+        // ENU pose does the same thing but adds a translation
+        let enu_pose = unsafe {
+            RigidBodyTransform::<Enu, Frd>::new(
+                Vector::from_nalgebra_vector(translation),
+                enu_orientation,
+            )
+        };
+
+        let frd_after_pose = enu_pose.transform(enu);
+        assert_relative_eq!(
+            frd_after_pose,
+            frd - enu_orientation.transform(Vector::<Enu>::from_nalgebra_vector(translation)),
+        );
+        // Check from FRD to ENU
+        let enu_again_after_pose = enu_pose.inverse_transform(frd_after_pose);
+        assert_relative_eq!(enu, enu_again_after_pose)
     }
 
     #[test]
@@ -2064,35 +2095,63 @@ mod tests {
         #[case] long: Angle,
         #[case] alt: Length,
     ) {
-        // Test ECEF to ENU transformations work correctly
+        // This test uses nav_types to check if the computations match.
 
         let ecef_to_enu = unsafe { Rotation::<Ecef, PlaneEnu>::ecef_to_enu_at(lat, long) };
 
-        // Test basic ENU axis orientations
+        let location = nav_types::WGS84::from_degrees_and_meters(
+            lat.get::<degree>(),
+            long.get::<degree>(),
+            alt.get::<meter>(),
+        );
+        let location_ecef = nav_types::ECEF::from(location);
+
+        let east = nav_types::ENU::new(1., 0., 0.);
+        let north = nav_types::ENU::new(0., 1., 0.);
+        let up = nav_types::ENU::new(0., 0., 1.);
+        let origin = nav_types::ENU::new(0., 0., 0.);
+
+        // Get the axis points of the NED local in ECEF using nav_types.
+        let enu_origin_in_ecef = location_ecef + origin;
+        let enu_origin_in_ecef = Coordinate::<Ecef>::from(&enu_origin_in_ecef);
+
+        let enu_east_in_ecef = location_ecef + east;
+        let enu_east_in_ecef = Coordinate::<Ecef>::from(&enu_east_in_ecef);
+
+        let enu_north_in_ecef = location_ecef + north;
+        let enu_north_in_ecef = Coordinate::<Ecef>::from(&enu_north_in_ecef);
+
+        let enu_up_in_ecef = location_ecef + up;
+        let enu_up_in_ecef = Coordinate::<Ecef>::from(&enu_up_in_ecef);
+
+        let result_origin = ecef_to_enu.inverse_transform(Coordinate::<PlaneEnu>::origin());
+
+        assert_relative_eq!(Coordinate::<Ecef>::origin(), result_origin);
+        assert_relative_eq!(
+            ecef_to_enu.transform(Coordinate::<Ecef>::origin()),
+            Coordinate::<PlaneEnu>::origin()
+        );
+
         let point_on_east = Coordinate::<PlaneEnu>::origin() + Vector::<PlaneEnu>::enu_east_axis();
-        let point_on_north = Coordinate::<PlaneEnu>::origin() + Vector::<PlaneEnu>::enu_north_axis();
-        let point_on_up = Coordinate::<PlaneEnu>::origin() + Vector::<PlaneEnu>::enu_up_axis();
-
         let result_east = ecef_to_enu.inverse_transform(point_on_east);
+        // nav_types does the ENU at the correct position and not the center of the earth. We remove the translation here.
+        let expected_east = enu_east_in_ecef - enu_origin_in_ecef;
+        assert_relative_eq!(result_east, Coordinate::<Ecef>::origin() + expected_east);
+
+        let point_on_north = Coordinate::<PlaneEnu>::origin() + Vector::<PlaneEnu>::enu_north_axis();
         let result_north = ecef_to_enu.inverse_transform(point_on_north);
-        let result_up = ecef_to_enu.inverse_transform(point_on_up);
+        // nav_types does the ENU at the correct position and not the center of the earth. We remove the translation here.
+        let expected_north = enu_north_in_ecef - enu_origin_in_ecef;
+        assert_relative_eq!(result_north, Coordinate::<Ecef>::origin() + expected_north);
 
-        // The ENU axes should transform correctly to ECEF
-        // (Note: we're testing the rotation only, so no translation offset)
-        assert_relative_eq!(
-            ecef_to_enu.transform(result_east),
-            point_on_east,
-        );
-        assert_relative_eq!(
-            ecef_to_enu.transform(result_north),
-            point_on_north,
-        );
-        assert_relative_eq!(
-            ecef_to_enu.transform(result_up),
-            point_on_up,
-        );
+        let point_on_up = Coordinate::<PlaneEnu>::origin() + Vector::<PlaneEnu>::enu_up_axis();
+        let result_up = ecef_to_enu.inverse_transform(point_on_up); 
+        // nav_types does the ENU at the correct position and not the center of the earth. We remove the translation here.
+        let expected_up = enu_up_in_ecef - enu_origin_in_ecef;
+        assert_relative_eq!(result_up, Coordinate::<Ecef>::origin() + expected_up);
 
-        // Test that the rigid body transform works correctly
+        // Construct this as pose instead of just orientation.
+        // This time the translation should be in there as well, so we can compare directly to nav_types output.
         let pose = unsafe {
             RigidBodyTransform::<Ecef, PlaneEnu>::ecef_to_enu_at(
                 &Wgs84::builder()
@@ -2104,54 +2163,14 @@ mod tests {
             )
         };
 
-        // The pose should include both rotation and translation
-        let transformed_east = pose.inverse_transform(point_on_east);
-        let transformed_north = pose.inverse_transform(point_on_north);
-        let transformed_up = pose.inverse_transform(point_on_up);
+        let result_enu_east_in_ecef = pose.inverse_transform(point_on_east);
+        assert_relative_eq!(result_enu_east_in_ecef, enu_east_in_ecef);
 
-        // Transform back should give us the original points
-        assert_relative_eq!(pose.transform(transformed_east), point_on_east);
-        assert_relative_eq!(pose.transform(transformed_north), point_on_north);
-        assert_relative_eq!(pose.transform(transformed_up), point_on_up);
-    }
+        let result_enu_north_in_ecef = pose.inverse_transform(point_on_north);
+        assert_relative_eq!(result_enu_north_in_ecef, enu_north_in_ecef);
 
-    #[test] 
-    fn enu_and_frd_coordinate_transforms_work() {
-        // Test transformations between ENU and FRD coordinate systems
-        let yaw = d(45.);
-        let pitch = d(30.);
-        let roll = d(15.);
-
-        let enu_to_frd = unsafe {
-            Rotation::<PlaneEnu, PlaneFrd>::from_tait_bryan_angles(yaw, pitch, roll)
-        };
-
-        // Test some basic coordinate transformations
-        let east_point = coordinate!(e = m(1.), n = m(0.), u = m(0.); in PlaneEnu);
-        let north_point = coordinate!(e = m(0.), n = m(1.), u = m(0.); in PlaneEnu);
-        let up_point = coordinate!(e = m(0.), n = m(0.), u = m(1.); in PlaneEnu);
-
-        let east_in_frd = enu_to_frd.transform(east_point);
-        let north_in_frd = enu_to_frd.transform(north_point);
-        let up_in_frd = enu_to_frd.transform(up_point);
-
-        // Transform back to verify roundtrip
-        assert_relative_eq!(enu_to_frd.inverse_transform(east_in_frd), east_point);
-        assert_relative_eq!(enu_to_frd.inverse_transform(north_in_frd), north_point);
-        assert_relative_eq!(enu_to_frd.inverse_transform(up_in_frd), up_point);
-
-        // Test with rigid body transform (adding translation)
-        let translation = Vector3::new(2., 3., 1.);
-        let enu_pose = unsafe {
-            RigidBodyTransform::<PlaneEnu, PlaneFrd>::new(
-                Vector::from_nalgebra_vector(translation),
-                enu_to_frd,
-            )
-        };
-
-        let east_after_pose = enu_pose.transform(east_point);
-        let east_back = enu_pose.inverse_transform(east_after_pose);
-        assert_relative_eq!(east_point, east_back);
+        let result_enu_up_in_ecef = pose.inverse_transform(point_on_up);
+        assert_relative_eq!(result_enu_up_in_ecef, enu_up_in_ecef);
     }
 
     #[test]

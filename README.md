@@ -43,10 +43,10 @@ module which has easier-to-grasp types like `Pose` and `Orientation`.
 
 There are a wide variety of ways to describe the locations of objects in
 space. This crate exists to help you convert between those different
-ways. At the time of writing, it supports four main coordinate systems:
+ways. At the time of writing, it supports five main coordinate systems:
 [WGS84] (latitude and longitude), [ECEF] ("Earth-centered,
-Earth-fixed"), [NED] ("North, East, Down"), and [FRD] ("Front, Right,
-Down").
+Earth-fixed"), [NED] ("North, East, Down"), [FRD] ("Front, Right,
+Down"), and [ENU] ("East, North, Down").
 
 [WGS84] and [ECEF] are both Earth-bound coordinate systems that describe
 points in space on or near Earth. They do this by describing positions
@@ -58,7 +58,7 @@ coordinate system at the center of the earth and locating [the X, Y, and
 Z axes][axes] towards specific points on the Earth's surface. One can
 convert between them [without too much trouble][trouble].
 
-[NED] and [FRD] on the other hand are "local" coordinate systems that
+[NED], [FRD], and [ENU] on the other hand are "local" coordinate systems that
 are descriptions of relative positions to the location of the observer.
 [NED] is still Earth-bound in that it describes positions in terms of
 how far North, East, and Down (towards Earth's core) they are relative
@@ -76,6 +76,7 @@ in Earth-bound coordinates.
 [ECEF]: https://en.wikipedia.org/wiki/Earth-centered,_Earth-fixed_coordinate_system
 [NED]: https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates#Local_north,_east,_down_(NED)_coordinates
 [FRD]: https://en.wikipedia.org/wiki/Body_relative_direction
+[ENU]: https://en.wikipedia.org/wiki/Local_tangent_plane_coordinates#Local_east,_north,_up_(ENU)_coordinates
 [axes]: https://en.wikipedia.org/wiki/Axes_conventions
 [trouble]: https://en.wikipedia.org/wiki/Geographic_coordinate_conversion#Coordinate_system_conversion
 
