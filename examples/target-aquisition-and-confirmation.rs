@@ -6,9 +6,9 @@ use uom::si::{angle::degree, length::meter};
 
 fn main() {
     // Calculate and confirm the position of a target given the following data
-    // * Plane heading relative to the Plane NED (eg. compass)
-    // * Pilot observation of target relative to Plane FRD (eg. range finder)
-    // * Ground control observation of the plane relative to Ground ENU (eg. Radar)
+    // * Plane heading relative to Plane NED (eg. compass)
+    // * Pilot observation of the target relative to Plane FRD (eg. range finder)
+    // * Ground control observation of the plane relative to Ground ENU (eg. radar)
     // * Ground control location as world coordinate (eg. GPS)
 
     let expected_plane_wgs84 = Wgs84::builder()
@@ -27,8 +27,8 @@ fn main() {
         .build();
     let expected_target_ecef = Coordinate::<Ecef>::from_wgs84(&expected_target_wgs84);
 
-    system!(struct PlaneNed using NED);  // Plane Instruments
-    system!(struct PlaneFrd using FRD);  // Pilot Observation
+    system!(struct PlaneNed using NED); // Plane Instruments
+    system!(struct PlaneFrd using FRD); // Pilot Observation
     
     let plane_bearing: Bearing<PlaneNed> = 
         Bearing::builder()
@@ -79,9 +79,9 @@ fn main() {
     let transform_ecef_to_plane_ned = unsafe { RigidBodyTransform::ecef_to_ned_at(&plane_ecef.to_wgs84()) };
     
     let plane_orientation = Orientation::<PlaneNed>::from_tait_bryan_angles(
-        plane_bearing.azimuth(),     // yaw from NED bearing
+        plane_bearing.azimuth(), // yaw from NED bearing
         plane_bearing.elevation(), // pitch from NED bearing
-        Angle::new::<degree>(0.),   // roll
+        Angle::new::<degree>(0.), // roll
     );
     
     let transform_plane_ned_to_plane_frd = unsafe { plane_orientation.map_as_zero_in::<PlaneFrd>() };

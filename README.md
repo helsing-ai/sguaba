@@ -46,7 +46,7 @@ space. This crate exists to help you convert between those different
 ways. At the time of writing, it supports five main coordinate systems:
 [WGS84] (latitude and longitude), [ECEF] ("Earth-centered,
 Earth-fixed"), [NED] ("North, East, Down"), [FRD] ("Front, Right,
-Down"), and [ENU] ("East, North, Down").
+Down"), and [ENU] ("East, North, Up").
 
 [WGS84] and [ECEF] are both Earth-bound coordinate systems that describe
 points in space on or near Earth. They do this by describing positions
