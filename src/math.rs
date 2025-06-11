@@ -2228,7 +2228,7 @@ mod tests {
             }).unwrap()
         );
 
-        // a bearing pointing slightly off East should have an azimuth of 267° to forward
+        // a bearing pointing 3° off East should have an azimuth of 267°
         assert_relative_eq!(
             Bearing::<Enu>::build(Components {
                 azimuth: d(93.),
@@ -2282,7 +2282,7 @@ mod tests {
             ) 
         };
 
-        // a bearing pointing North East and Down should have an azimuth of 0° and very Down
+        // a bearing pointing North East and Down, slightly off from the FRD
         assert_relative_eq!(
             Bearing::<Enu>::build(Components {
                 azimuth: d(46.),
