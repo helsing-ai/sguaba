@@ -2,7 +2,7 @@ use crate::builder::{Set, Unset};
 use crate::directions::Bearing;
 use crate::Vector3;
 use crate::{
-    systems::{EquivalentTo, FrdLike, NedLike, RightHandedXyzLike, EnuLike},
+    systems::{EnuLike, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike},
     Coordinate, CoordinateSystem,
 };
 use std::fmt::{Display, Formatter};

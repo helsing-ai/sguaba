@@ -66,9 +66,9 @@ unsafe impl<System> EquivalentTo<System> for System {}
 /// Note that the "counterclockwise" above is around Z-axis as viewed from positive Z, which in
 /// [`NedLike`] and [`FrdLike`] is _down_, so viewed from "above" positive azimuth will look
 /// clockwise (as expected).
-/// 
+///
 /// And for the [`EnuLike`] coordinate system:
-/// 
+///
 /// - azimuth is the angle clockwise about positive Z along the XY plane from positive Y; and
 /// - elevation is the angle towards positive Z from the XY plane.
 pub trait BearingDefined: Sized {

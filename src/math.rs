@@ -22,7 +22,10 @@ use crate::geodedic::Wgs84;
 use crate::systems::EquivalentTo;
 use crate::vectors::Vector;
 use crate::Bearing;
-use crate::{systems::{NedLike, EnuLike}, CoordinateSystem, Isometry3, UnitQuaternion};
+use crate::{
+    systems::{EnuLike, NedLike},
+    CoordinateSystem, Isometry3, UnitQuaternion,
+};
 use nalgebra::{Matrix3, Rotation3, Translation3};
 use std::convert::From;
 use std::fmt;
@@ -1249,7 +1252,7 @@ impl<From, To> RelativeEq for RigidBodyTransform<From, To> {
 #[cfg(test)]
 mod tests {
     use crate::builder::bearing::Components;
-    use crate::coordinate_systems::{Ecef, Frd, Ned, Enu};
+    use crate::coordinate_systems::{Ecef, Enu, Frd, Ned};
     use crate::coordinates::Coordinate;
     use crate::geodedic::Wgs84;
     use crate::math::{RigidBodyTransform, Rotation};
@@ -1460,8 +1463,8 @@ mod tests {
         let ned_again_after_pose = ned_pose.inverse_transform(frd_after_pose);
         assert_relative_eq!(ned, ned_again_after_pose);
 
-        // Check that orientation works between ENU and FRD coordinates. These work with the 
-        // same test cases because Rotation::<Ned, Frd> and Rotation::<Enu, Frd> build the 
+        // Check that orientation works between ENU and FRD coordinates. These work with the
+        // same test cases because Rotation::<Ned, Frd> and Rotation::<Enu, Frd> build the
         // same quaternions.
         let enu_orientation =
             unsafe { Rotation::<Enu, Frd>::from_tait_bryan_angles(yaw, pitch, roll) };
@@ -2138,14 +2141,15 @@ mod tests {
         let expected_east = enu_east_in_ecef - enu_origin_in_ecef;
         assert_relative_eq!(result_east, Coordinate::<Ecef>::origin() + expected_east);
 
-        let point_on_north = Coordinate::<PlaneEnu>::origin() + Vector::<PlaneEnu>::enu_north_axis();
+        let point_on_north =
+            Coordinate::<PlaneEnu>::origin() + Vector::<PlaneEnu>::enu_north_axis();
         let result_north = ecef_to_enu.inverse_transform(point_on_north);
         // nav_types does the ENU at the correct position and not the center of the earth. We remove the translation here.
         let expected_north = enu_north_in_ecef - enu_origin_in_ecef;
         assert_relative_eq!(result_north, Coordinate::<Ecef>::origin() + expected_north);
 
         let point_on_up = Coordinate::<PlaneEnu>::origin() + Vector::<PlaneEnu>::enu_up_axis();
-        let result_up = ecef_to_enu.inverse_transform(point_on_up); 
+        let result_up = ecef_to_enu.inverse_transform(point_on_up);
         // nav_types does the ENU at the correct position and not the center of the earth. We remove the translation here.
         let expected_up = enu_up_in_ecef - enu_origin_in_ecef;
         assert_relative_eq!(result_up, Coordinate::<Ecef>::origin() + expected_up);
@@ -2190,7 +2194,7 @@ mod tests {
         assert_relative_eq!(enu_in_ecef, ned_in_ecef);
     }
 
-    #[test] 
+    #[test]
     fn enu_pose_serde() {
         // Test serialization/deserialization of ENU poses
         let pose = unsafe {
@@ -2208,24 +2212,22 @@ mod tests {
     #[test]
     fn bearing_rotation_enu_to_frd() {
         // assume forward is pointing North
-        let enu_to_frd_pointing_north = unsafe { 
-            Rotation::<Enu, Frd>::from_tait_bryan_angles(
-                d(90.), 
-                d(0.),
-                d(0.)
-            ) 
-        };
+        let enu_to_frd_pointing_north =
+            unsafe { Rotation::<Enu, Frd>::from_tait_bryan_angles(d(90.), d(0.), d(0.)) };
 
         // a bearing pointing North should have an azimuth of 0° to forward
         assert_relative_eq!(
             Bearing::<Enu>::build(Components {
                 azimuth: d(0.),
                 elevation: d(0.)
-            }).unwrap() * enu_to_frd_pointing_north,
+            })
+            .unwrap()
+                * enu_to_frd_pointing_north,
             Bearing::<Frd>::build(Components {
                 azimuth: d(0.),
                 elevation: d(0.)
-            }).unwrap()
+            })
+            .unwrap()
         );
 
         // a bearing pointing 3° off East should have an azimuth of 267°
@@ -2233,20 +2235,23 @@ mod tests {
             Bearing::<Enu>::build(Components {
                 azimuth: d(93.),
                 elevation: d(0.)
-            }).unwrap() * enu_to_frd_pointing_north,
+            })
+            .unwrap()
+                * enu_to_frd_pointing_north,
             Bearing::<Frd>::build(Components {
                 azimuth: d(267.),
                 elevation: d(0.)
-            }).unwrap()
+            })
+            .unwrap()
         );
 
         // assume forward is pointing West
-        let enu_to_frd_pointing_west = unsafe { 
+        let enu_to_frd_pointing_west = unsafe {
             Rotation::<Enu, Frd>::from_tait_bryan_angles(
                 d(180.), // FRD X must rotate 180° to point West in ENU
                 d(0.),
-                d(0.)
-            ) 
+                d(0.),
+            )
         };
 
         // a bearing pointing West and Up should have an azimuth of 0° to forward and Up
@@ -2254,11 +2259,14 @@ mod tests {
             Bearing::<Enu>::build(Components {
                 azimuth: d(270.),
                 elevation: d(30.)
-            }).unwrap() * enu_to_frd_pointing_west,
+            })
+            .unwrap()
+                * enu_to_frd_pointing_west,
             Bearing::<Frd>::build(Components {
                 azimuth: d(0.),
                 elevation: d(-30.)
-            }).unwrap()
+            })
+            .unwrap()
         );
 
         // a bearing pointing South and Down should have an azimuth of 90° to Right and Down
@@ -2266,20 +2274,23 @@ mod tests {
             Bearing::<Enu>::build(Components {
                 azimuth: d(180.),
                 elevation: d(-62.)
-            }).unwrap() * enu_to_frd_pointing_west,
+            })
+            .unwrap()
+                * enu_to_frd_pointing_west,
             Bearing::<Frd>::build(Components {
                 azimuth: d(90.),
                 elevation: d(62.)
-            }).unwrap()
+            })
+            .unwrap()
         );
 
         // assume forward is pointing North East at a 30° elevation
-        let enu_to_frd_pointing_north_east_and_up = unsafe { 
+        let enu_to_frd_pointing_north_east_and_up = unsafe {
             Rotation::<Enu, Frd>::from_tait_bryan_angles(
-                d(45.), 
+                d(45.),
                 d(-30.), // rotating FRD to point up
-                d(0.)
-            ) 
+                d(0.),
+            )
         };
 
         // a bearing pointing North East and Down, slightly off from the FRD
@@ -2287,11 +2298,14 @@ mod tests {
             Bearing::<Enu>::build(Components {
                 azimuth: d(46.),
                 elevation: d(-10.)
-            }).unwrap() * enu_to_frd_pointing_north_east_and_up,
+            })
+            .unwrap()
+                * enu_to_frd_pointing_north_east_and_up,
             Bearing::<Frd>::build(Components {
                 azimuth: d(-1.2855),
                 elevation: d(39.9944)
-            }).unwrap(),
+            })
+            .unwrap(),
             epsilon = 0.0001_f64.to_radians() // FRD bearing is approximate
         );
     }

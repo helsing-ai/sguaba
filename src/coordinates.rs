@@ -1,5 +1,5 @@
 use crate::coordinate_systems::{
-    CoordinateSystem, FrdLike, HasComponents, NedLike, RightHandedXyzLike, EnuLike,
+    CoordinateSystem, EnuLike, FrdLike, HasComponents, NedLike, RightHandedXyzLike,
 };
 use crate::directions::Bearing;
 use crate::math::RigidBodyTransform;

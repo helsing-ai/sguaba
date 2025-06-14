@@ -253,10 +253,10 @@ pub type AngleForBearingTrait = uom::si::f64::Angle;
 /// Well-known coordinate systems and conventions.
 pub mod systems {
     pub use super::coordinate_systems::{
-        BearingDefined, Ecef, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike, EnuLike,
+        BearingDefined, Ecef, EnuLike, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike,
     };
     pub use super::coordinate_systems::{
-        FrdComponents, HasComponents, NedComponents, XyzComponents, EnuComponents,
+        EnuComponents, FrdComponents, HasComponents, NedComponents, XyzComponents,
     };
     pub use super::geodedic::Wgs84;
 }
