@@ -9,12 +9,12 @@ use uom::si::f64::{Angle, Length};
 use uom::si::{angle::degree, length::meter};
 
 fn main() {
-    // This example uses a handful of hard-coded values to demonstrate conversions 
+    // This example uses a handful of hard-coded values to demonstrate conversions
     // between NED, FRD, and ENU coordinate systems. Hard-coded values are meant to
     // emulate real-world instrument readings, and are derived from the the expected
-    // plane and target WGS84 coordinates found at the bottom of this example. The 
+    // plane and target WGS84 coordinates found at the bottom of this example. The
     // following "instrument readings" are used to confirm that both the plane and
-    // ground control are looking at the same target: 
+    // ground control are looking at the same target:
     // * Plane heading relative to Plane NED (eg. compass)
     // * Pilot observation of the target relative to Plane FRD (eg. range finder)
     // * Ground control observation of the plane relative to Ground ENU (eg. radar)
