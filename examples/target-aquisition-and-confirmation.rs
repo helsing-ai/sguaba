@@ -9,7 +9,12 @@ use uom::si::f64::{Angle, Length};
 use uom::si::{angle::degree, length::meter};
 
 fn main() {
-    // Calculate and confirm the position of a target given the following data
+    // This example uses a handful of hard-coded values to demonstrate conversions 
+    // between NED, FRD, and ENU coordinate systems. Hard-coded values are meant to
+    // emulate real-world instrument readings, and are derived from the the expected
+    // plane and target WGS84 coordinates found at the bottom of this example. The 
+    // following "instrument readings" are used to confirm that both the plane and
+    // ground control are looking at the same target: 
     // * Plane heading relative to Plane NED (eg. compass)
     // * Pilot observation of the target relative to Plane FRD (eg. range finder)
     // * Ground control observation of the plane relative to Ground ENU (eg. radar)
@@ -17,30 +22,24 @@ fn main() {
 
     system!(struct PlaneNed using NED); // Plane Instruments
     system!(struct PlaneFrd using FRD); // Pilot Observation
+    system!(struct GroundEnu using ENU); // Ground Control Instruments
 
+    // Example value from the plane's onboard compass, happens to point to the target's expected position
     let plane_bearing: Bearing<PlaneNed> = Bearing::builder()
         .azimuth(Angle::new::<degree>(214.74)) // clockwise from North
         .elevation(Angle::new::<degree>(0.)) // level with the horizon
         .expect("elevation is in [-90º, 90º]")
         .build();
 
+    // Example values from the pilot's range finder, happens to point to the target's expected position
+    let target_range = Length::new::<meter>(14824.);
     let target_bearing: Bearing<PlaneFrd> = Bearing::builder()
         .azimuth(Angle::new::<degree>(0.)) // straight ahead
         .elevation(Angle::new::<degree>(5.342)) // above nose
         .expect("elevation is in [-90º, 90º]")
         .build();
 
-    let target_range = Length::new::<meter>(14824.);
-
-    println!(
-        "[FRANK01] Tally one balloon, heading {:.3}°, range of {:.3}m at elevation {:.1}°",
-        plane_bearing.azimuth().get::<degree>(),
-        target_range.get::<meter>(),
-        target_bearing.elevation().get::<degree>()
-    );
-
-    system!(struct GroundEnu using ENU); // Ground Control Instruments
-
+    // Example value from the ground control's GPS
     let ground_control_wgs84 = Wgs84::builder()
         .latitude(Angle::new::<degree>(33.6954))
         .expect("latitude is in [-90º, 90º]")
@@ -48,6 +47,7 @@ fn main() {
         .altitude(Length::new::<meter>(3.))
         .build();
 
+    // Example value from the ground control's radar, happens to point to the plane's expected position
     let ground_control_plane_observation = Coordinate::<GroundEnu>::from_bearing(
         Bearing::builder()
             .azimuth(Angle::new::<degree>(84.574)) // clockwise from North
@@ -55,6 +55,13 @@ fn main() {
             .expect("elevation is in [-90º, 90º]")
             .build(),
         Length::new::<meter>(22236.3), // distance to plane
+    );
+
+    println!(
+        "[FRANK01] Tally one balloon, heading {:.3}°, range of {:.3}m at elevation {:.1}°",
+        plane_bearing.azimuth().get::<degree>(),
+        target_range.get::<meter>(),
+        target_bearing.elevation().get::<degree>()
     );
 
     let transform_ecef_to_ground_enu =
