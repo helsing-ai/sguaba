@@ -15,22 +15,6 @@ fn main() {
     // * Ground control observation of the plane relative to Ground ENU (eg. radar)
     // * Ground control location as world coordinate (eg. GPS)
 
-    let expected_plane_wgs84 = Wgs84::builder()
-        .latitude(Angle::new::<degree>(33.7068))
-        .expect("latitude is in [-90º, 90º]")
-        .longitude(Angle::new::<degree>(-78.7355))
-        .altitude(Length::new::<meter>(17678.))
-        .build();
-    let expected_plane_ecef = Coordinate::<Ecef>::from_wgs84(&expected_plane_wgs84);
-
-    let expected_target_wgs84 = Wgs84::builder()
-        .latitude(Angle::new::<degree>(33.597744245441966))
-        .expect("latitude is in [-90º, 90º]")
-        .longitude(Angle::new::<degree>(-78.82584635802755))
-        .altitude(Length::new::<meter>(19075.36499))
-        .build();
-    let expected_target_ecef = Coordinate::<Ecef>::from_wgs84(&expected_target_wgs84);
-
     system!(struct PlaneNed using NED); // Plane Instruments
     system!(struct PlaneFrd using FRD); // Pilot Observation
 
@@ -78,7 +62,6 @@ fn main() {
 
     let plane_ecef =
         transform_ecef_to_ground_enu.inverse_transform(ground_control_plane_observation);
-    assert_distance_tolerance(expected_plane_ecef, plane_ecef);
 
     println!(
         "[GROUNDC] Radar confirmed aircraft at {}",
@@ -102,15 +85,14 @@ fn main() {
 
     let pilot_observation = Coordinate::<PlaneFrd>::from_bearing(target_bearing, target_range);
 
-    let target_ecef = transform_ecef_to_plane_frd.inverse_transform(pilot_observation);
-    assert_distance_tolerance(expected_target_ecef, target_ecef);
+    let plane_target_ecef = transform_ecef_to_plane_frd.inverse_transform(pilot_observation);
 
     println!(
         "[GROUNDC] Standby for visual inspection of target at {}",
-        &target_ecef.to_wgs84()
+        &plane_target_ecef.to_wgs84()
     );
 
-    let target_ground_enu = transform_ecef_to_ground_enu.transform(expected_target_ecef);
+    let target_ground_enu = transform_ecef_to_ground_enu.transform(plane_target_ecef);
 
     let calculated_bearing = target_ground_enu
         .bearing_from_origin()
@@ -127,16 +109,48 @@ fn main() {
     let ground_control_target_observation =
         Coordinate::<GroundEnu>::from_bearing(calculated_bearing, calculated_distance);
 
-    let target_ecef =
+    let ground_control_target_ecef =
         transform_ecef_to_ground_enu.inverse_transform(ground_control_target_observation);
-    assert_distance_tolerance(expected_target_ecef, target_ecef);
 
     println!(
         "[GROUNDC] Confirmed target locked at {}, cleared to engage",
-        &target_ecef.to_wgs84()
+        &ground_control_target_ecef.to_wgs84()
     );
 
-    println!("[FRANK01] Copy, target confirmed and locked, weapons hot")
+    println!("[FRANK01] Copy, target confirmed and locked, weapons hot");
+
+    // Sanity checking example results against expected coordinates
+    let expected_plane_wgs84 = Wgs84::builder()
+        .latitude(Angle::new::<degree>(33.7068))
+        .expect("latitude is in [-90º, 90º]")
+        .longitude(Angle::new::<degree>(-78.7355))
+        .altitude(Length::new::<meter>(17678.))
+        .build();
+    let expected_plane_ecef = Coordinate::<Ecef>::from_wgs84(&expected_plane_wgs84);
+
+    let expected_target_wgs84 = Wgs84::builder()
+        .latitude(Angle::new::<degree>(33.597744245441966))
+        .expect("latitude is in [-90º, 90º]")
+        .longitude(Angle::new::<degree>(-78.82584635802755))
+        .altitude(Length::new::<meter>(19075.36499))
+        .build();
+    let expected_target_ecef = Coordinate::<Ecef>::from_wgs84(&expected_target_wgs84);
+
+    println!("\nChecking calculated plane position given expected plane position");
+    assert_distance_tolerance(expected_plane_ecef, plane_ecef);
+
+    println!("Checking calculated plane's target position given expected target position");
+    assert_distance_tolerance(expected_target_ecef, plane_target_ecef);
+
+    println!("Checking calculated ground's target position given expected target position");
+    assert_distance_tolerance(expected_target_ecef, ground_control_target_ecef);
+
+    println!(
+        "Checking calculated ground's target position against calculated plane's target position"
+    );
+    assert_distance_tolerance(ground_control_target_ecef, plane_target_ecef);
+
+    println!("\nAll checks passed");
 }
 
 fn assert_distance_tolerance(expected_ecef: Coordinate<Ecef>, actual_ecef: Coordinate<Ecef>) {

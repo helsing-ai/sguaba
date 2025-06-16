@@ -389,7 +389,6 @@ macro_rules! system {
             ) -> Option<$crate::Bearing<Self>> {
                 // just the inverse of the above
                 let elevation = $crate::AngleForBearingTrait::HALF_TURN/2. - polar.into();
-                #[allow(clippy::redundant_locals)]
                 let azimuth = $crate::AngleForBearingTrait::HALF_TURN/2. - azimuth.into();
 
                 Some($crate::Bearing::builder().azimuth(azimuth).elevation(elevation)?.build())
