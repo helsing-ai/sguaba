@@ -247,6 +247,70 @@ where
     }
 }
 
+fn swap_x_y_negate_z_quaternion() -> UnitQuaternion {
+    use nalgebra::{Matrix3, Rotation3, UnitQuaternion};
+
+    const SWAP_X_Y_NEGATE_Z: [[f64; 3]; 3] = [
+        [0.0, 1.0, 0.0],  // swap x and y
+        [1.0, 0.0, 0.0],  // swap x and y
+        [0.0, 0.0, -1.0], // negate z
+    ];
+    let m = Matrix3::from_row_slice(&SWAP_X_Y_NEGATE_Z.concat());
+    UnitQuaternion::from_rotation_matrix(&Rotation3::from_matrix(&m))
+}
+
+impl<From, To> Rotation<From, To>
+where
+    To: CoordinateSystem<Convention = EnuLike>,
+{
+    /// Converts a rotation from an [`EnuLike`] coordinate system into the equivalent rotation in the
+    /// [`NedLike`] coordinate system that shares the same origin.
+    ///
+    /// # Safety
+    ///
+    /// This function only provides a valid rotation if the [`EnuLike`] and [`NedLike`] coordinate
+    /// systems share the same origin. If this is not the case, the resulting rotation will lead to
+    /// incorrect transformations.
+    #[must_use]
+    pub unsafe fn into_ned_equivalent<NedTo>(self) -> Rotation<From, NedTo>
+    where
+        NedTo: CoordinateSystem<Convention = NedLike>,
+    {
+        // Chain the rotations: From -> ENU -> NED
+        Rotation {
+            inner: self.inner * swap_x_y_negate_z_quaternion(),
+            from: PhantomData::<From>,
+            to: PhantomData::<NedTo>,
+        }
+    }
+}
+
+impl<From, To> Rotation<From, To>
+where
+    To: CoordinateSystem<Convention = NedLike>,
+{
+    /// Converts a rotation from a [`NedLike`] coordinate system into the equivalent rotation in the
+    /// [`EnuLike`] coordinate system that shares the same origin.
+    ///
+    /// # Safety
+    ///
+    /// This function only provides a valid rotation if the [`NedLike`] and [`EnuLike`] coordinate
+    /// systems share the same origin. If this is not the case, the resulting rotation will lead to
+    /// incorrect transformations.
+    #[must_use]
+    pub unsafe fn into_enu_equivalent<EnuTo>(self) -> Rotation<From, EnuTo>
+    where
+        EnuTo: CoordinateSystem<Convention = EnuLike>,
+    {
+        // Chain the rotations: From -> NED -> ENU
+        Rotation {
+            inner: self.inner * swap_x_y_negate_z_quaternion(),
+            from: PhantomData::<From>,
+            to: PhantomData::<EnuTo>,
+        }
+    }
+}
+
 impl<From, To> Rotation<From, To> {
     /// Constructs a rotation between two [`CoordinateSystem`]s using ([intrinsic]) yaw, pitch, and
     /// roll [Tait-Bryan angles][tb].
@@ -2351,5 +2415,51 @@ mod tests {
             })
             .unwrap()
         );
+    }
+
+    #[test]
+    fn enu_to_ned_equivalent_gives_same_rotation() {
+        let lat = d(52.);
+        let lon = d(-3.);
+
+        // Check quaternion equality of chained rotation
+        let ecef_to_ned = unsafe { Rotation::<Ecef, PlaneNed>::ecef_to_ned_at(lat, lon) };
+        let ecef_to_enu = unsafe { Rotation::<Ecef, PlaneEnu>::ecef_to_enu_at(lat, lon) };
+        let ned_from_enu = unsafe { ecef_to_enu.into_ned_equivalent::<PlaneNed>() };
+        assert_relative_eq!(ned_from_enu.inner, ecef_to_ned.inner, epsilon = 1e-10);
+
+        // Check a single coordinate in chained rotation
+        let enu_coord_actual = coordinate!(e = m(4.), n = m(7.), u = m(1.); in PlaneEnu);
+        let ned_coord_expected = coordinate!(n = m(7.), e = m(4.), d = m(-1.); in PlaneNed);
+        let ned_coord_actual =
+            ned_from_enu.transform(ecef_to_enu.inverse_transform(enu_coord_actual));
+        assert_relative_eq!(ned_coord_actual, ned_coord_expected);
+
+        // Check round trip
+        let enu_round_trip = unsafe { ned_from_enu.into_enu_equivalent::<PlaneEnu>() };
+        assert_relative_eq!(enu_round_trip.inner, ecef_to_enu.inner, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn ned_to_enu_equivalent_gives_same_rotation() {
+        let lat = d(47.);
+        let lon = d(26.);
+
+        // Check quaternion equality
+        let ecef_to_enu = unsafe { Rotation::<Ecef, PlaneEnu>::ecef_to_enu_at(lat, lon) };
+        let ecef_to_ned = unsafe { Rotation::<Ecef, PlaneNed>::ecef_to_ned_at(lat, lon) };
+        let enu_from_ned = unsafe { ecef_to_ned.into_enu_equivalent::<PlaneEnu>() };
+        assert_relative_eq!(enu_from_ned.inner, ecef_to_enu.inner, epsilon = 1e-10);
+
+        // Check a single coordinate in chained rotation
+        let ned_coord_actual = coordinate!(n = m(18.), e = m(-2.), d = m(5.); in PlaneNed);
+        let enu_coord_expected = coordinate!(e = m(-2.), n = m(18.), u = m(-5.); in PlaneEnu);
+        let enu_coord_actual =
+            enu_from_ned.transform(ecef_to_ned.inverse_transform(ned_coord_actual));
+        assert_relative_eq!(enu_coord_actual, enu_coord_expected);
+
+        // Check round trip
+        let ned_round_trip = unsafe { enu_from_ned.into_ned_equivalent::<PlaneNed>() };
+        assert_relative_eq!(ned_round_trip.inner, ecef_to_ned.inner, epsilon = 1e-10);
     }
 }
