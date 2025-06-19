@@ -2377,7 +2377,7 @@ mod tests {
         let enu_to_frd_pointing_north_inverted =
             unsafe { Rotation::<Enu, Frd>::from_tait_bryan_angles(d(90.), d(0.), d(0.)) };
 
-        // a bearing pointing 3° off East
+        // a bearing pointing 3° off East, a roll of 0° in ENU means the frame is "upside down" compared to FRD.
         assert_relative_eq!(
             Bearing::<Enu>::build(Components {
                 azimuth: d(93.),
@@ -2401,7 +2401,7 @@ mod tests {
             )
         };
 
-        // a bearing pointing North East and Down
+        // a bearing pointing North East and Down, a roll of 0° in ENU means the frame is "upside down" compared to FRD.
         assert_relative_eq!(
             Bearing::<Enu>::build(Components {
                 azimuth: d(45.),
@@ -2425,18 +2425,22 @@ mod tests {
         // Check quaternion equality of chained rotation
         let ecef_to_ned = unsafe { Rotation::<Ecef, PlaneNed>::ecef_to_ned_at(lat, lon) };
         let ecef_to_enu = unsafe { Rotation::<Ecef, PlaneEnu>::ecef_to_enu_at(lat, lon) };
-        let ned_from_enu = unsafe { ecef_to_enu.into_ned_equivalent::<PlaneNed>() };
-        assert_relative_eq!(ned_from_enu.inner, ecef_to_ned.inner, epsilon = 1e-10);
+        let ecef_to_ned_via_enu = unsafe { ecef_to_enu.into_ned_equivalent::<PlaneNed>() };
+        assert_relative_eq!(
+            ecef_to_ned_via_enu.inner,
+            ecef_to_ned.inner,
+            epsilon = 1e-10
+        );
 
         // Check a single coordinate in chained rotation
         let enu_coord_actual = coordinate!(e = m(4.), n = m(7.), u = m(1.); in PlaneEnu);
         let ned_coord_expected = coordinate!(n = m(7.), e = m(4.), d = m(-1.); in PlaneNed);
         let ned_coord_actual =
-            ned_from_enu.transform(ecef_to_enu.inverse_transform(enu_coord_actual));
+            ecef_to_ned_via_enu.transform(ecef_to_enu.inverse_transform(enu_coord_actual));
         assert_relative_eq!(ned_coord_actual, ned_coord_expected);
 
         // Check round trip
-        let enu_round_trip = unsafe { ned_from_enu.into_enu_equivalent::<PlaneEnu>() };
+        let enu_round_trip = unsafe { ecef_to_ned_via_enu.into_enu_equivalent::<PlaneEnu>() };
         assert_relative_eq!(enu_round_trip.inner, ecef_to_enu.inner, epsilon = 1e-10);
     }
 
@@ -2448,18 +2452,22 @@ mod tests {
         // Check quaternion equality
         let ecef_to_enu = unsafe { Rotation::<Ecef, PlaneEnu>::ecef_to_enu_at(lat, lon) };
         let ecef_to_ned = unsafe { Rotation::<Ecef, PlaneNed>::ecef_to_ned_at(lat, lon) };
-        let enu_from_ned = unsafe { ecef_to_ned.into_enu_equivalent::<PlaneEnu>() };
-        assert_relative_eq!(enu_from_ned.inner, ecef_to_enu.inner, epsilon = 1e-10);
+        let ecef_to_enu_via_ned = unsafe { ecef_to_ned.into_enu_equivalent::<PlaneEnu>() };
+        assert_relative_eq!(
+            ecef_to_enu_via_ned.inner,
+            ecef_to_enu.inner,
+            epsilon = 1e-10
+        );
 
         // Check a single coordinate in chained rotation
         let ned_coord_actual = coordinate!(n = m(18.), e = m(-2.), d = m(5.); in PlaneNed);
         let enu_coord_expected = coordinate!(e = m(-2.), n = m(18.), u = m(-5.); in PlaneEnu);
         let enu_coord_actual =
-            enu_from_ned.transform(ecef_to_ned.inverse_transform(ned_coord_actual));
+            ecef_to_enu_via_ned.transform(ecef_to_ned.inverse_transform(ned_coord_actual));
         assert_relative_eq!(enu_coord_actual, enu_coord_expected);
 
         // Check round trip
-        let ned_round_trip = unsafe { enu_from_ned.into_ned_equivalent::<PlaneNed>() };
+        let ned_round_trip = unsafe { ecef_to_enu_via_ned.into_ned_equivalent::<PlaneNed>() };
         assert_relative_eq!(ned_round_trip.inner, ecef_to_ned.inner, epsilon = 1e-10);
     }
 }
