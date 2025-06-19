@@ -47,7 +47,8 @@ fn main() {
         .altitude(Length::new::<meter>(3.))
         .build();
 
-    // Example value from the ground control's radar, happens to point to the plane's expected position
+    // Where the ground control's radar sees the plane.
+    // The values here were manually computed from the actual relative position of the plane to the ground control radar. 
     let ground_control_plane_observation = Coordinate::<GroundEnu>::from_bearing(
         Bearing::builder()
             .azimuth(Angle::new::<degree>(84.574)) // clockwise from North
