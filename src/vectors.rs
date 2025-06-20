@@ -198,10 +198,15 @@ impl<In> Vector<In> {
     /// order confusion. This function will be removed in a future version of Sguaba in favor of
     /// those.
     ///
+    /// NOTE: This function will not be removed, but should only be used when writing code that is generic
+    /// over all possible coordinate systems.
+    ///
     /// The meaning of `x`, `y`, and `z` is dictated by the "convention" of `In`. For example, in
     /// [`NedLike`], `x` is North, `y` is East, and `z` is "down" (ie, in the direction of
     /// gravity).
-    #[deprecated = "prefer `Vector::builder` to avoid risk of argument order confusion"]
+    #[deprecated = "prefer `Vector::builder` to avoid risk of argument order confusion.
+    This function will not be removed, but should only be used when writing code that is generic
+    over all possible coordinate systems."]
     // TODO(jon): make this private
     pub fn from_cartesian(
         x: impl Into<Length>,
