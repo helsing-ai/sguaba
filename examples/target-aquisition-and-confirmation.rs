@@ -35,7 +35,7 @@ fn main() {
     // Values from the pilot's range finder, manually picked to align with the actual target position (see bottom).
     let target_range = Length::new::<meter>(14824.);
     let target_bearing: Bearing<PlaneFrd> = Bearing::builder()
-        .azimuth(Angle::new::<degree>(10.)) // straight ahead
+        .azimuth(Angle::new::<degree>(10.)) // clockwise from forward
         .elevation(Angle::new::<degree>(5.342)) // above nose
         .expect("elevation is in [-90º, 90º]")
         .build();
@@ -153,6 +153,7 @@ fn main() {
         .build();
     let expected_target_ecef = Coordinate::<Ecef>::from_wgs84(&expected_target_wgs84);
 
+    // These values were computed manually and committed to ensure no regression.
     let expected_ground_distance_to_target = Length::new::<meter>(22515.102);
     let expected_ground_bearing_to_target = Bearing::<GroundEnu>::builder()
         .azimuth(Angle::new::<degree>(155.02306))
