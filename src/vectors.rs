@@ -198,16 +198,23 @@ impl<In> Vector<In> {
     /// order confusion. This function will be removed in a future version of Sguaba in favor of
     /// those.
     ///
-    /// NOTE: This function will not be removed, but should only be used when writing code that is generic
-    /// over all possible coordinate systems.
+    /// <div class="warning">
+    ///
+    /// This method is permanently deprecated because it is particularly vulnerable to argument
+    /// order confusion (eg, accidentally passing in the "down" component of a FRD vector
+    /// first instead of last). Methods like [Vector::builder] and the [vector!] macro
+    /// should be preferred instead, as they do not have this problem. However, this method is
+    /// left for use-cases where those alternatives cannot be used, such as when writing code
+    /// that is fully generic over the coordinate system, and thus cannot use the safer
+    /// constructors provided by those APIs. If this applies to you, make sure you apply due
+    /// diligence when writing out the argument ordering.
+    ///
+    /// </div>
     ///
     /// The meaning of `x`, `y`, and `z` is dictated by the "convention" of `In`. For example, in
     /// [`NedLike`], `x` is North, `y` is East, and `z` is "down" (ie, in the direction of
     /// gravity).
-    #[deprecated = "prefer `Vector::builder` to avoid risk of argument order confusion.
-    This function will not be removed, but should only be used when writing code that is generic
-    over all possible coordinate systems."]
-    // TODO(jon): make this private
+    #[deprecated = "prefer `Vector::builder` to avoid risk of argument order confusion"]
     pub fn from_cartesian(
         x: impl Into<Length>,
         y: impl Into<Length>,
