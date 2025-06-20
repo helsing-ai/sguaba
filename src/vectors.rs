@@ -202,7 +202,7 @@ impl<In> Vector<In> {
     ///
     /// This method is permanently deprecated because it is particularly vulnerable to argument
     /// order confusion (eg, accidentally passing in the "down" component of a FRD vector
-    /// first instead of last). Methods like [Vector::builder] and the [vector!] macro
+    /// first instead of last). Methods like [`Vector::builder`] and the [`vector!`] macro
     /// should be preferred instead, as they do not have this problem. However, this method is
     /// left for use-cases where those alternatives cannot be used, such as when writing code
     /// that is fully generic over the coordinate system, and thus cannot use the safer
