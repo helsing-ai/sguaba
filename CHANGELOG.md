@@ -19,6 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.9.2]
+
+### Added
+
+- Support for the ENU coordinate system
+  ([#13](https://github.com/helsing-ai/sguaba/pull/13)).
+
+### Changed
+
+- Clarified deprecation notice for `from_cartesian` to note that it will
+  not be removed ([#14](https://github.com/helsing-ai/sguaba/pull/14)).
+
 ## [0.9.1]
 
 ### Added
@@ -40,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial public release.
 
-[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.1...HEAD
+[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/helsing-ai/sguaba/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/helsing-ai/sguaba/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/helsing-ai/sguaba/releases/tag/v0.9.0
