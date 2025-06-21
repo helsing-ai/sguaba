@@ -23,9 +23,10 @@ use uom::ConstZero;
 /// A `Bearing` has an azimuth and elevation, whose meanings differ for different kinds of
 /// coordinate systems (although there [are conventions][bearing]). The meaning of azimuth and
 /// elevation for a given coordinate system is defined by its implementation of [`BearingDefined`].
-/// For example, a bearing azimuth in an FRD system is relative to the forward direction of the 
-/// system; the bearing azimuth in NED and ENU is relative to north. In general though, azimuth
-/// tends to align with yaw and elevation with pitch (as defined by Tait-Bryan angles).
+/// For example, a bearing azimuth in an FRD system is relative to the forward direction of the
+/// system, while in both NED _and_ ENU (somewhat counter-intuitively) it is relative to North. In
+/// general, azimuth _tends to_ align with yaw and elevation with pitch (as defined by Tait-Bryan
+/// angles).
 ///
 /// See also [horizontal coordinate systems][azel].
 ///
