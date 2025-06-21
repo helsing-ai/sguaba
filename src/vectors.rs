@@ -2,7 +2,7 @@ use crate::builder::{Set, Unset};
 use crate::directions::Bearing;
 use crate::Vector3;
 use crate::{
-    systems::{EquivalentTo, FrdLike, NedLike, RightHandedXyzLike},
+    systems::{EnuLike, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike},
     Coordinate, CoordinateSystem,
 };
 use std::fmt::{Display, Formatter};
@@ -145,6 +145,13 @@ macro_rules! vector {
             north: $n.into(),
             east: $e.into(),
             down: $d.into(),
+        })
+    };
+    (e = $e:expr, n = $n:expr, u = $u:expr; in $in:ty) => {
+        $crate::Vector::<$in>::build($crate::systems::EnuComponents {
+            east: $e.into(),
+            north: $n.into(),
+            up: $u.into(),
         })
     };
     (f = $f:expr, r = $r:expr, d = $d:expr; in $in:ty) => {
@@ -560,6 +567,7 @@ macro_rules! accessors {
 accessors!(RightHandedXyzLike using x, y, z + x_axis, y_axis, z_axis);
 accessors!(NedLike using ned_north, ned_east, ned_down + ned_north_axis, ned_east_axis, ned_down_axis);
 accessors!(FrdLike using frd_front, frd_right, frd_down + frd_front_axis, frd_right_axis, frd_down_axis);
+accessors!(EnuLike using enu_east, enu_north, enu_up + enu_east_axis, enu_north_axis, enu_up_axis);
 
 impl<In> Vector<In> {
     /// Returns the cartesian components of this vector in XYZ order.
@@ -784,6 +792,7 @@ macro_rules! constructor {
 constructor!(RightHandedXyzLike, [x, y, z]);
 constructor!(NedLike, [ned_north, ned_east, ned_down]);
 constructor!(FrdLike, [frd_front, frd_right, frd_down]);
+constructor!(EnuLike, [enu_east, enu_north, enu_up]);
 
 #[cfg(test)]
 mod tests {}
