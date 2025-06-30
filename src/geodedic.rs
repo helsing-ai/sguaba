@@ -87,6 +87,18 @@ impl Wgs84 {
         }
     }
 
+    /// Turns a [`Wgs84`] coordinate back into a builder so that its components can be modified.
+    pub fn to_builder(self) -> Builder<HasLatitude, HasLongitude, HasAltitude> {
+        Builder {
+            under_construction: Self {
+                latitude: self.latitude,
+                longitude: self.longitude,
+                altitude: self.altitude,
+            },
+            has: (PhantomData, PhantomData, PhantomData),
+        }
+    }
+
     /// Constructs a world location from latitude, longitude, and altitude.
     ///
     /// Prefer [`Wgs84::build`] or [`Wgs84::builder`] to avoid risk of argument order confusion.
@@ -403,7 +415,7 @@ pub struct HasAltitude;
 
 /// [Builder] for a [`Wgs84`] coordinate.
 ///
-/// Construct one through [`Wgs84::builder`], and finalize with [`Builder::build`].
+/// Construct one through [`Wgs84::builder`] or [`Wgs84::to_builder`], and finalize with [`Builder::build`].
 ///
 /// [Builder]: https://rust-unofficial.github.io/patterns/patterns/creational/builder.html
 #[derive(Debug)]
@@ -563,6 +575,37 @@ mod tests {
                 }))
             }
         }
+    }
+
+    #[test]
+    fn wgs_builder() {
+        let wgs = Wgs84::build(Components {
+            latitude: d(1.0),
+            longitude: d(2.0),
+            altitude: m(3.0),
+        })
+        .unwrap();
+        assert_eq!(wgs.latitude(), d(1.0));
+        assert_eq!(wgs.longitude(), d(2.0));
+        assert_eq!(wgs.altitude(), m(3.0));
+
+        let wgs = wgs.to_builder().latitude(d(10.0)).unwrap().build();
+
+        assert_eq!(wgs.latitude(), d(10.0));
+        assert_eq!(wgs.longitude(), d(2.0));
+        assert_eq!(wgs.altitude(), m(3.0));
+
+        let wgs = wgs.to_builder().longitude(d(20.0)).build();
+
+        assert_eq!(wgs.latitude(), d(10.0));
+        assert_eq!(wgs.longitude(), d(20.0));
+        assert_eq!(wgs.altitude(), m(3.0));
+
+        let wgs = wgs.to_builder().altitude(m(30.0)).build();
+
+        assert_eq!(wgs.latitude(), d(10.0));
+        assert_eq!(wgs.longitude(), d(20.0));
+        assert_eq!(wgs.altitude(), m(30.0));
     }
 
     #[rstest]
