@@ -9,7 +9,7 @@ use crate::{Coordinate, Vector};
 
 /// Defines how a coordinate system behaves.
 ///
-/// For example, two coordinate systems that implement `CoordinateSystem<NedLike>` both behave
+/// For example, two coordinate systems that implement `CoordinateSystem<Convention = NedLike>` both behave
 /// [`NedLike`], and get appropriately-named accessors on types like [`Coordinate`] and [`Vector`]
 /// (ie, `north`, `east`, and `down`).
 ///
