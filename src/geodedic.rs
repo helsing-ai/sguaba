@@ -247,7 +247,10 @@ impl Coordinate<Ecef> {
         //   https://www.sciencedirect.com/science/article/pii/S0098300410001238
         //
         // which seemed promising both computationally and accuracy-wise. and indeed, implementing
-        // it gives us very fast convergence to correct values:
+        // it gives us very fast convergence to correct values.
+        //
+        // TODO: better solution for altitudes close to the center of the geosphere. The above
+        // paper specifically calls out convergence problems within 50km of earth center.
         let a = SEMI_MAJOR_AXIS;
         let b = SEMI_MINOR_AXIS;
         let a2 = a.powi(2);
@@ -260,34 +263,45 @@ impl Coordinate<Ecef> {
         let bigr2 = x2y2 + z2;
 
         let k0 = (((a2 * z2 + b2 * r2).sqrt() - ab) * bigr2) / (a2 * z2 + b2 * r2);
-        let mut k = k0;
-        loop {
+        let wgs84 = if !k0.is_normal() {
+            // This happens at or within few ULPs of ECEF = (0, 0, 0) due to 0/0 divide
+            // producing NaN. There are multiple Wgs84 coordinates representing the center
+            // of the earth sphere but (0, 0, -SEMI_MAJOR_AXIS) is the simplest.
+            Wgs84::builder()
+                .latitude(Angle::ZERO)
+                .expect("0 is in [-pi/2,pi/2]")
+                .longitude(Angle::ZERO)
+                .altitude(Length::new::<meter>(-SEMI_MAJOR_AXIS))
+                .build()
+        } else {
+            let mut k = k0;
+            loop {
+                let p = a + b * k;
+                let q = b + a * k;
+                let f_k = 2. * (b * p * q.powi(2) + a * p.powi(2) * q - a * r2 * q - b * z2 * p);
+                // NOTE(jon): dk here is the delta to the angle of the tangent _of the earth's
+                // surface_, so it will get very small very quickly.
+                let dk = -1. / f_k;
+
+                if !dk.is_normal() || dk.abs() < f64::EPSILON {
+                    // don't propagate NaNs and stop if there's no further refinement
+                    break;
+                }
+
+                k += dk;
+            }
             let p = a + b * k;
             let q = b + a * k;
-            let f_k = 2. * (b * p * q.powi(2) + a * p.powi(2) * q - a * r2 * q - b * z2 * p);
-            // NOTE(jon): dk here is the delta to the angle of the tangent _of the earth's
-            // surface_, so it will get very small very quickly.
-            let dk = -1. / f_k;
+            let lat = ((a * p * self.point.z) / (b * q * r)).atan();
+            let altitude = k * ((b2 * r2 / p.powi(2)) + (a2 * z2 / q.powi(2))).sqrt();
 
-            if !dk.is_normal() || dk.abs() < f64::EPSILON {
-                // don't propagate NaNs and stop if there's no further refinement
-                break;
-            }
-
-            k += dk;
-        }
-
-        let p = a + b * k;
-        let q = b + a * k;
-        let lat = ((a * p * self.point.z) / (b * q * r)).atan();
-        let altitude = k * ((b2 * r2 / p.powi(2)) + (a2 * z2 / q.powi(2))).sqrt();
-
-        let wgs84 = Wgs84::builder()
-            .latitude(Angle::new::<radian>(lat))
-            .expect("produces lat in [-pi/2,pi/2]")
-            .longitude(Angle::new::<radian>(lon))
-            .altitude(Length::new::<meter>(altitude))
-            .build();
+            Wgs84::builder()
+                .latitude(Angle::new::<radian>(lat))
+                .expect("produces lat in [-pi/2,pi/2]")
+                .longitude(Angle::new::<radian>(lon))
+                .altitude(Length::new::<meter>(altitude))
+                .build()
+        };
 
         #[cfg(all(debug_assertions, any(test, feature = "approx")))]
         {
@@ -750,5 +764,21 @@ mod tests {
             let ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
             assert_relative_eq!(ecef, coordinate!(x = m(x), y = m(y), z = m(z)),);
         }
+    }
+
+    #[test]
+    fn ecef_origin_to_wgs_and_back() {
+        let wgs_center = Wgs84::build(Components {
+            latitude: d(0.0),
+            longitude: d(0.0),
+            altitude: m(-6378137.),
+        })
+        .unwrap();
+
+        let wgs_from_ecef_origin = Coordinate::<Ecef>::origin().to_wgs84();
+        assert_eq!(wgs_from_ecef_origin, wgs_center); // Exact
+
+        let ecef = Coordinate::<Ecef>::from_wgs84(&wgs_center);
+        assert_eq!(ecef, Coordinate::<Ecef>::origin()); // Exact
     }
 }
