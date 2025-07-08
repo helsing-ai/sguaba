@@ -158,6 +158,25 @@ impl<In> Bearing<In> {
     {
         Vector::from_bearing(*self, Length::new::<meter>(1.))
     }
+
+    /// Constructs a bearing in coordinate system `In` with azimuth and elevation set to 0.
+    ///
+    /// The definition of the azimuthal angle depends on the implementation of [`BearingDefined`]
+    /// for `In`.
+    #[must_use]
+    pub fn zero() -> Self {
+        Self {
+            azimuth: Angle::ZERO,
+            elevation: Angle::ZERO,
+            system: PhantomData,
+        }
+    }
+}
+
+impl<In> Default for Bearing<In> {
+    fn default() -> Self {
+        Self::zero()
+    }
 }
 
 impl<In> Display for Bearing<In> {
