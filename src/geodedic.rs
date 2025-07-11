@@ -38,6 +38,17 @@ const SEMI_MINOR_AXIS: f64 = SEMI_MAJOR_AXIS * (1.0 - FLATTENING);
 //     = 2 * f - f^2
 const ECCENTRICITY_SQ: f64 = 2.0 * FLATTENING - FLATTENING * FLATTENING;
 
+// Altitude range for which we guarantee From<Ecef> for Wgs84.
+const ECEF_TO_WGS84_MIN_ALTITUDE_M: f64 = -10_000.0;
+const ECEF_TO_WGS84_MAX_ALTITUDE_M: f64 = 50_000.0;
+
+const ECEF_TO_WGS84_MIN_GEO_CENTER_DISTANCE_M_SQ: f64 = (SEMI_MINOR_AXIS
+    + ECEF_TO_WGS84_MIN_ALTITUDE_M)
+    * (SEMI_MINOR_AXIS + ECEF_TO_WGS84_MIN_ALTITUDE_M);
+const ECEF_TO_WGS84_MAX_GEO_CENTER_DISTANCE_M_SQ: f64 = (SEMI_MAJOR_AXIS
+    + ECEF_TO_WGS84_MAX_ALTITUDE_M)
+    * (SEMI_MAJOR_AXIS + ECEF_TO_WGS84_MAX_ALTITUDE_M);
+
 /// Representing an Earth-bound location using the [World Geodedic System
 /// '84](https://en.wikipedia.org/wiki/World_Geodetic_System#WGS_84).
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -215,12 +226,36 @@ impl Coordinate<Ecef> {
 
     /// Converts an Earth-Centered, Earth-Fixed coordinate into latitude, longitude, and altitude.
     ///
-    /// Note that this conversion is not trivial and needs to be approximated. This implementation
-    /// currentaly uses [Ferrari's solution][ferrari], but this may change in the future.
+    /// Note that this conversion is not trivial and needs to be approximated.
+    ///
+    /// The implementation currently only guarantees conversion to Wgs84 datums with altitude
+    /// between -10km and 50km from the surface of the Wgs84 ellipsoid, roughly corresponding
+    /// to the bottom of the Mariana Trench to the top of the stratosphere. Outside this range,
+    /// the implementation may panic.
+    ///
+    /// This implementation currently uses [Ferrari's solution][ferrari], but this may change
+    /// in the future.
     ///
     /// [ferrari]: https://en.wikipedia.org/wiki/Geographic_coordinate_conversion#The_application_of_Ferrari's_solution
     #[must_use]
     pub fn to_wgs84(&self) -> Wgs84 {
+        let geo_center_distance_sq =
+            self.point.x * self.point.x + self.point.y * self.point.y + self.point.z * self.point.z;
+
+        if !(ECEF_TO_WGS84_MIN_GEO_CENTER_DISTANCE_M_SQ
+            ..=ECEF_TO_WGS84_MAX_GEO_CENTER_DISTANCE_M_SQ)
+            .contains(&geo_center_distance_sq)
+        {
+            if geo_center_distance_sq < f64::EPSILON {
+                panic!("conversion from Ecef to Wgs84 at coordinate origin is not supported");
+            } else {
+                panic!(
+                    "conversion from Ecef to Wgs84 outside altitude range {}..{} is not supported: {}",
+                    ECEF_TO_WGS84_MIN_ALTITUDE_M, ECEF_TO_WGS84_MAX_ALTITUDE_M, self
+                )
+            }
+        }
+
         let lon = self.point.y.atan2(self.point.x);
 
         // interestingly, there is no single way to convert from ECEF to WGS84.
@@ -263,45 +298,33 @@ impl Coordinate<Ecef> {
         let bigr2 = x2y2 + z2;
 
         let k0 = (((a2 * z2 + b2 * r2).sqrt() - ab) * bigr2) / (a2 * z2 + b2 * r2);
-        let wgs84 = if !k0.is_normal() {
-            // This happens at or within few ULPs of ECEF = (0, 0, 0) due to 0/0 divide
-            // producing NaN. There are multiple Wgs84 coordinates representing the center
-            // of the earth sphere but (0, 0, -SEMI_MAJOR_AXIS) is the simplest.
-            Wgs84::builder()
-                .latitude(Angle::ZERO)
-                .expect("0 is in [-pi/2,pi/2]")
-                .longitude(Angle::ZERO)
-                .altitude(Length::new::<meter>(-SEMI_MAJOR_AXIS))
-                .build()
-        } else {
-            let mut k = k0;
-            loop {
-                let p = a + b * k;
-                let q = b + a * k;
-                let f_k = 2. * (b * p * q.powi(2) + a * p.powi(2) * q - a * r2 * q - b * z2 * p);
-                // NOTE(jon): dk here is the delta to the angle of the tangent _of the earth's
-                // surface_, so it will get very small very quickly.
-                let dk = -1. / f_k;
-
-                if !dk.is_normal() || dk.abs() < f64::EPSILON {
-                    // don't propagate NaNs and stop if there's no further refinement
-                    break;
-                }
-
-                k += dk;
-            }
+        let mut k = k0;
+        loop {
             let p = a + b * k;
             let q = b + a * k;
-            let lat = ((a * p * self.point.z) / (b * q * r)).atan();
-            let altitude = k * ((b2 * r2 / p.powi(2)) + (a2 * z2 / q.powi(2))).sqrt();
+            let f_k = 2. * (b * p * q.powi(2) + a * p.powi(2) * q - a * r2 * q - b * z2 * p);
+            // NOTE(jon): dk here is the delta to the angle of the tangent _of the earth's
+            // surface_, so it will get very small very quickly.
+            let dk = -1. / f_k;
 
-            Wgs84::builder()
-                .latitude(Angle::new::<radian>(lat))
-                .expect("produces lat in [-pi/2,pi/2]")
-                .longitude(Angle::new::<radian>(lon))
-                .altitude(Length::new::<meter>(altitude))
-                .build()
-        };
+            if !dk.is_normal() || dk.abs() < f64::EPSILON {
+                // don't propagate NaNs and stop if there's no further refinement
+                break;
+            }
+
+            k += dk;
+        }
+        let p = a + b * k;
+        let q = b + a * k;
+        let lat = ((a * p * self.point.z) / (b * q * r)).atan();
+        let altitude = k * ((b2 * r2 / p.powi(2)) + (a2 * z2 / q.powi(2))).sqrt();
+
+        let wgs84 = Wgs84::builder()
+            .latitude(Angle::new::<radian>(lat))
+            .expect("produces lat in [-pi/2,pi/2]")
+            .longitude(Angle::new::<radian>(lon))
+            .altitude(Length::new::<meter>(altitude))
+            .build();
 
         #[cfg(all(debug_assertions, any(test, feature = "approx")))]
         {
@@ -501,11 +524,13 @@ impl Builder<HasLatitude, HasLongitude, HasAltitude> {
 
 #[cfg(test)]
 mod tests {
+    use std::panic;
+
     use super::Wgs84;
     use crate::coordinate;
     use crate::coordinate_systems::Ecef;
     use crate::coordinates::Coordinate;
-    use crate::geodedic::Components;
+    use crate::geodedic::{Components, ECEF_TO_WGS84_MAX_ALTITUDE_M, ECEF_TO_WGS84_MIN_ALTITUDE_M};
     use crate::util::BoundedAngle;
     use approx::{assert_relative_eq, AbsDiffEq};
     use quickcheck::quickcheck;
@@ -552,7 +577,12 @@ mod tests {
                     latitude.rem_euclid(std::f64::consts::PI) - std::f64::consts::FRAC_PI_2,
                 ),
                 longitude: Angle::new::<radian>(longitude.rem_euclid(std::f64::consts::TAU)),
-                altitude: Length::new::<meter>(altitude.rem_euclid(50000.) - 10000.),
+                altitude: Length::new::<meter>(
+                    // Generates values ranged ECEF_TO_WGS84_MIN_ALTITUDE_M..ECEF_TO_WGS84_MAX_ALTITUDE_M
+                    altitude
+                        .rem_euclid(ECEF_TO_WGS84_MAX_ALTITUDE_M - ECEF_TO_WGS84_MIN_ALTITUDE_M)
+                        + ECEF_TO_WGS84_MIN_ALTITUDE_M,
+                ),
             }
         }
 
@@ -711,6 +741,37 @@ mod tests {
         }
     }
 
+    // Check a few points that should definitely panic due to being outside the supported altitude.
+    // wgs_ecef_roundtrip verifies that the conversion succeeds within the documented range.
+    #[rstest]
+    #[case(d(0.), d(0.), m(-50_000.))]
+    #[case(d(90.), d(180.), m(-50_000.))]
+    #[case(d(-90.), d(90.), m(-50_000.))]
+    #[case(d(0.), d(0.), m(80_000.))]
+    #[case(d(90.), d(180.), m(80_000.))]
+    #[case(d(-90.), d(90.), m(80_000.))]
+    #[should_panic(expected = "conversion from Ecef to Wgs84 outside altitude range")]
+    fn wgs_ecef_conversion_fails_for_low_or_high_altitudes(
+        #[case] lat: Angle,
+        #[case] long: Angle,
+        #[case] alt: Length,
+    ) -> () {
+        let wgs84 = Wgs84::build(Components {
+            latitude: lat,
+            longitude: long,
+            altitude: alt,
+        })
+        .unwrap();
+        let ecef: Coordinate<Ecef> = wgs84.into();
+        let _should_panic = ecef.to_wgs84();
+    }
+
+    #[test]
+    #[should_panic(expected = "conversion from Ecef to Wgs84 at coordinate origin")]
+    fn wgs_ecef_conversion_fails_for_ecef_origin() -> () {
+        let _should_panic = Coordinate::<Ecef>::origin().to_wgs84();
+    }
+
     // also, stress test known problematic things
     #[rstest]
     #[case(d(0.), d(0.), m(1000.))]
@@ -764,21 +825,5 @@ mod tests {
             let ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
             assert_relative_eq!(ecef, coordinate!(x = m(x), y = m(y), z = m(z)),);
         }
-    }
-
-    #[test]
-    fn ecef_origin_to_wgs_and_back() {
-        let wgs_center = Wgs84::build(Components {
-            latitude: d(0.0),
-            longitude: d(0.0),
-            altitude: m(-6378137.),
-        })
-        .unwrap();
-
-        let wgs_from_ecef_origin = Coordinate::<Ecef>::origin().to_wgs84();
-        assert_eq!(wgs_from_ecef_origin, wgs_center); // Exact
-
-        let ecef = Coordinate::<Ecef>::from_wgs84(&wgs_center);
-        assert_eq!(ecef, Coordinate::<Ecef>::origin()); // Exact
     }
 }
