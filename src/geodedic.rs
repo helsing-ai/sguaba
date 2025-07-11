@@ -250,8 +250,7 @@ impl Coordinate<Ecef> {
                 panic!("conversion from Ecef to Wgs84 at coordinate origin is not supported");
             } else {
                 panic!(
-                    "conversion from Ecef to Wgs84 outside altitude range {}..{} is not supported: {}",
-                    ECEF_TO_WGS84_MIN_ALTITUDE_M, ECEF_TO_WGS84_MAX_ALTITUDE_M, self
+                    "conversion from Ecef to Wgs84 outside altitude range {ECEF_TO_WGS84_MIN_ALTITUDE_M}..{ECEF_TO_WGS84_MAX_ALTITUDE_M} is not supported: {self}",
                 )
             }
         }
