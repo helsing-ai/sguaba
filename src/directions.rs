@@ -114,6 +114,18 @@ impl<In> Bearing<In> {
         }
     }
 
+    /// Turns a [`Bearing`] back into a builder so that its components can be modified.
+    pub fn to_builder(self) -> Builder<In, HasAzimuth, HasElevation> {
+        Builder {
+            under_construction: Self {
+                azimuth: self.azimuth,
+                elevation: self.elevation,
+                system: PhantomData,
+            },
+            has: (PhantomData, PhantomData),
+        }
+    }
+
     /// Constructs a bearing towards the given azimuth and elevation in the [`CoordinateSystem`]
     /// `In`.
     ///
@@ -267,7 +279,8 @@ pub struct HasElevation;
 
 /// [Builder] for a [`Bearing`].
 ///
-/// Construct one through [`Bearing::builder`], and finalize with [`Builder::build`].
+/// Construct one through [`Bearing::builder`] or [`Bearing::to_builder`], and finalize with
+/// [`Builder::build`].
 ///
 /// [Builder]: https://rust-unofficial.github.io/patterns/patterns/creational/builder.html
 #[derive(Debug)]
@@ -368,6 +381,27 @@ mod tests {
             .to_unit_vector(),
             vector!(f = m(expected[0]), r = m(expected[1]), d = m(expected[2]))
         );
+    }
+
+    #[test]
+    fn bearing_builder() {
+        let bearing = Bearing::<Frd>::build(Components {
+            azimuth: d(1.0),
+            elevation: d(2.0),
+        })
+        .unwrap();
+        assert_eq!(bearing.azimuth(), d(1.0));
+        assert_eq!(bearing.elevation(), d(2.0));
+
+        let bearing = bearing.to_builder().azimuth(d(10.0)).build();
+
+        assert_eq!(bearing.azimuth(), d(10.0));
+        assert_eq!(bearing.elevation(), d(2.0));
+
+        let bearing = bearing.to_builder().elevation(d(20.0)).unwrap().build();
+
+        assert_eq!(bearing.azimuth(), d(10.0));
+        assert_eq!(bearing.elevation(), d(20.0));
     }
 
     impl<In> quickcheck::Arbitrary for Bearing<In>
