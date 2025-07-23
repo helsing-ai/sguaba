@@ -19,6 +19,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.9.3]
+
+### Added
+
+- Implement `Default` for `Bearing`
+  ([#17](https://github.com/helsing-ai/sguaba/pull/17)).
+- Ability to turn a `Wgs84` or `Bearing` back into a builder
+  ([#16](https://github.com/helsing-ai/sguaba/pull/16),
+  ([#22](https://github.com/helsing-ai/sguaba/pull/22)).
+
+### Changed
+
+- Panic when ECEF->WGS84 conversion would produce incorrect results due
+  to being outside the supported range of the underlying algorithm. Note
+  that previously, this wouldn't panic, but you would instead get simply
+  incorrect conversion results
+  ([#24](https://github.com/helsing-ai/sguaba/pull/24)).
+
+### Fixed
+
+- Fixed edge case where 2π could be returned instead of 0 for very small
+  negative angles
+  ([#23](https://github.com/helsing-ai/sguaba/pull/23)).
+
 ## [0.9.2]
 
 ### Added
@@ -52,7 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial public release.
 
-[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.2...HEAD
+[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/helsing-ai/sguaba/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/helsing-ai/sguaba/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/helsing-ai/sguaba/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/helsing-ai/sguaba/releases/tag/v0.9.0

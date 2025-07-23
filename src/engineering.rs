@@ -806,7 +806,6 @@ mod tests {
     system!(struct PlaneNed using NED);
     system!(struct PlaneBNed using NED);
     system!(struct SensorFrd using FRD);
-    system!(struct EmitterFrd using FRD);
 
     #[test]
     fn usecase_1_where_is_the_object_in_world() {
