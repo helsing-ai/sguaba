@@ -228,8 +228,8 @@ impl Coordinate<Ecef> {
     ///
     /// Note that this conversion is not trivial and needs to be approximated.
     ///
-    /// The implementation currently only guarantees conversion to Wgs84 datums with altitude
-    /// between -10km and 50km from the surface of the Wgs84 ellipsoid, roughly corresponding
+    /// The implementation currently only guarantees conversion to WGS84 datums with altitude
+    /// between -10km and 50km from the surface of the WGS84 ellipsoid, roughly corresponding
     /// to the bottom of the Mariana Trench to the top of the stratosphere. Outside this range,
     /// the implementation may panic.
     ///
@@ -239,18 +239,20 @@ impl Coordinate<Ecef> {
     /// [ferrari]: https://en.wikipedia.org/wiki/Geographic_coordinate_conversion#The_application_of_Ferrari's_solution
     #[must_use]
     pub fn to_wgs84(&self) -> Wgs84 {
-        let geo_center_distance_sq =
-            self.point.x * self.point.x + self.point.y * self.point.y + self.point.z * self.point.z;
-
-        if !(ECEF_TO_WGS84_MIN_GEO_CENTER_DISTANCE_M_SQ
-            ..=ECEF_TO_WGS84_MAX_GEO_CENTER_DISTANCE_M_SQ)
-            .contains(&geo_center_distance_sq)
+        #[cfg(any(debug_assertions, test))]
         {
-            if geo_center_distance_sq < f64::EPSILON {
-                panic!("conversion from Ecef to Wgs84 at coordinate origin is not supported");
-            } else {
+            let geo_center_distance_sq = self.point.x * self.point.x
+                + self.point.y * self.point.y
+                + self.point.z * self.point.z;
+
+            if !(ECEF_TO_WGS84_MIN_GEO_CENTER_DISTANCE_M_SQ
+                ..=ECEF_TO_WGS84_MAX_GEO_CENTER_DISTANCE_M_SQ)
+                .contains(&geo_center_distance_sq)
+            {
                 panic!(
-                    "conversion from Ecef to Wgs84 outside altitude range {ECEF_TO_WGS84_MIN_ALTITUDE_M}..{ECEF_TO_WGS84_MAX_ALTITUDE_M} is not supported: {self}",
+                    "conversion from ECEF to WGS84 outside altitude range \
+            {ECEF_TO_WGS84_MIN_ALTITUDE_M}..{ECEF_TO_WGS84_MAX_ALTITUDE_M} \
+            is not supported: {self}"
                 )
             }
         }
@@ -313,6 +315,7 @@ impl Coordinate<Ecef> {
 
             k += dk;
         }
+
         let p = a + b * k;
         let q = b + a * k;
         let lat = ((a * p * self.point.z) / (b * q * r)).atan();
@@ -749,7 +752,7 @@ mod tests {
     #[case(d(0.), d(0.), m(80_000.))]
     #[case(d(90.), d(180.), m(80_000.))]
     #[case(d(-90.), d(90.), m(80_000.))]
-    #[should_panic(expected = "conversion from Ecef to Wgs84 outside altitude range")]
+    #[should_panic(expected = "conversion from ECEF to WGS84 outside altitude range")]
     fn wgs_ecef_conversion_fails_for_low_or_high_altitudes(
         #[case] lat: Angle,
         #[case] long: Angle,
@@ -766,7 +769,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "conversion from Ecef to Wgs84 at coordinate origin")]
+    #[should_panic(expected = "conversion from ECEF to WGS84 outside altitude range")]
     fn wgs_ecef_conversion_fails_for_ecef_origin() -> () {
         let _should_panic = Coordinate::<Ecef>::origin().to_wgs84();
     }
