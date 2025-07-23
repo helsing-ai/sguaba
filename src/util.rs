@@ -46,7 +46,14 @@ impl BoundedAngle {
 
     fn into_bounds(angle: Angle) -> f64 {
         let out_of_bounds: f64 = angle.get::<radian>();
-        out_of_bounds.rem_euclid(Angle::FULL_TURN.get::<radian>())
+        let in_bounds = out_of_bounds.rem_euclid(Angle::FULL_TURN.get::<radian>());
+        // `rem_euclid(self, rhs) == rhs` for specific inputs (e.g., `-f64::EPSILON`).
+        // We correct for this explicitly to ensure we never return the upper bound.
+        if in_bounds == Angle::FULL_TURN.get::<radian>() {
+            0.0
+        } else {
+            in_bounds
+        }
     }
 
     /// Returns the angle in [-180°, 180°) in radians.
@@ -111,6 +118,8 @@ impl AbsDiffEq<Self> for BoundedAngle {
 
 #[cfg(test)]
 mod tests {
+    use core::f64;
+
     use crate::util::BoundedAngle;
     use approx::{assert_abs_diff_eq, assert_abs_diff_ne, assert_relative_eq, assert_relative_ne};
     use rstest::rstest;
@@ -151,6 +160,13 @@ mod tests {
         let sut = BoundedAngle::new(out_of_bounds);
         let s: f64 = sut.get_bounded();
         assert_relative_eq!(s, 0.9, epsilon = 0.000_000_001);
+    }
+
+    #[test]
+    fn bounded_angle_negative_epsilon_radians() {
+        let out_of_bounds = Angle::new::<radian>(-f64::EPSILON);
+        let sut = BoundedAngle::into_bounds(out_of_bounds);
+        assert_eq!(sut, 0.0);
     }
 
     #[rstest]
