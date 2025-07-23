@@ -1342,7 +1342,6 @@ mod tests {
     system!(struct PlaneNed using NED);
     system!(struct PlaneEnu using ENU);
     system!(struct PlaneBNed using NED);
-    system!(struct PlaneBEnu using ENU);
     system!(struct SensorFrd using FRD);
     system!(struct EmitterFrd using FRD);
 
