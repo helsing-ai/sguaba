@@ -118,8 +118,6 @@ impl AbsDiffEq<Self> for BoundedAngle {
 
 #[cfg(test)]
 mod tests {
-    use core::f64;
-
     use crate::util::BoundedAngle;
     use approx::{assert_abs_diff_eq, assert_abs_diff_ne, assert_relative_eq, assert_relative_ne};
     use rstest::rstest;
