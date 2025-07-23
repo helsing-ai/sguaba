@@ -146,6 +146,8 @@ impl<In> Bearing<In> {
     ///
     /// The definition of the azimuthal angle depends on the implementation of [`BearingDefined`]
     /// for `In`.
+    ///
+    /// Note: There is no guarantee on the numeric range of the azimuthal angle.
     #[must_use]
     pub fn azimuth(&self) -> Angle {
         self.azimuth
@@ -156,7 +158,7 @@ impl<In> Bearing<In> {
     /// The definition of the azimuthal angle depends on the implementation of [`BearingDefined`]
     /// for `In`.
     ///
-    /// The returned value is always in [-90°, 90°].
+    /// The returned value is always in [-90°, 90°] % 360°
     #[must_use]
     pub fn elevation(&self) -> Angle {
         self.elevation
