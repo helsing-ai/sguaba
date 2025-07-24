@@ -158,7 +158,7 @@ impl<In> Bearing<In> {
     /// The definition of the azimuthal angle depends on the implementation of [`BearingDefined`]
     /// for `In`.
     ///
-    /// The returned value is always in [-90°, 90°] % 360°
+    /// The returned value is always in [-90°, 90°] ± N × 360°.
     #[must_use]
     pub fn elevation(&self) -> Angle {
         self.elevation
