@@ -334,6 +334,94 @@ impl<In> Builder<In, HasAzimuth, HasElevation> {
     }
 }
 
+/// Constructs a [`Bearing`] with compile-time validated angles using unit suffixes.
+///
+/// This macro provides a safe way to construct bearings with compile-time known angles,
+/// eliminating the need for `.expect()` calls on the elevation validation.
+///
+/// # Supported Units
+/// - `deg` - degrees
+/// - `rad` - radians
+///
+/// # Examples
+/// ```rust
+/// use sguaba::{bearing, system};
+///
+/// system!(struct PlaneFrd using FRD);
+///
+/// // Using degrees with explicit coordinate system
+/// let bearing1 = bearing!(azimuth = deg(20.0), elevation = deg(10.0); in PlaneFrd);
+///
+/// // Using degrees with inferred coordinate system (requires type annotation)
+/// let bearing2: sguaba::Bearing<PlaneFrd> = bearing!(azimuth = deg(20.0), elevation = deg(10.0));
+///
+/// // Using radians
+/// let bearing3 = bearing!(azimuth = rad(0.349), elevation = rad(0.175); in PlaneFrd);
+/// ```
+///
+/// # Compile-time validation
+///
+/// The following examples should fail to compile because elevation is out of range:
+///
+/// ```compile_fail
+/// # use sguaba::{bearing, system};
+/// # system!(struct PlaneFrd using FRD);
+/// // Elevation > 90° should fail
+/// let bearing = bearing!(azimuth = deg(0.0), elevation = deg(91.0); in PlaneFrd);
+/// ```
+///
+/// ```compile_fail
+/// # use sguaba::{bearing, system};
+/// # system!(struct PlaneFrd using FRD);
+/// // Elevation < -90° should fail
+/// let bearing = bearing!(azimuth = deg(0.0), elevation = deg(-91.0); in PlaneFrd);
+/// ```
+///
+/// ```compile_fail
+/// # use sguaba::{bearing, system};
+/// # system!(struct PlaneFrd using FRD);
+/// // Elevation > π/2 radians should fail
+/// let bearing = bearing!(azimuth = rad(0.0), elevation = rad(1.58); in PlaneFrd);
+/// ```
+///
+/// ```compile_fail
+/// # use sguaba::{bearing, system};
+/// # system!(struct PlaneFrd using FRD);
+/// // Elevation < -π/2 radians should fail
+/// let bearing = bearing!(azimuth = rad(0.0), elevation = rad(-1.58); in PlaneFrd);
+/// ```
+#[macro_export]
+macro_rules! bearing {
+    (azimuth = deg($az:expr), elevation = deg($el:expr) $(,)?) => {
+        bearing!(azimuth = deg($az), elevation = deg($el); in _)
+    };
+    (azimuth = rad($az:expr), elevation = rad($el:expr) $(,)?) => {
+        bearing!(azimuth = rad($az), elevation = rad($el); in _)
+    };
+    (azimuth = deg($az:expr), elevation = deg($el:expr); in $system:ty) => {{
+        const _: () = assert!(
+            $el >= -90.0 && $el <= 90.0,
+            "elevation must be in [-90°, 90°]"
+        );
+        $crate::Bearing::<$system>::builder()
+            .azimuth(::uom::si::f64::Angle::new::<::uom::si::angle::degree>($az))
+            .elevation(::uom::si::f64::Angle::new::<::uom::si::angle::degree>($el))
+            .expect("elevation is valid because it was checked at compile time")
+            .build()
+    }};
+    (azimuth = rad($az:expr), elevation = rad($el:expr); in $system:ty) => {{
+        const _: () = assert!(
+            $el >= -::std::f64::consts::FRAC_PI_2 && $el <= ::std::f64::consts::FRAC_PI_2,
+            "elevation must be in [-π/2, π/2] radians"
+        );
+        $crate::Bearing::<$system>::builder()
+            .azimuth(::uom::si::f64::Angle::new::<::uom::si::angle::radian>($az))
+            .elevation(::uom::si::f64::Angle::new::<::uom::si::angle::radian>($el))
+            .expect("elevation is valid because it was checked at compile time")
+            .build()
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use crate::coordinate_systems::Frd;
@@ -381,6 +469,46 @@ mod tests {
             .to_unit_vector(),
             vector!(f = m(expected[0]), r = m(expected[1]), d = m(expected[2]))
         );
+    }
+
+    #[test]
+    fn bearing_macro() {
+        // Test degrees with explicit coordinate system
+        let bearing1 = bearing!(azimuth = deg(20.0), elevation = deg(10.0); in Frd);
+        assert_eq!(bearing1.azimuth(), d(20.0));
+        assert_eq!(bearing1.elevation(), d(10.0));
+
+        // Test degrees with inferred coordinate system
+        let bearing2: Bearing<Frd> = bearing!(azimuth = deg(30.0), elevation = deg(5.0));
+        assert_eq!(bearing2.azimuth(), d(30.0));
+        assert_eq!(bearing2.elevation(), d(5.0));
+
+        // Test radians with explicit coordinate system
+        let bearing3 = bearing!(azimuth = rad(0.349), elevation = rad(0.175); in Frd);
+        assert_relative_eq!(bearing3.azimuth().get::<radian>(), 0.349);
+        assert_relative_eq!(bearing3.elevation().get::<radian>(), 0.175);
+
+        // Test radians with inferred coordinate system
+        let bearing4: Bearing<Frd> = bearing!(azimuth = rad(0.5), elevation = rad(0.1));
+        assert_relative_eq!(bearing4.azimuth().get::<radian>(), 0.5);
+        assert_relative_eq!(bearing4.elevation().get::<radian>(), 0.1);
+
+        // Test boundary values
+        let bearing5 = bearing!(azimuth = deg(0.0), elevation = deg(90.0); in Frd);
+        assert_eq!(bearing5.azimuth(), d(0.0));
+        assert_eq!(bearing5.elevation(), d(90.0));
+
+        let bearing6 = bearing!(azimuth = deg(0.0), elevation = deg(-90.0); in Frd);
+        assert_eq!(bearing6.azimuth(), d(0.0));
+        assert_eq!(bearing6.elevation(), d(-90.0));
+
+        // Test with radians at boundaries
+        use std::f64::consts::FRAC_PI_2;
+        let bearing7 = bearing!(azimuth = rad(0.0), elevation = rad(1.5707963267948966); in Frd);
+        assert_relative_eq!(bearing7.elevation().get::<radian>(), FRAC_PI_2);
+
+        let bearing8 = bearing!(azimuth = rad(0.0), elevation = rad(-1.5707963267948966); in Frd);
+        assert_relative_eq!(bearing8.elevation().get::<radian>(), -FRAC_PI_2);
     }
 
     #[test]
