@@ -302,6 +302,11 @@ pub mod builder {
             MissingLatitude, MissingLongitude,
         };
     }
+    pub mod tait_bryan {
+        pub use crate::math::tait_bryan_builder::{
+            Complete, NeedsPitch, NeedsRoll, NeedsYaw, TaitBryanBuilder,
+        };
+    }
 }
 
 /// Convenience re-exports for working with different vector units

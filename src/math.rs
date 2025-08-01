@@ -644,6 +644,86 @@ impl<From, To> Rotation<From, To> {
             Angle::new::<radian>(roll),
         )
     }
+
+    /// Provides a type-safe builder for constructing a rotation from Tait-Bryan angles.
+    ///
+    /// This builder enforces the correct intrinsic order (yaw → pitch → roll) at compile time
+    /// and provides named parameters to prevent argument order confusion.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use sguaba::{system, math::Rotation};
+    /// use uom::si::{f64::Angle, angle::degree};
+    ///
+    /// system!(struct PlaneNed using NED);
+    /// system!(struct PlaneFrd using FRD);
+    ///
+    /// let rotation = unsafe {
+    ///     Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+    ///         .yaw(Angle::new::<degree>(90.0))
+    ///         .pitch(Angle::new::<degree>(45.0))
+    ///         .roll(Angle::new::<degree>(5.0))
+    ///         .build()
+    /// };
+    /// ```
+    ///
+    /// The following examples should fail to compile because the angles are not provided
+    /// in the correct order:
+    ///
+    /// ```compile_fail
+    /// # use sguaba::{system, math::Rotation};
+    /// # use uom::si::{f64::Angle, angle::degree};
+    /// # system!(struct PlaneNed using NED);
+    /// # system!(struct PlaneFrd using FRD);
+    /// // Cannot call pitch before yaw - pitch() method doesn't exist on NeedsYaw state
+    /// let rotation = unsafe {
+    ///     Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+    ///         .pitch(Angle::new::<degree>(45.0))
+    ///         .yaw(Angle::new::<degree>(90.0))
+    ///         .roll(Angle::new::<degree>(5.0))
+    ///         .build()
+    /// };
+    /// ```
+    ///
+    /// ```compile_fail
+    /// # use sguaba::{system, math::Rotation};
+    /// # use uom::si::{f64::Angle, angle::degree};
+    /// # system!(struct PlaneNed using NED);
+    /// # system!(struct PlaneFrd using FRD);
+    /// // Cannot call build before setting all angles - build() method doesn't exist on NeedsPitch state
+    /// let rotation = unsafe {
+    ///     Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+    ///         .yaw(Angle::new::<degree>(90.0))
+    ///         .build()
+    /// };
+    /// ```
+    ///
+    /// ```compile_fail
+    /// # use sguaba::{system, math::Rotation};
+    /// # use uom::si::{f64::Angle, angle::degree};
+    /// # system!(struct PlaneNed using NED);
+    /// # system!(struct PlaneFrd using FRD);
+    /// // Cannot call roll before pitch - roll() method doesn't exist on NeedsPitch state
+    /// let rotation = unsafe {
+    ///     Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+    ///         .yaw(Angle::new::<degree>(90.0))
+    ///         .roll(Angle::new::<degree>(5.0))
+    ///         .pitch(Angle::new::<degree>(45.0))
+    ///         .build()
+    /// };
+    /// ```
+    ///
+    /// # Safety
+    ///
+    /// The builder's `build()` method is `unsafe` for the same reasons as
+    /// [`from_tait_bryan_angles`](Self::from_tait_bryan_angles): you are asserting
+    /// a relationship between coordinate systems `From` and `To`.
+    pub fn tait_bryan_builder(
+    ) -> tait_bryan_builder::TaitBryanBuilder<tait_bryan_builder::NeedsYaw, Rotation<From, To>>
+    {
+        tait_bryan_builder::TaitBryanBuilder::new()
+    }
 }
 
 impl<From, To> Rotation<From, To> {
@@ -1310,6 +1390,178 @@ impl<From, To> RelativeEq for RigidBodyTransform<From, To> {
         max_relative: Self::Epsilon,
     ) -> bool {
         self.inner.relative_eq(&other.inner, epsilon, max_relative)
+    }
+}
+
+/// Unified builder for constructing both [`Rotation`] and [`engineering::Orientation`] from Tait-Bryan angles.
+///
+/// This builder enforces the intrinsic Tait-Bryan angle order (yaw → pitch → roll) at compile time
+/// while providing named parameters to prevent argument order confusion.
+///
+/// The builder uses type states to ensure angles are set in the correct order and can construct
+/// either a [`Rotation`] (with `unsafe`) or an [`engineering::Orientation`] (safe).
+pub mod tait_bryan_builder {
+    use super::*;
+    use crate::engineering::Orientation;
+    use std::marker::PhantomData;
+    use uom::si::f64::Angle;
+    use uom::ConstZero;
+
+    /// State marker indicating yaw angle is needed next
+    pub struct NeedsYaw;
+
+    /// State marker indicating pitch angle is needed next
+    pub struct NeedsPitch;
+
+    /// State marker indicating roll angle is needed next
+    pub struct NeedsRoll;
+
+    /// State marker indicating all angles are set and ready to build
+    pub struct Complete;
+
+    /// Unified builder for Tait-Bryan angle construction with compile-time ordering enforcement.
+    ///
+    /// This builder ensures that Tait-Bryan angles are provided in the correct intrinsic order:
+    /// yaw (rotation about Z), then pitch (rotation about Y'), then roll (rotation about X'').
+    ///
+    /// The builder can construct either [`engineering::Orientation`] or [`Rotation`] depending
+    /// on the target type parameter.
+    pub struct TaitBryanBuilder<State, Target> {
+        yaw: Angle,
+        pitch: Angle,
+        roll: Angle,
+        _state: PhantomData<State>,
+        _target: PhantomData<fn() -> Target>,
+    }
+
+    // Manual implementations to avoid requiring derives on State and Target types
+    impl<State, Target> Clone for TaitBryanBuilder<State, Target> {
+        fn clone(&self) -> Self {
+            *self
+        }
+    }
+
+    impl<State, Target> Copy for TaitBryanBuilder<State, Target> {}
+
+    impl<Target> std::fmt::Debug for TaitBryanBuilder<NeedsYaw, Target> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("TaitBryanBuilder<NeedsYaw>").finish()
+        }
+    }
+
+    impl<Target> std::fmt::Debug for TaitBryanBuilder<NeedsPitch, Target> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("TaitBryanBuilder<NeedsPitch>")
+                .field("yaw", &self.yaw)
+                .finish()
+        }
+    }
+
+    impl<Target> std::fmt::Debug for TaitBryanBuilder<NeedsRoll, Target> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("TaitBryanBuilder<NeedsRoll>")
+                .field("yaw", &self.yaw)
+                .field("pitch", &self.pitch)
+                .finish()
+        }
+    }
+
+    impl<Target> std::fmt::Debug for TaitBryanBuilder<Complete, Target> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("TaitBryanBuilder<Complete>")
+                .field("yaw", &self.yaw)
+                .field("pitch", &self.pitch)
+                .field("roll", &self.roll)
+                .finish()
+        }
+    }
+
+    // State transition methods - these work for any target type
+    impl<Target> TaitBryanBuilder<NeedsYaw, Target> {
+        /// Creates a new builder needing a yaw angle.
+        pub(crate) fn new() -> Self {
+            Self {
+                yaw: Angle::ZERO,
+                pitch: Angle::ZERO,
+                roll: Angle::ZERO,
+                _state: PhantomData,
+                _target: PhantomData,
+            }
+        }
+
+        /// Sets the yaw angle (rotation about Z axis).
+        ///
+        /// In most coordinate systems, positive yaw rotates clockwise when viewed from above.
+        /// The exact meaning depends on the specific coordinate system being used.
+        pub fn yaw(mut self, angle: impl Into<Angle>) -> TaitBryanBuilder<NeedsPitch, Target> {
+            self.yaw = angle.into();
+            TaitBryanBuilder {
+                yaw: self.yaw,
+                pitch: self.pitch,
+                roll: self.roll,
+                _state: PhantomData,
+                _target: PhantomData,
+            }
+        }
+    }
+
+    impl<Target> TaitBryanBuilder<NeedsPitch, Target> {
+        /// Sets the pitch angle (rotation about Y' axis after yaw is applied).
+        ///
+        /// In most coordinate systems, positive pitch rotates the nose up.
+        /// This is an intrinsic rotation applied after the yaw rotation.
+        pub fn pitch(mut self, angle: impl Into<Angle>) -> TaitBryanBuilder<NeedsRoll, Target> {
+            self.pitch = angle.into();
+            TaitBryanBuilder {
+                yaw: self.yaw,
+                pitch: self.pitch,
+                roll: self.roll,
+                _state: PhantomData,
+                _target: PhantomData,
+            }
+        }
+    }
+
+    impl<Target> TaitBryanBuilder<NeedsRoll, Target> {
+        /// Sets the roll angle (rotation about X'' axis after yaw and pitch are applied).
+        ///
+        /// In most coordinate systems, positive roll rotates clockwise about the forward axis.
+        /// This is an intrinsic rotation applied after both yaw and pitch rotations.
+        pub fn roll(mut self, angle: impl Into<Angle>) -> TaitBryanBuilder<Complete, Target> {
+            self.roll = angle.into();
+            TaitBryanBuilder {
+                yaw: self.yaw,
+                pitch: self.pitch,
+                roll: self.roll,
+                _state: PhantomData,
+                _target: PhantomData,
+            }
+        }
+    }
+
+    // Specialized build methods for each target type
+    impl<In> TaitBryanBuilder<Complete, Orientation<In>> {
+        /// Builds an [`engineering::Orientation`] from the provided Tait-Bryan angles.
+        pub fn build(self) -> Orientation<In> {
+            Orientation::from_tait_bryan_angles(self.yaw, self.pitch, self.roll)
+        }
+    }
+
+    impl<From, To> TaitBryanBuilder<Complete, Rotation<From, To>> {
+        /// Builds a [`Rotation`] from the provided Tait-Bryan angles.
+        ///
+        /// # Safety
+        ///
+        /// This is `unsafe` because you are asserting a relationship between the coordinate
+        /// systems `From` and `To`. The constructed rotation will allow type-safe conversion
+        /// between these coordinate systems, so this assertion must be correct.
+        ///
+        /// Specifically, you are asserting that applying the yaw, pitch, and roll rotations
+        /// (in that intrinsic order) to the axes of coordinate system `From` will align them
+        /// with the axes of coordinate system `To`.
+        pub unsafe fn build(self) -> Rotation<From, To> {
+            Rotation::from_tait_bryan_angles(self.yaw, self.pitch, self.roll)
+        }
     }
 }
 
@@ -2468,5 +2720,154 @@ mod tests {
         // Check round trip
         let ned_round_trip = unsafe { ecef_to_enu_via_ned.into_ned_equivalent::<PlaneNed>() };
         assert_relative_eq!(ned_round_trip.inner, ecef_to_ned.inner, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn tait_bryan_builder_works_for_rotation() {
+        // Test that the builder produces the same result as direct construction
+        let yaw = d(90.);
+        let pitch = d(45.);
+        let roll = d(30.);
+
+        let rotation_direct =
+            unsafe { Rotation::<PlaneNed, PlaneFrd>::from_tait_bryan_angles(yaw, pitch, roll) };
+
+        let rotation_builder = unsafe {
+            Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+                .yaw(yaw)
+                .pitch(pitch)
+                .roll(roll)
+                .build()
+        };
+
+        assert_relative_eq!(rotation_direct.inner, rotation_builder.inner);
+    }
+
+    #[test]
+    fn tait_bryan_builder_works_for_orientation() {
+        use crate::engineering::Orientation;
+
+        // Test that the builder produces the same result as direct construction
+        let yaw = d(45.);
+        let pitch = d(-30.);
+        let roll = d(15.);
+
+        let orientation_direct = Orientation::<PlaneNed>::from_tait_bryan_angles(yaw, pitch, roll);
+
+        let orientation_builder = Orientation::<PlaneNed>::tait_bryan_builder()
+            .yaw(yaw)
+            .pitch(pitch)
+            .roll(roll)
+            .build();
+
+        assert_relative_eq!(
+            orientation_direct.inner.inner,
+            orientation_builder.inner.inner
+        );
+    }
+
+    /// Test that the builder correctly compiles for valid usage
+    #[test]
+    fn tait_bryan_builder_enforces_order() {
+        let builder = Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder();
+
+        // Can only call yaw first
+        let builder = builder.yaw(d(10.));
+
+        // Can only call pitch after yaw
+        let builder = builder.pitch(d(20.));
+
+        // Can only call roll after pitch
+        let builder = builder.roll(d(30.));
+
+        // Can only call build after roll
+        let _rotation = unsafe { builder.build() };
+    }
+
+    #[test]
+    fn tait_bryan_builder_derives_work() {
+        let builder = Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder();
+
+        // Test Clone
+        let builder_cloned = builder.clone();
+        let builder_after_yaw = builder_cloned.yaw(d(90.));
+
+        // Test Copy (implicit through assignment)
+        let builder_copied = builder;
+        let builder_after_yaw_2 = builder_copied.yaw(d(45.));
+
+        // Test Debug shows only set fields per state
+        let builder_needs_yaw = Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder();
+        let debug_str = format!("{:?}", builder_needs_yaw);
+        assert!(debug_str.contains("TaitBryanBuilder<NeedsYaw>"));
+        assert!(!debug_str.contains("yaw"));
+        assert!(!debug_str.contains("pitch"));
+        assert!(!debug_str.contains("roll"));
+
+        let debug_str = format!("{:?}", builder_after_yaw);
+        assert!(debug_str.contains("TaitBryanBuilder<NeedsPitch>"));
+        assert!(debug_str.contains("yaw"));
+        assert!(!debug_str.contains("pitch"));
+        assert!(!debug_str.contains("roll"));
+
+        let builder_after_pitch = builder_after_yaw.pitch(d(30.));
+        let debug_str = format!("{:?}", builder_after_pitch);
+        assert!(debug_str.contains("TaitBryanBuilder<NeedsRoll>"));
+        assert!(debug_str.contains("yaw"));
+        assert!(debug_str.contains("pitch"));
+        assert!(!debug_str.contains("roll"));
+
+        let builder_complete = builder_after_pitch.roll(d(15.));
+        let debug_str = format!("{:?}", builder_complete);
+        assert!(debug_str.contains("TaitBryanBuilder<Complete>"));
+        assert!(debug_str.contains("yaw"));
+        assert!(debug_str.contains("pitch"));
+        assert!(debug_str.contains("roll"));
+
+        // Verify both work independently
+        let builder_complete_1 = builder_after_yaw.pitch(d(30.)).roll(d(15.));
+        let builder_complete_2 = builder_after_yaw_2.pitch(d(60.)).roll(d(0.));
+
+        let _rotation_1 = unsafe { builder_complete_1.build() };
+        let _rotation_2 = unsafe { builder_complete_2.build() };
+    }
+
+    #[test]
+    fn tait_bryan_builder_orientation_derives_work() {
+        use crate::engineering::Orientation;
+
+        let builder = Orientation::<PlaneNed>::tait_bryan_builder();
+
+        // Test Clone and Copy work the same way
+        let builder_cloned = builder.clone();
+        let builder_copied = builder;
+
+        // Test Debug shows only set fields per state
+        let debug_str = format!("{:?}", builder);
+        assert!(debug_str.contains("TaitBryanBuilder<NeedsYaw>"));
+        assert!(!debug_str.contains("yaw"));
+        assert!(!debug_str.contains("pitch"));
+        assert!(!debug_str.contains("roll"));
+
+        // Both builders should work independently
+        let orientation_1 = builder_cloned.yaw(d(90.)).pitch(d(45.)).roll(d(0.)).build();
+
+        let orientation_2 = builder_copied.yaw(d(0.)).pitch(d(0.)).roll(d(90.)).build();
+
+        // Verify they produced different results
+        let (yaw1, _, _) = orientation_1.to_tait_bryan_angles();
+        let (_, _, roll2) = orientation_2.to_tait_bryan_angles();
+
+        use crate::util::BoundedAngle;
+        assert_abs_diff_eq!(
+            BoundedAngle::new(yaw1),
+            BoundedAngle::new(d(90.)),
+            epsilon = 1e-10
+        );
+        assert_abs_diff_eq!(
+            BoundedAngle::new(roll2),
+            BoundedAngle::new(d(90.)),
+            epsilon = 1e-10
+        );
     }
 }
