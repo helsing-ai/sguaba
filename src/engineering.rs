@@ -134,6 +134,7 @@ impl<In> Orientation<In> {
     #[doc(alias = "from_nautical_angles")]
     #[doc(alias = "from_cardan_angles")]
     #[doc(alias = "from_ypr")]
+    #[deprecated = "Prefer `tait_bryan_builder` to avoid argument-order confusion"]
     pub fn from_tait_bryan_angles(
         yaw: impl Into<Angle>,
         pitch: impl Into<Angle>,
@@ -142,6 +143,7 @@ impl<In> Orientation<In> {
         Self {
             // SAFETY: the object coordinate system is implictly defined, and so if we're told this
             // is the orientation of the object/body axes, then so be it.
+            #[allow(deprecated)]
             inner: unsafe { Rotation::from_tait_bryan_angles(yaw, pitch, roll) },
         }
     }
@@ -152,7 +154,64 @@ impl<In> Orientation<In> {
     /// zero values.
     #[must_use]
     pub fn aligned() -> Self {
-        Self::from_tait_bryan_angles(Angle::ZERO, Angle::ZERO, Angle::ZERO)
+        Self::tait_bryan_builder()
+            .yaw(Angle::ZERO)
+            .pitch(Angle::ZERO)
+            .roll(Angle::ZERO)
+            .build()
+    }
+
+    /// Provides a type-safe builder for constructing an orientation from Tait-Bryan angles.
+    ///
+    /// This builder enforces the correct intrinsic order (yaw → pitch → roll) at compile time
+    /// and provides named parameters to prevent argument order confusion.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use sguaba::{system, engineering::Orientation};
+    /// use uom::si::{f64::Angle, angle::degree};
+    ///
+    /// system!(struct PlaneNed using NED);
+    ///
+    /// let orientation = Orientation::<PlaneNed>::tait_bryan_builder()
+    ///     .yaw(Angle::new::<degree>(90.0))
+    ///     .pitch(Angle::new::<degree>(45.0))
+    ///     .roll(Angle::new::<degree>(5.0))
+    ///     .build();
+    /// ```
+    ///
+    /// The following examples should fail to compile because the angles are not provided
+    /// in the correct order:
+    ///
+    /// ```compile_fail
+    /// # use sguaba::{system, engineering::Orientation};
+    /// # use uom::si::{f64::Angle, angle::degree};
+    /// # system!(struct PlaneNed using NED);
+    /// // Cannot call roll before pitch - roll() method doesn't exist on NeedsPitch state
+    /// let orientation = Orientation::<PlaneNed>::tait_bryan_builder()
+    ///     .yaw(Angle::new::<degree>(90.0))
+    ///     .roll(Angle::new::<degree>(5.0))
+    ///     .pitch(Angle::new::<degree>(45.0))
+    ///     .build();
+    /// ```
+    ///
+    /// ```compile_fail
+    /// # use sguaba::{system, engineering::Orientation};
+    /// # use uom::si::{f64::Angle, angle::degree};
+    /// # system!(struct PlaneNed using NED);
+    /// // Cannot skip yaw and start with pitch - pitch() method doesn't exist on NeedsYaw state
+    /// let orientation = Orientation::<PlaneNed>::tait_bryan_builder()
+    ///     .pitch(Angle::new::<degree>(45.0))
+    ///     .yaw(Angle::new::<degree>(90.0))
+    ///     .roll(Angle::new::<degree>(5.0))
+    ///     .build();
+    /// ```
+    pub fn tait_bryan_builder() -> crate::math::tait_bryan_builder::TaitBryanBuilder<
+        crate::math::tait_bryan_builder::NeedsYaw,
+        Orientation<In>,
+    > {
+        crate::math::tait_bryan_builder::TaitBryanBuilder::new()
     }
 }
 
@@ -837,11 +896,11 @@ mod tests {
         // The instruments give the orientation as yaw, pitch, roll
         // The pilot knows that these are the tait-bryan angles we expect to get.
         // Here the plane is pitched 45 degrees upwards.
-        let orientation_in_ned = Orientation::<PlaneNed>::from_tait_bryan_angles(
-            d(0.),  // yaw
-            d(45.), // pitch
-            d(0.),  // roll
-        );
+        let orientation_in_ned = Orientation::<PlaneNed>::tait_bryan_builder()
+            .yaw(d(0.))
+            .pitch(d(45.))
+            .roll(d(0.))
+            .build();
 
         // And the pilot knows from pilot school, that the pose NED of the plane is defined by the WGS84 coordinate.
         // Also, the pilot knows that ECEF is a cartesian representation of WGS84.
@@ -879,11 +938,11 @@ mod tests {
         // If the pilot studied math and just wants to use transformations
         let ecef_to_ned = unsafe { RigidBodyTransform::<Ecef, PlaneNed>::ecef_to_ned_at(&wgs84) };
         let ned_to_frd = unsafe {
-            Rotation::from_tait_bryan_angles(
-                d(0.),  // yaw
-                d(45.), // pitch
-                d(0.),  // roll
-            )
+            Rotation::tait_bryan_builder()
+                .yaw(d(0.))
+                .pitch(d(45.))
+                .roll(d(0.))
+                .build()
         };
         // Think of matrix multiplication
         let ecef_to_frd = ecef_to_ned * ned_to_frd;
@@ -914,11 +973,18 @@ mod tests {
         .expect("latitude is in-range");
 
         // Pilot A reads plane A instruments.
-        let orientation_plane_a_in_ned =
-            Orientation::<PlaneNed>::from_tait_bryan_angles(d(0.), d(45.), d(0.));
+        let orientation_plane_a_in_ned = Orientation::<PlaneNed>::tait_bryan_builder()
+            .yaw(d(0.))
+            .pitch(d(45.))
+            .roll(d(0.))
+            .build();
 
         // Pilot B reads plane B instruments.
-        let orientation_plane_b_in_ned = Orientation::from_tait_bryan_angles(d(20.), d(12.), d(0.));
+        let orientation_plane_b_in_ned = Orientation::tait_bryan_builder()
+            .yaw(d(20.))
+            .pitch(d(12.))
+            .roll(d(0.))
+            .build();
 
         // Now both pilots can get the pose of their plane in the world
         let ecef_to_plane_a_ned = unsafe { RigidBodyTransform::ecef_to_ned_at(&position_plane_a) };
@@ -1003,7 +1069,11 @@ mod tests {
         let (yaw, pitch, roll) = ypr;
         let pose = Pose::<Ned>::new(
             Coordinate::from_nalgebra_point(position),
-            Orientation::from_tait_bryan_angles(yaw, pitch, roll),
+            Orientation::tait_bryan_builder()
+                .yaw(yaw)
+                .pitch(pitch)
+                .roll(roll)
+                .build(),
         );
 
         // also double-check the sanity of to_tait_bryan_angles
@@ -1022,7 +1092,11 @@ mod tests {
     #[test]
     fn orientation_inverse_works() {
         let ned_to_frd = unsafe {
-            Rotation::<PlaneNed, PlaneFrd>::from_tait_bryan_angles(d(45.), d(85.), d(150.))
+            Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+                .yaw(d(45.))
+                .pitch(d(85.))
+                .roll(d(150.))
+                .build()
         };
         let frd_to_ned = ned_to_frd.inverse();
 
@@ -1040,7 +1114,11 @@ mod tests {
         let ned_to_frd = unsafe {
             RigidBodyTransform::<PlaneNed, PlaneFrd>::new(
                 Vector::<PlaneNed>::zero(),
-                Rotation::from_tait_bryan_angles(d(90.), d(90.), d(0.)),
+                Rotation::tait_bryan_builder()
+                    .yaw(d(90.))
+                    .pitch(d(90.))
+                    .roll(d(0.))
+                    .build(),
             )
         };
 
@@ -1125,7 +1203,11 @@ mod tests {
         let ned_to_frd_2 = unsafe {
             RigidBodyTransform::<PlaneBNed, SensorFrd>::new(
                 Vector::<PlaneBNed>::zero(),
-                Rotation::from_tait_bryan_angles(d(-45.), d(0.), d(0.)),
+                Rotation::tait_bryan_builder()
+                    .yaw(d(-45.))
+                    .pitch(d(0.))
+                    .roll(d(0.))
+                    .build(),
             )
         };
 
