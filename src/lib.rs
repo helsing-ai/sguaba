@@ -289,5 +289,10 @@ pub mod builder {
             MissingLatitude, MissingLongitude,
         };
     }
+    pub mod tait_bryan {
+        pub use crate::math::tait_bryan_builder::{
+            Complete, NeedsPitch, NeedsRoll, NeedsYaw, TaitBryanBuilder,
+        };
+    }
 }
 pub use vectors::Vector;

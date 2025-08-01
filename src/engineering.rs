@@ -154,6 +154,59 @@ impl<In> Orientation<In> {
     pub fn aligned() -> Self {
         Self::from_tait_bryan_angles(Angle::ZERO, Angle::ZERO, Angle::ZERO)
     }
+
+    /// Provides a type-safe builder for constructing an orientation from Tait-Bryan angles.
+    ///
+    /// This builder enforces the correct intrinsic order (yaw → pitch → roll) at compile time
+    /// and provides named parameters to prevent argument order confusion.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use sguaba::{system, engineering::Orientation};
+    /// use uom::si::{f64::Angle, angle::degree};
+    ///
+    /// system!(struct PlaneNed using NED);
+    ///
+    /// let orientation = Orientation::<PlaneNed>::tait_bryan_builder()
+    ///     .yaw(Angle::new::<degree>(90.0))
+    ///     .pitch(Angle::new::<degree>(45.0))
+    ///     .roll(Angle::new::<degree>(5.0))
+    ///     .build();
+    /// ```
+    ///
+    /// The following examples should fail to compile because the angles are not provided
+    /// in the correct order:
+    ///
+    /// ```compile_fail
+    /// # use sguaba::{system, engineering::Orientation};
+    /// # use uom::si::{f64::Angle, angle::degree};
+    /// # system!(struct PlaneNed using NED);
+    /// // Cannot call roll before pitch - roll() method doesn't exist on NeedsPitch state
+    /// let orientation = Orientation::<PlaneNed>::tait_bryan_builder()
+    ///     .yaw(Angle::new::<degree>(90.0))
+    ///     .roll(Angle::new::<degree>(5.0))
+    ///     .pitch(Angle::new::<degree>(45.0))
+    ///     .build();
+    /// ```
+    ///
+    /// ```compile_fail
+    /// # use sguaba::{system, engineering::Orientation};
+    /// # use uom::si::{f64::Angle, angle::degree};
+    /// # system!(struct PlaneNed using NED);
+    /// // Cannot skip yaw and start with pitch - pitch() method doesn't exist on NeedsYaw state
+    /// let orientation = Orientation::<PlaneNed>::tait_bryan_builder()
+    ///     .pitch(Angle::new::<degree>(45.0))
+    ///     .yaw(Angle::new::<degree>(90.0))
+    ///     .roll(Angle::new::<degree>(5.0))
+    ///     .build();
+    /// ```
+    pub fn tait_bryan_builder() -> crate::math::tait_bryan_builder::TaitBryanBuilder<
+        crate::math::tait_bryan_builder::NeedsYaw,
+        Orientation<In>,
+    > {
+        crate::math::tait_bryan_builder::TaitBryanBuilder::new()
+    }
 }
 
 impl<In> Default for Orientation<In> {
