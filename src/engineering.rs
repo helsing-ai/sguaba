@@ -134,6 +134,7 @@ impl<In> Orientation<In> {
     #[doc(alias = "from_nautical_angles")]
     #[doc(alias = "from_cardan_angles")]
     #[doc(alias = "from_ypr")]
+    #[deprecated = "Prefer `tait_bryan_builder` to avoid argument-order confusion"]
     pub fn from_tait_bryan_angles(
         yaw: impl Into<Angle>,
         pitch: impl Into<Angle>,
@@ -142,6 +143,7 @@ impl<In> Orientation<In> {
         Self {
             // SAFETY: the object coordinate system is implictly defined, and so if we're told this
             // is the orientation of the object/body axes, then so be it.
+            #[allow(deprecated)]
             inner: unsafe { Rotation::from_tait_bryan_angles(yaw, pitch, roll) },
         }
     }
@@ -152,6 +154,7 @@ impl<In> Orientation<In> {
     /// zero values.
     #[must_use]
     pub fn aligned() -> Self {
+        #[allow(deprecated)]
         Self::from_tait_bryan_angles(Angle::ZERO, Angle::ZERO, Angle::ZERO)
     }
 
