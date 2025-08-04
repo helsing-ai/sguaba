@@ -355,7 +355,7 @@ impl<In> Builder<In, HasAzimuth, HasElevation> {
 /// // Using degrees with inferred coordinate system (requires type annotation)
 /// let bearing2: sguaba::Bearing<PlaneFrd> = bearing!(azimuth = deg(20.0), elevation = deg(10.0));
 ///
-/// // Using radians  
+/// // Using radians
 /// let bearing3 = bearing!(azimuth = rad(0.349), elevation = rad(0.175); in PlaneFrd);
 /// ```
 ///
@@ -404,19 +404,19 @@ macro_rules! bearing {
             "elevation must be in [-90°, 90°]"
         );
         $crate::Bearing::<$system>::builder()
-            .azimuth(uom::si::f64::Angle::new::<uom::si::angle::degree>($az))
-            .elevation(uom::si::f64::Angle::new::<uom::si::angle::degree>($el))
+            .azimuth(::uom::si::f64::Angle::new::<::uom::si::angle::degree>($az))
+            .elevation(::uom::si::f64::Angle::new::<::uom::si::angle::degree>($el))
             .expect("elevation is valid because it was checked at compile time")
             .build()
     }};
     (azimuth = rad($az:expr), elevation = rad($el:expr); in $system:ty) => {{
         const _: () = assert!(
-            $el >= -std::f64::consts::FRAC_PI_2 && $el <= std::f64::consts::FRAC_PI_2,
+            $el >= -::std::f64::consts::FRAC_PI_2 && $el <= ::std::f64::consts::FRAC_PI_2,
             "elevation must be in [-π/2, π/2] radians"
         );
         $crate::Bearing::<$system>::builder()
-            .azimuth(uom::si::f64::Angle::new::<uom::si::angle::radian>($az))
-            .elevation(uom::si::f64::Angle::new::<uom::si::angle::radian>($el))
+            .azimuth(::uom::si::f64::Angle::new::<::uom::si::angle::radian>($az))
+            .elevation(::uom::si::f64::Angle::new::<::uom::si::angle::radian>($el))
             .expect("elevation is valid because it was checked at compile time")
             .build()
     }};

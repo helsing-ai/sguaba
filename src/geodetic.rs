@@ -584,10 +584,12 @@ macro_rules! wgs84 {
             "latitude must be in [-90°, 90°]"
         );
         $crate::systems::Wgs84::builder()
-            .latitude(uom::si::f64::Angle::new::<uom::si::angle::degree>($lat))
+            .latitude(::uom::si::f64::Angle::new::<::uom::si::angle::degree>($lat))
             .expect("latitude is valid because it was checked at compile time")
-            .longitude(uom::si::f64::Angle::new::<uom::si::angle::degree>($lng))
-            .altitude(uom::si::f64::Length::new::<uom::si::length::meter>($alt))
+            .longitude(::uom::si::f64::Angle::new::<::uom::si::angle::degree>($lng))
+            .altitude(::uom::si::f64::Length::new::<::uom::si::length::meter>(
+                $alt,
+            ))
             .build()
     }};
     (latitude = deg($lat:expr), longitude = deg($lng:expr), altitude = km($alt:expr)) => {{
@@ -596,10 +598,10 @@ macro_rules! wgs84 {
             "latitude must be in [-90°, 90°]"
         );
         $crate::systems::Wgs84::builder()
-            .latitude(uom::si::f64::Angle::new::<uom::si::angle::degree>($lat))
+            .latitude(::uom::si::f64::Angle::new::<::uom::si::angle::degree>($lat))
             .expect("latitude is valid because it was checked at compile time")
-            .longitude(uom::si::f64::Angle::new::<uom::si::angle::degree>($lng))
-            .altitude(uom::si::f64::Length::new::<uom::si::length::kilometer>(
+            .longitude(::uom::si::f64::Angle::new::<::uom::si::angle::degree>($lng))
+            .altitude(::uom::si::f64::Length::new::<::uom::si::length::kilometer>(
                 $alt,
             ))
             .build()
@@ -610,10 +612,12 @@ macro_rules! wgs84 {
             "latitude must be in [-π/2, π/2] radians"
         );
         $crate::systems::Wgs84::builder()
-            .latitude(uom::si::f64::Angle::new::<uom::si::angle::radian>($lat))
+            .latitude(::uom::si::f64::Angle::new::<::uom::si::angle::radian>($lat))
             .expect("latitude is valid because it was checked at compile time")
-            .longitude(uom::si::f64::Angle::new::<uom::si::angle::radian>($lng))
-            .altitude(uom::si::f64::Length::new::<uom::si::length::meter>($alt))
+            .longitude(::uom::si::f64::Angle::new::<::uom::si::angle::radian>($lng))
+            .altitude(::uom::si::f64::Length::new::<::uom::si::length::meter>(
+                $alt,
+            ))
             .build()
     }};
     (latitude = rad($lat:expr), longitude = rad($lng:expr), altitude = km($alt:expr)) => {{
@@ -622,10 +626,10 @@ macro_rules! wgs84 {
             "latitude must be in [-π/2, π/2] radians"
         );
         $crate::systems::Wgs84::builder()
-            .latitude(uom::si::f64::Angle::new::<uom::si::angle::radian>($lat))
+            .latitude(::uom::si::f64::Angle::new::<::uom::si::angle::radian>($lat))
             .expect("latitude is valid because it was checked at compile time")
-            .longitude(uom::si::f64::Angle::new::<uom::si::angle::radian>($lng))
-            .altitude(uom::si::f64::Length::new::<uom::si::length::kilometer>(
+            .longitude(::uom::si::f64::Angle::new::<::uom::si::angle::radian>($lng))
+            .altitude(::uom::si::f64::Length::new::<::uom::si::length::kilometer>(
                 $alt,
             ))
             .build()
