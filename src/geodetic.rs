@@ -49,7 +49,7 @@ const ECEF_TO_WGS84_MAX_GEO_CENTER_DISTANCE_M_SQ: f64 = (SEMI_MAJOR_AXIS
     + ECEF_TO_WGS84_MAX_ALTITUDE_M)
     * (SEMI_MAJOR_AXIS + ECEF_TO_WGS84_MAX_ALTITUDE_M);
 
-/// Representing an Earth-bound location using the [World Geodedic System
+/// Representing an Earth-bound location using the [World Geodetic System
 /// '84](https://en.wikipedia.org/wiki/World_Geodetic_System#WGS_84).
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -532,7 +532,7 @@ mod tests {
     use crate::coordinate;
     use crate::coordinate_systems::Ecef;
     use crate::coordinates::Coordinate;
-    use crate::geodedic::{Components, ECEF_TO_WGS84_MAX_ALTITUDE_M, ECEF_TO_WGS84_MIN_ALTITUDE_M};
+    use crate::geodetic::{Components, ECEF_TO_WGS84_MAX_ALTITUDE_M, ECEF_TO_WGS84_MIN_ALTITUDE_M};
     use crate::util::BoundedAngle;
     use approx::{assert_relative_eq, AbsDiffEq};
     use quickcheck::quickcheck;

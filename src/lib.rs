@@ -233,7 +233,7 @@ mod coordinate_systems;
 
 mod coordinates;
 mod directions;
-mod geodedic;
+mod geodetic;
 mod util;
 mod vectors;
 
@@ -258,7 +258,7 @@ pub mod systems {
     pub use super::coordinate_systems::{
         EnuComponents, FrdComponents, HasComponents, NedComponents, XyzComponents,
     };
-    pub use super::geodedic::Wgs84;
+    pub use super::geodetic::Wgs84;
 }
 pub use coordinate_systems::CoordinateSystem;
 pub use coordinates::Coordinate;
@@ -284,7 +284,7 @@ pub mod builder {
         };
     }
     pub mod wgs84 {
-        pub use crate::geodedic::{
+        pub use crate::geodetic::{
             Builder, Components, HasAltitude, HasLatitude, HasLongitude, MissingAltitude,
             MissingLatitude, MissingLongitude,
         };
