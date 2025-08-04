@@ -363,6 +363,7 @@ impl<From, To> Rotation<From, To> {
     #[doc(alias = "from_nautical_angles")]
     #[doc(alias = "from_cardan_angles")]
     #[doc(alias = "from_ypr")]
+    #[deprecated = "Prefer `tait_bryan_builder` to avoid argument-order confusion"]
     pub unsafe fn from_tait_bryan_angles(
         yaw: impl Into<Angle>,
         pitch: impl Into<Angle>,
@@ -1543,6 +1544,7 @@ pub mod tait_bryan_builder {
     impl<In> TaitBryanBuilder<Complete, Orientation<In>> {
         /// Builds an [`engineering::Orientation`] from the provided Tait-Bryan angles.
         pub fn build(self) -> Orientation<In> {
+            #[allow(deprecated)]
             Orientation::from_tait_bryan_angles(self.yaw, self.pitch, self.roll)
         }
     }
@@ -1560,6 +1562,7 @@ pub mod tait_bryan_builder {
         /// (in that intrinsic order) to the axes of coordinate system `From` will align them
         /// with the axes of coordinate system `To`.
         pub unsafe fn build(self) -> Rotation<From, To> {
+            #[allow(deprecated)]
             Rotation::from_tait_bryan_angles(self.yaw, self.pitch, self.roll)
         }
     }
