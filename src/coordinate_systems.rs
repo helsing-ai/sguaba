@@ -1,5 +1,6 @@
-use crate::Bearing;
-use uom::si::f64::{Angle, Length};
+use crate::{Bearing, LengthPossiblyPer};
+use typenum::Z0;
+use uom::si::f64::Angle;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -21,8 +22,20 @@ pub trait CoordinateSystem {
 
 /// Links a coordinate system convention to the type holding the constituent parts under proper
 /// names.
-pub trait HasComponents {
-    type Components: Into<[Length; 3]>;
+///
+/// The `Time` component is the magnitude of the time dimension in the encompassed unit, expressed
+/// in terms of values from the [`typenum`] crate. For example, `Time = Z0` would signify a length
+/// with no time component, which would simply be a length (eg, meters). `Time = N1` would signify
+/// a length with a ^-1 time component, which is a velocity (eg, meters per second). Similarly,
+/// `Time = N2` is acceleration (eg, meters per second squared).
+///
+/// You should generally implement this trait generically. The `Time = Z0` default is only there to
+/// preserve backwards compatibility.
+pub trait HasComponents<Time = Z0>
+where
+    Time: typenum::Integer,
+{
+    type Components: Into<[LengthPossiblyPer<Time>; 3]>;
 }
 
 /// Indicates that the implementing coordinate system is exactly equivalent to
@@ -116,20 +129,23 @@ pub struct NedLike;
 /// Usually provided to methods like [`Coordinate::build`] or [`Vector::build`].
 #[derive(Debug, Clone, Copy)]
 #[must_use]
-pub struct NedComponents {
-    pub north: Length,
-    pub east: Length,
-    pub down: Length,
+pub struct NedComponents<Time = Z0>
+where
+    Time: typenum::Integer,
+{
+    pub north: LengthPossiblyPer<Time>,
+    pub east: LengthPossiblyPer<Time>,
+    pub down: LengthPossiblyPer<Time>,
 }
 
-impl From<NedComponents> for [Length; 3] {
-    fn from(c: NedComponents) -> [Length; 3] {
+impl<Time: typenum::Integer> From<NedComponents<Time>> for [LengthPossiblyPer<Time>; 3] {
+    fn from(c: NedComponents<Time>) -> [LengthPossiblyPer<Time>; 3] {
         [c.north, c.east, c.down]
     }
 }
 
-impl HasComponents for NedLike {
-    type Components = NedComponents;
+impl<Time: typenum::Integer> HasComponents<Time> for NedLike {
+    type Components = NedComponents<Time>;
 }
 
 /// Marks an FRD-like coordinate system where the axes are Front (or "Forward"), Right, and Down.
@@ -167,20 +183,23 @@ pub struct FrdLike;
 /// Usually provided to methods like [`Coordinate::build`] or [`Vector::build`].
 #[derive(Debug, Clone, Copy)]
 #[must_use]
-pub struct FrdComponents {
-    pub front: Length,
-    pub right: Length,
-    pub down: Length,
+pub struct FrdComponents<Time = Z0>
+where
+    Time: typenum::Integer,
+{
+    pub front: LengthPossiblyPer<Time>,
+    pub right: LengthPossiblyPer<Time>,
+    pub down: LengthPossiblyPer<Time>,
 }
 
-impl From<FrdComponents> for [Length; 3] {
-    fn from(c: FrdComponents) -> [Length; 3] {
+impl<Time: typenum::Integer> From<FrdComponents<Time>> for [LengthPossiblyPer<Time>; 3] {
+    fn from(c: FrdComponents<Time>) -> [LengthPossiblyPer<Time>; 3] {
         [c.front, c.right, c.down]
     }
 }
 
-impl HasComponents for FrdLike {
-    type Components = FrdComponents;
+impl<Time: typenum::Integer> HasComponents<Time> for FrdLike {
+    type Components = FrdComponents<Time>;
 }
 
 /// Marks an ENU-like coordinate system where the axes are East, North, and Up.
@@ -214,20 +233,23 @@ pub struct EnuLike;
 /// Usually provided to methods like [`Coordinate::build`] or [`Vector::build`].
 #[derive(Debug, Clone, Copy)]
 #[must_use]
-pub struct EnuComponents {
-    pub east: Length,
-    pub north: Length,
-    pub up: Length,
+pub struct EnuComponents<Time = Z0>
+where
+    Time: typenum::Integer,
+{
+    pub east: LengthPossiblyPer<Time>,
+    pub north: LengthPossiblyPer<Time>,
+    pub up: LengthPossiblyPer<Time>,
 }
 
-impl From<EnuComponents> for [Length; 3] {
-    fn from(c: EnuComponents) -> [Length; 3] {
+impl<Time: typenum::Integer> From<EnuComponents<Time>> for [LengthPossiblyPer<Time>; 3] {
+    fn from(c: EnuComponents<Time>) -> [LengthPossiblyPer<Time>; 3] {
         [c.east, c.north, c.up]
     }
 }
 
-impl HasComponents for EnuLike {
-    type Components = EnuComponents;
+impl<Time: typenum::Integer> HasComponents<Time> for EnuLike {
+    type Components = EnuComponents<Time>;
 }
 
 /// Marks a coordinate system whose axes are simply named X, Y, and Z.
@@ -243,20 +265,23 @@ pub struct RightHandedXyzLike;
 /// Usually provided to methods like [`Coordinate::build`] or [`Vector::build`].
 #[derive(Debug, Clone, Copy)]
 #[must_use]
-pub struct XyzComponents {
-    pub x: Length,
-    pub y: Length,
-    pub z: Length,
+pub struct XyzComponents<Time = Z0>
+where
+    Time: typenum::Integer,
+{
+    pub x: LengthPossiblyPer<Time>,
+    pub y: LengthPossiblyPer<Time>,
+    pub z: LengthPossiblyPer<Time>,
 }
 
-impl From<XyzComponents> for [Length; 3] {
-    fn from(c: XyzComponents) -> [Length; 3] {
+impl<Time: typenum::Integer> From<XyzComponents<Time>> for [LengthPossiblyPer<Time>; 3] {
+    fn from(c: XyzComponents<Time>) -> [LengthPossiblyPer<Time>; 3] {
         [c.x, c.y, c.z]
     }
 }
 
-impl HasComponents for RightHandedXyzLike {
-    type Components = XyzComponents;
+impl<Time: typenum::Integer> HasComponents<Time> for RightHandedXyzLike {
+    type Components = XyzComponents<Time>;
 }
 
 /// Defines a new coordinate system and its conventions.

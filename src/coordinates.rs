@@ -548,11 +548,11 @@ macro_rules! accessors {
             pub fn $z(&self) -> Length { Length::new::<meter>(self.point.z) }
 
             #[must_use]
-            pub fn $x_ax() -> Vector<In> { Vector::<In>::$x_ax() }
+            pub fn $x_ax() -> Vector<In> { Vector::$x_ax() }
             #[must_use]
-            pub fn $y_ax() -> Vector<In> { Vector::<In>::$y_ax() }
+            pub fn $y_ax() -> Vector<In> { Vector::$y_ax() }
             #[must_use]
-            pub fn $z_ax() -> Vector<In> { Vector::<In>::$z_ax() }
+            pub fn $z_ax() -> Vector<In> { Vector::$z_ax() }
         }
     };
 }
