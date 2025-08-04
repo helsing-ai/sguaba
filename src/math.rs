@@ -1719,8 +1719,13 @@ mod tests {
         #[case] point_in_b: Point3,
     ) {
         let (yaw, pitch, roll) = ypr;
-        let frd_orientation =
-            unsafe { Rotation::<SensorFrd, EmitterFrd>::from_tait_bryan_angles(yaw, pitch, roll) };
+        let frd_orientation = unsafe {
+            Rotation::<SensorFrd, EmitterFrd>::tait_bryan_builder()
+                .yaw(yaw)
+                .pitch(pitch)
+                .roll(roll)
+                .build()
+        };
 
         // Sanity-check that to_tait_bryan_angles does what we expect, but only if we're already
         // giving normalized input (otherwise the unit quaternion will do it for us and the
@@ -1744,17 +1749,22 @@ mod tests {
 
         let (yaw_converted, pitch_converted, roll_converted) = frd_orientation.euler_angles();
         let frd_orientation_converted = unsafe {
-            Rotation::<SensorFrd, EmitterFrd>::from_tait_bryan_angles(
-                yaw_converted,
-                pitch_converted,
-                roll_converted,
-            )
+            Rotation::<SensorFrd, EmitterFrd>::tait_bryan_builder()
+                .yaw(yaw_converted)
+                .pitch(pitch_converted)
+                .roll(roll_converted)
+                .build()
         };
         assert_relative_eq!(frd_orientation, frd_orientation_converted);
 
         // Orientation works between NED and FRD coordinates
-        let ned_orientation =
-            unsafe { Rotation::<Ned, Frd>::from_tait_bryan_angles(yaw, pitch, roll) };
+        let ned_orientation = unsafe {
+            Rotation::<Ned, Frd>::tait_bryan_builder()
+                .yaw(yaw)
+                .pitch(pitch)
+                .roll(roll)
+                .build()
+        };
 
         let ned = Coordinate::<Ned>::from_nalgebra_point(point_in_a);
         let frd = ned_orientation.transform(ned);
@@ -1784,8 +1794,13 @@ mod tests {
         // Check that orientation works between ENU and FRD coordinates. These work with the
         // same test cases because Rotation::<Ned, Frd> and Rotation::<Enu, Frd> build the
         // same quaternions.
-        let enu_orientation =
-            unsafe { Rotation::<Enu, Frd>::from_tait_bryan_angles(yaw, pitch, roll) };
+        let enu_orientation = unsafe {
+            Rotation::<Enu, Frd>::tait_bryan_builder()
+                .yaw(yaw)
+                .pitch(pitch)
+                .roll(roll)
+                .build()
+        };
 
         let enu = Coordinate::<Enu>::from_nalgebra_point(point_in_a);
         let frd = enu_orientation.transform(enu);
@@ -1817,7 +1832,11 @@ mod tests {
     fn orientation_multiplication_works() {
         // Transforms a NED to an FRD coordinate of an object with this yaw, pitch, roll.
         let ned_to_frd = unsafe {
-            Rotation::<PlaneNed, PlaneFrd>::from_tait_bryan_angles(d(90.), d(90.), d(0.))
+            Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+                .yaw(d(90.))
+                .pitch(d(90.))
+                .roll(d(0.))
+                .build()
         };
 
         // Transforms a ECEF coordinate to a NED coordinate for a NED at a particular latitude and longitude.
@@ -1873,7 +1892,11 @@ mod tests {
 
         // Pose of a second frd in another ned
         let ned_to_frd_2 = unsafe {
-            Rotation::<PlaneBNed, SensorFrd>::from_tait_bryan_angles(d(-45.), d(0.), d(0.))
+            Rotation::<PlaneBNed, SensorFrd>::tait_bryan_builder()
+                .yaw(d(-45.))
+                .pitch(d(0.))
+                .roll(d(0.))
+                .build()
         };
         // NED of the other FRDs object
         let ecef_to_ned_2 =
@@ -2007,7 +2030,11 @@ mod tests {
         let pose = unsafe {
             RigidBodyTransform::new(
                 vector!(n = m(50.), e = m(45.), d = m(10.)),
-                Rotation::<PlaneNed, PlaneFrd>::from_tait_bryan_angles(d(15.), d(0.), d(1.)),
+                Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+                    .yaw(d(15.))
+                    .pitch(d(0.))
+                    .roll(d(1.))
+                    .build(),
             )
         };
 
@@ -2020,8 +2047,13 @@ mod tests {
     #[test]
     fn bearing_rotation() {
         // assume forward is currently pointing east
-        let ned_to_frd =
-            unsafe { Rotation::<Ned, Frd>::from_tait_bryan_angles(d(90.), d(0.), d(0.)) };
+        let ned_to_frd = unsafe {
+            Rotation::<Ned, Frd>::tait_bryan_builder()
+                .yaw(d(90.))
+                .pitch(d(0.))
+                .roll(d(0.))
+                .build()
+        };
 
         // a bearing pointing East should have an azimuth of 0° to forward
         // and since the plane has no pitch relative to horizon, elevation shouldn't change
@@ -2087,8 +2119,13 @@ mod tests {
 
         // if the plane is pitched, elevation _does_ change
         // (we'll keep yaw 0° for now)
-        let ned_to_frd =
-            unsafe { Rotation::<Ned, Frd>::from_tait_bryan_angles(d(0.), d(45.), d(0.)) };
+        let ned_to_frd = unsafe {
+            Rotation::<Ned, Frd>::tait_bryan_builder()
+                .yaw(d(0.))
+                .pitch(d(45.))
+                .roll(d(0.))
+                .build()
+        };
 
         // along the horizon should be seen as -45° compared to FR-plane
         assert_relative_eq!(
@@ -2155,11 +2192,11 @@ mod tests {
         // it just "flips" the azimuth and predictably changes the elevation, so that's what we'll
         // use in these tests. we'll continue with no roll.
         let ned_to_frd = unsafe {
-            Rotation::<Ned, Frd>::from_tait_bryan_angles(
-                d(180.), // pointed South
-                d(45.),  // FRD "up" 0 is NED "up" 45
-                d(0.),
-            )
+            Rotation::<Ned, Frd>::tait_bryan_builder()
+                .yaw(d(180.)) // pointed South
+                .pitch(d(45.)) // FRD "up" 0 is NED "up" 45
+                .roll(d(0.))
+                .build()
         };
 
         // sanity-check: directly in front should match orientation of plane
@@ -2283,11 +2320,11 @@ mod tests {
         // this too makes computing what's expected tricky for the human brain. so, we pick a roll
         // of 180° which essentially just flips elevation _and_ azimuth in this configuration.
         let ned_to_frd = unsafe {
-            Rotation::<Ned, Frd>::from_tait_bryan_angles(
-                d(180.), // pointed South
-                d(45.),  // FRD "up" 0 is NED "up" 45
-                d(180.), // upside-down
-            )
+            Rotation::<Ned, Frd>::tait_bryan_builder()
+                .yaw(d(180.)) // pointed South
+                .pitch(d(45.)) // FRD "up" 0 is NED "up" 45
+                .roll(d(180.)) // upside-down
+                .build()
         };
 
         // directly in front should still match orientation of plane
@@ -2518,7 +2555,11 @@ mod tests {
         let pose = unsafe {
             RigidBodyTransform::new(
                 vector!(e = m(50.), n = m(45.), u = m(10.)),
-                Rotation::<PlaneEnu, PlaneFrd>::from_tait_bryan_angles(d(15.), d(0.), d(1.)),
+                Rotation::<PlaneEnu, PlaneFrd>::tait_bryan_builder()
+                    .yaw(d(15.))
+                    .pitch(d(0.))
+                    .roll(d(1.))
+                    .build(),
             )
         };
 
@@ -2530,8 +2571,13 @@ mod tests {
     #[test]
     fn bearing_rotation_enu_to_frd() {
         // assume forward is pointing North
-        let enu_to_frd_pointing_north_rolled_upright =
-            unsafe { Rotation::<Enu, Frd>::from_tait_bryan_angles(d(90.), d(0.), d(180.)) };
+        let enu_to_frd_pointing_north_rolled_upright = unsafe {
+            Rotation::<Enu, Frd>::tait_bryan_builder()
+                .yaw(d(90.))
+                .pitch(d(0.))
+                .roll(d(180.))
+                .build()
+        };
 
         // a bearing pointing North
         assert_relative_eq!(
@@ -2565,11 +2611,11 @@ mod tests {
 
         // assume forward is pointing West
         let enu_to_frd_pointing_west_rolled_upright = unsafe {
-            Rotation::<Enu, Frd>::from_tait_bryan_angles(
-                d(180.), // FRD X must rotate 180° to point West in ENU
-                d(0.),
-                d(180.),
-            )
+            Rotation::<Enu, Frd>::tait_bryan_builder()
+                .yaw(d(180.)) // FRD X must rotate 180° to point West in ENU
+                .pitch(d(0.))
+                .roll(d(180.))
+                .build()
         };
 
         // a bearing pointing West and Up
@@ -2604,11 +2650,11 @@ mod tests {
 
         // assume forward is pointing North East at a 30° elevation
         let enu_to_frd_pointing_north_east_and_up_rolled_upright = unsafe {
-            Rotation::<Enu, Frd>::from_tait_bryan_angles(
-                d(45.),
-                d(-30.), // rotating FRD to point up
-                d(180.),
-            )
+            Rotation::<Enu, Frd>::tait_bryan_builder()
+                .yaw(d(45.))
+                .pitch(d(-30.)) // rotating FRD to point up
+                .roll(d(180.))
+                .build()
         };
 
         // a bearing pointing North East and Down, slightly off from the FRD
@@ -2628,8 +2674,13 @@ mod tests {
         );
 
         // assume forward is pointing North
-        let enu_to_frd_pointing_north_inverted =
-            unsafe { Rotation::<Enu, Frd>::from_tait_bryan_angles(d(90.), d(0.), d(0.)) };
+        let enu_to_frd_pointing_north_inverted = unsafe {
+            Rotation::<Enu, Frd>::tait_bryan_builder()
+                .yaw(d(90.))
+                .pitch(d(0.))
+                .roll(d(0.))
+                .build()
+        };
 
         // a bearing pointing 3° off East, a roll of 0° in ENU means the frame is "upside down" compared to FRD.
         assert_relative_eq!(
@@ -2648,11 +2699,11 @@ mod tests {
 
         // assume forward is pointing North East at a 30° elevation but inverted
         let enu_to_frd_pointing_north_east_and_inverted = unsafe {
-            Rotation::<Enu, Frd>::from_tait_bryan_angles(
-                d(45.),
-                d(-30.), // rotating FRD to point up
-                d(0.),
-            )
+            Rotation::<Enu, Frd>::tait_bryan_builder()
+                .yaw(d(45.))
+                .pitch(d(-30.)) // rotating FRD to point up
+                .roll(d(0.))
+                .build()
         };
 
         // a bearing pointing North East and Down, a roll of 0° in ENU means the frame is "upside down" compared to FRD.
@@ -2732,8 +2783,13 @@ mod tests {
         let pitch = d(45.);
         let roll = d(30.);
 
-        let rotation_direct =
-            unsafe { Rotation::<PlaneNed, PlaneFrd>::from_tait_bryan_angles(yaw, pitch, roll) };
+        let rotation_direct = unsafe {
+            Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+                .yaw(yaw)
+                .pitch(pitch)
+                .roll(roll)
+                .build()
+        };
 
         let rotation_builder = unsafe {
             Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
@@ -2755,7 +2811,11 @@ mod tests {
         let pitch = d(-30.);
         let roll = d(15.);
 
-        let orientation_direct = Orientation::<PlaneNed>::from_tait_bryan_angles(yaw, pitch, roll);
+        let orientation_direct = Orientation::<PlaneNed>::tait_bryan_builder()
+            .yaw(yaw)
+            .pitch(pitch)
+            .roll(roll)
+            .build();
 
         let orientation_builder = Orientation::<PlaneNed>::tait_bryan_builder()
             .yaw(yaw)
