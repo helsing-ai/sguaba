@@ -43,11 +43,11 @@ fn main() {
 
     // where the plane was facing at the time (eg, from instrument panel);
     // expressed in yaw, pitch, roll relative to North-East-Down:
-    let orientation_in_ned = Orientation::<PlaneNed>::from_tait_bryan_angles(
-        Angle::new::<degree>(8.),  // yaw
-        Angle::new::<degree>(45.), // pitch
-        Angle::new::<degree>(0.),  // roll
-    );
+    let orientation_in_ned = Orientation::<PlaneNed>::tait_bryan_builder()
+        .yaw(Angle::new::<degree>(8.))
+        .pitch(Angle::new::<degree>(45.))
+        .roll(Angle::new::<degree>(0.))
+        .build();
 
     // we need to find the ECEF<>NED transform for the plane's location
     // SAFETY: we're claiming that `wgs84` is the location of `PlaneNed`'s origin.

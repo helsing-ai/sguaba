@@ -80,11 +80,11 @@ fn main() {
     let transform_ecef_to_plane_ned =
         unsafe { RigidBodyTransform::ecef_to_ned_at(&plane_ecef.to_wgs84()) };
 
-    let plane_orientation = Orientation::<PlaneNed>::from_tait_bryan_angles(
-        plane_bearing.azimuth(),   // yaw from NED bearing
-        plane_bearing.elevation(), // pitch from NED bearing
-        Angle::new::<degree>(0.),  // roll
-    );
+    let plane_orientation = Orientation::<PlaneNed>::tait_bryan_builder()
+        .yaw(plane_bearing.azimuth())
+        .pitch(plane_bearing.elevation())
+        .roll(Angle::new::<degree>(0.))
+        .build();
 
     let transform_plane_ned_to_plane_frd =
         unsafe { plane_orientation.map_as_zero_in::<PlaneFrd>() };

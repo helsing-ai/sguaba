@@ -39,11 +39,11 @@ fn main() {
 
     // where the plane was facing at the time (eg, from instrument panel);
     // expressed in yaw, pitch, roll relative to North-East-Down:
-    let orientation_in_ned = Orientation::<PlaneNed>::from_tait_bryan_angles(
-        Angle::new::<degree>(8.),  // yaw
-        Angle::new::<degree>(45.), // pitch
-        Angle::new::<degree>(0.),  // roll
-    );
+    let orientation_in_ned = Orientation::<PlaneNed>::tait_bryan_builder()
+        .yaw(Angle::new::<degree>(8.))
+        .pitch(Angle::new::<degree>(45.))
+        .roll(Angle::new::<degree>(0.))
+        .build();
 
     // to convert between NED and ECEF, we need a transform between the two.
     // this transform depends on where on the globe you are, so it takes the WGS84 position:
