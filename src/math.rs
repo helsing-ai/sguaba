@@ -18,7 +18,7 @@
 
 use crate::coordinate_systems::Ecef;
 use crate::coordinates::Coordinate;
-use crate::geodedic::Wgs84;
+use crate::geodetic::Wgs84;
 use crate::systems::EquivalentTo;
 use crate::vectors::Vector;
 use crate::Bearing;
@@ -1318,7 +1318,7 @@ mod tests {
     use crate::builder::bearing::Components;
     use crate::coordinate_systems::{Ecef, Enu, Frd, Ned};
     use crate::coordinates::Coordinate;
-    use crate::geodedic::Wgs84;
+    use crate::geodetic::Wgs84;
     use crate::math::{RigidBodyTransform, Rotation};
     use crate::util::BoundedAngle;
     use crate::vectors::Vector;
