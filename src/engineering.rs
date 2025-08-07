@@ -837,7 +837,7 @@ mod tests {
     use crate::coordinates::Coordinate;
     use crate::directions::{Bearing, Components as BearingComponents};
     use crate::engineering::{Orientation, Pose};
-    use crate::geodedic::{Components as Wgs84Components, Wgs84};
+    use crate::geodetic::{Components as Wgs84Components, Wgs84};
     use crate::math::{RigidBodyTransform, Rotation};
     use crate::util::BoundedAngle;
     use crate::vectors::Vector;

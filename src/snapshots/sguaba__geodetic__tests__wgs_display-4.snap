@@ -1,5 +1,5 @@
 ---
-source: src/geodedic.rs
+source: src/geodetic.rs
 expression: "Wgs84::new(Degrees::new(lat), Degrees::new(lon), Meters::new(alt)).unwrap()"
 ---
 35.3619°N, 138.728°W, 2294m
