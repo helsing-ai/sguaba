@@ -154,8 +154,11 @@ impl<In> Orientation<In> {
     /// zero values.
     #[must_use]
     pub fn aligned() -> Self {
-        #[allow(deprecated)]
-        Self::from_tait_bryan_angles(Angle::ZERO, Angle::ZERO, Angle::ZERO)
+        Self::tait_bryan_builder()
+            .yaw(Angle::ZERO)
+            .pitch(Angle::ZERO)
+            .roll(Angle::ZERO)
+            .build()
     }
 
     /// Provides a type-safe builder for constructing an orientation from Tait-Bryan angles.
