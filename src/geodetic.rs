@@ -165,6 +165,8 @@ impl Wgs84 {
     /// Returns the number of degrees longitude east of the [IERS Reference Meridian] near
     /// Greenwich ("easting").
     ///
+    /// There is no guarantee on the numeric range of the longitudinal angle.
+    ///
     /// [IERS Reference Meridian]: https://en.wikipedia.org/wiki/IERS_Reference_Meridian
     #[must_use]
     pub fn longitude(&self) -> Angle {

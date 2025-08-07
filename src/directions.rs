@@ -147,7 +147,7 @@ impl<In> Bearing<In> {
     /// The definition of the azimuthal angle depends on the implementation of [`BearingDefined`]
     /// for `In`.
     ///
-    /// Note: There is no guarantee on the numeric range of the azimuthal angle.
+    /// There is no guarantee on the numeric range of the azimuthal angle.
     #[must_use]
     pub fn azimuth(&self) -> Angle {
         self.azimuth
