@@ -19,6 +19,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.9.4]
+
+### Added
+
+- Argument-order-safe Tait-Bryan builder-constructor for `Orientation`
+  and `Rotation` ([#28](https://github.com/helsing-ai/sguaba/pull/28)).
+- Safe macros for constructing [`Bearing`] and [`Wgs84`] with
+  compile-time constants
+  ([#27](https://github.com/helsing-ai/sguaba/pull/27)).
+
+### Changed
+
+- Documented lack of normalization in elevation and latitude
+  ([#26](https://github.com/helsing-ai/sguaba/pull/26)).
+
+### Deprecated
+
+- `Orientation::from_tait_bryan_angles` and
+  `Rotation::from_tait_bryan_angles` in favour of new
+  argument-order-safe builder constructors.
+
 ## [0.9.3]
 
 ### Added
@@ -76,7 +97,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial public release.
 
-[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.3...HEAD
+[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.4...HEAD
+[0.9.4]: https://github.com/helsing-ai/sguaba/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/helsing-ai/sguaba/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/helsing-ai/sguaba/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/helsing-ai/sguaba/compare/v0.9.0...v0.9.1
