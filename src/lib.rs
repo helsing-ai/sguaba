@@ -228,12 +228,18 @@
 //! println!("{:?}", observation_in_ecef.to_wgs84());
 //! ```
 
+use typenum::{P1, Z0};
+use uom::{
+    si::{f64::V, Quantity, ISQ, SI},
+    Kind,
+};
+
 #[macro_use]
 mod coordinate_systems;
 
 mod coordinates;
 mod directions;
-mod geodedic;
+mod geodetic;
 mod util;
 mod vectors;
 
@@ -249,6 +255,13 @@ pub(crate) type Isometry3 = nalgebra::Isometry3<f64>;
 #[doc(hidden)]
 pub type AngleForBearingTrait = uom::si::f64::Angle;
 
+/// Type alias for a quantity whose unit is one-dimensional in length and has a zero- or
+/// negative-valued time dimension (ie, [`uom::si::f64::Length`], [`uom::si::f64::Velocity`], and
+/// [`uom::si::f64::Acceleration`]).
+///
+/// Only used internally.
+type LengthPossiblyPer<Time> = Quantity<ISQ<P1, Z0, Time, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
+
 // re-structure our impots slightly to better match user expectation
 /// Well-known coordinate systems and conventions.
 pub mod systems {
@@ -258,7 +271,7 @@ pub mod systems {
     pub use super::coordinate_systems::{
         EnuComponents, FrdComponents, HasComponents, NedComponents, XyzComponents,
     };
-    pub use super::geodedic::Wgs84;
+    pub use super::geodetic::Wgs84;
 }
 pub use coordinate_systems::CoordinateSystem;
 pub use coordinates::Coordinate;
@@ -284,10 +297,30 @@ pub mod builder {
         };
     }
     pub mod wgs84 {
-        pub use crate::geodedic::{
+        pub use crate::geodetic::{
             Builder, Components, HasAltitude, HasLatitude, HasLongitude, MissingAltitude,
             MissingLatitude, MissingLongitude,
         };
     }
+    pub mod tait_bryan {
+        pub use crate::math::tait_bryan_builder::{
+            Complete, NeedsPitch, NeedsRoll, NeedsYaw, TaitBryanBuilder,
+        };
+    }
 }
+
+/// Convenience re-exports for working with different vector units
+pub mod vector {
+    pub use crate::Vector;
+
+    /// Type alias for a length vector (meters)
+    pub type LengthVector<In> = Vector<In, typenum::Z0>;
+
+    /// Type alias for a velocity vector (meters per second)
+    pub type VelocityVector<In> = Vector<In, typenum::N1>;
+
+    /// Type alias for an acceleration vector (meters per second squared)
+    pub type AccelerationVector<In> = Vector<In, typenum::N2>;
+}
+
 pub use vectors::Vector;

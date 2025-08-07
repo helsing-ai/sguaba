@@ -1,16 +1,18 @@
 use crate::builder::{Set, Unset};
+use crate::coordinate_systems::HasComponents;
 use crate::directions::Bearing;
-use crate::Vector3;
 use crate::{
     systems::{EnuLike, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike},
     Coordinate, CoordinateSystem,
 };
+use crate::{LengthPossiblyPer, Vector3};
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 use std::{fmt, iter::Sum};
-use uom::si::f64::{Angle, Length};
-use uom::si::length::meter;
+use typenum::{Integer, N1, N2, Z0};
+use uom::si::f64::{Acceleration, Angle, Length, Velocity};
+use uom::si::{acceleration::meter_per_second_squared, length::meter, velocity::meter_per_second};
 
 #[cfg(any(test, feature = "approx"))]
 use {
@@ -21,20 +23,152 @@ use {
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::coordinate_systems::HasComponents;
 #[cfg(doc)]
-use crate::{math::RigidBodyTransform, systems::BearingDefined};
+use crate::{
+    math::RigidBodyTransform,
+    systems::BearingDefined,
+    vector::{AccelerationVector, LengthVector, VelocityVector},
+};
 
 /// Defines a vector (ie, direction with magnitude) in the coordinate system specified by `In`.
 ///
 /// You can construct one using [Cartesian](Vector::build) or
 /// [spherical](Vector::from_spherical) components, or using [bearing +
-/// range](Vector::from_bearing). You can also use the [`vector!`](crate::vector) macro
+/// range](Vector::from_bearing). You can also use the [`vector!`](crate::vector!) macro
 /// for a concise constructor with named arguments.
 ///
 /// Depending on the convention of the coordinate system (eg, [`NedLike`], [`FrdLike`], or
 /// [`RightHandedXyzLike`]), you'll have different appropriately-named accessors for the vector's
 /// cartesian components like [`Vector::ned_north`] or [`Vector::frd_front`].
+///
+/// # Working with different `Vector` units
+///
+/// sguaba supports vectors representing different physical quantities:
+///
+/// - **Length vectors** (`Vector<In>`, `Vector<In, Z0>`, or [`LengthVector`]) for positions and displacements
+/// - **Velocity vectors** (`Vector<In, N1>` or [`VelocityVector`]) for velocities
+/// - **Acceleration vectors** (`Vector<In, N2>` or [`AccelerationVector`]) for accelerations
+///
+/// All vector operations (addition, scaling, transforms) are supported for all units.
+///
+/// ## Length `Vector`
+/// ```rust
+/// # use sguaba::{system, vector, Vector};
+/// # use uom::si::f64::Length;
+/// # use uom::si::length::meter;
+/// # system!(struct PlaneFrd using FRD);
+///
+/// let displacement = vector!(
+///     f = Length::new::<meter>(10.0),
+///     r = Length::new::<meter>(5.0),
+///     d = Length::new::<meter>(0.0);
+///     in PlaneFrd
+/// );
+/// ```
+///
+/// ## Velocity `Vector`
+/// ```rust
+/// # use sguaba::{system, vector, Vector, vector::VelocityVector};
+/// # use uom::si::f64::Velocity;
+/// # use uom::si::velocity::meter_per_second;
+/// # system!(struct PlaneFrd using FRD);
+///
+/// let velocity = vector!(
+///     f = Velocity::new::<meter_per_second>(100.0), // forward
+///     r = Velocity::new::<meter_per_second>(0.0),   // right
+///     d = Velocity::new::<meter_per_second>(5.0);   // down
+///     in PlaneFrd
+/// );
+/// ```
+///
+/// ## Acceleration `Vector`
+/// ```rust
+/// # use sguaba::{system, vector, Vector, vector::AccelerationVector};
+/// # use uom::si::f64::Acceleration;
+/// # use uom::si::acceleration::meter_per_second_squared;
+/// # system!(struct PlaneFrd using FRD);
+/// # system!(struct PlaneNed using NED);
+///
+/// // Commanded acceleration (climb has negative d in FRD)
+/// let acceleration = vector!(
+///     f = Acceleration::new::<meter_per_second_squared>(2.0),  // speed up
+///     r = Acceleration::new::<meter_per_second_squared>(0.0),
+///     d = Acceleration::new::<meter_per_second_squared>(-1.0); // climb
+///     in PlaneFrd
+/// );
+///
+/// // Can use other acceleration units, such as standard gravity
+/// let gravity = vector!(
+///     n = Acceleration::new::<meter_per_second_squared>(0.0),
+///     e = Acceleration::new::<meter_per_second_squared>(0.0),
+///     d = Acceleration::new::<uom::si::acceleration::standard_gravity>(1.);
+///     in PlaneNed
+/// );
+/// ```
+///
+/// ## Type safety with units
+///
+/// The type system prevents mixing incompatible units:
+///
+/// ```compile_fail
+/// # use sguaba::{system, vector};
+/// # use uom::si::f64::{Length, Velocity};
+/// # use uom::si::{length::meter, velocity::meter_per_second};
+/// # system!(struct PlaneFrd using FRD);
+///
+/// // Cannot put meters in a velocity vector - this will not compile
+/// let bad_velocity = vector!(
+///     f = Length::new::<meter>(10.0), // Length, not Velocity!
+///     r = Velocity::new::<meter_per_second>(5.0),
+///     d = Velocity::new::<meter_per_second>(0.0);
+///     in PlaneFrd
+/// );
+/// ```
+///
+/// ```compile_fail
+/// # use sguaba::{system, vector, Vector, vector::{VelocityVector, AccelerationVector}};
+/// # use uom::si::f64::{Velocity, Acceleration};
+/// # use uom::si::{velocity::meter_per_second, acceleration::meter_per_second_squared};
+/// # system!(struct PlaneFrd using FRD);
+///
+/// // Cannot add length and acceleration vectors - this will not compile
+/// let velocity = vector!(
+///     f = Velocity::new::<meter_per_second>(10.0),
+///     r = Velocity::new::<meter_per_second>(0.0),
+///     d = Velocity::new::<meter_per_second>(0.0);
+///     in PlaneFrd
+/// );
+/// let acceleration = vector!(
+///     f = Acceleration::new::<meter_per_second_squared>(2.0),
+///     r = Acceleration::new::<meter_per_second_squared>(0.0),
+///     d = Acceleration::new::<meter_per_second_squared>(0.0);
+///     in PlaneFrd
+/// );
+/// let bad_sum = velocity + acceleration; // Different Time parameters!
+/// ```
+///
+/// Only [`LengthVector`] can be created from [`Coordinate`], as coordinates are inherently just
+/// describing positions in a coordinate system, which are displacements (ie, lengths) from origin:
+///
+/// ```compile_fail
+/// # use sguaba::{system, coordinate, vector, vector::{LengthVector, VelocityVector}};
+/// # use uom::si::f64::{Length, Velocity};
+/// # use uom::si::{length::meter, velocity::meter_per_second};
+/// # system!(struct PlaneFrd using FRD);
+///
+/// let coordinate = coordinate!(
+///     f = Length::new::<meter>(10.0),
+///     r = Length::new::<meter>(5.0),
+///     d = Length::new::<meter>(0.0);
+///     in PlaneFrd
+/// );
+///
+/// // This compiles fine
+/// let _: LengthVector<PlaneFrd> = coordinate.into();
+///
+/// // This will not compile as that `impl From` does not exist
+/// let _: VelocityVector<PlaneFrd> = coordinate.into();
+/// ```
 ///
 /// <div class="warning">
 ///
@@ -50,20 +184,120 @@ use crate::{math::RigidBodyTransform, systems::BearingDefined};
 #[cfg_attr(feature = "serde", serde(bound = ""))]
 // no need for the "inner": indirection
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct Vector<In> {
+pub struct Vector<In, Time = Z0>
+where
+    Time: Integer,
+{
     /// X, Y, Z in meters
     pub(crate) inner: Vector3,
     #[cfg_attr(feature = "serde", serde(skip))]
     system: PhantomData<In>,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    unit: PhantomData<LengthPossiblyPer<Time>>,
+}
+
+/// Trait used to access a [`Vector`]'s Cartesian components in its native units.
+///
+/// Only used to abstract over `Time`; should never be used in user code.
+///
+/// This trait is sealed, and so also cannot be implemented by user code.
+#[doc(hidden = "users should never be implementing or using this trait")]
+pub trait LengthBasedComponents<In, Time>: private::Sealed
+where
+    Time: Integer,
+{
+    /// Directly construct from constituent components.
+    fn from_cartesian(xyz: [LengthPossiblyPer<Time>; 3]) -> Self;
+    /// Deconstruct into constituent components.
+    fn to_cartesian(&self) -> [LengthPossiblyPer<Time>; 3];
+
+    /// Cast constituent component unit to [`Length`].
+    ///
+    /// This is entirely intended for _internal_ use, such as to allow conversion to and from
+    /// [`Coordinate`] (which is only ever [`Length`]-unit). You should strongly avoid using this
+    /// directly, as it allows units to be confused.
+    // NOTE(jon): while it's tempting to just re-assign the .value of the various uom types that
+    // involve length, we're not _guaranteed_ that uom's inner representation for length, velocity,
+    // and acceleration is the same, so we have to do the whole dance and expect it to be elided by
+    // the compiler.
+    fn recast_to_length(v: LengthPossiblyPer<Time>) -> Length;
+}
+
+impl<In> LengthBasedComponents<In, Z0> for Vector<In, Z0> {
+    fn from_cartesian([x, y, z]: [Length; 3]) -> Self {
+        Self::from_nalgebra_vector(Vector3::new(
+            x.get::<meter>(),
+            y.get::<meter>(),
+            z.get::<meter>(),
+        ))
+    }
+    fn to_cartesian(&self) -> [Length; 3] {
+        [
+            Length::new::<meter>(self.inner.x),
+            Length::new::<meter>(self.inner.y),
+            Length::new::<meter>(self.inner.z),
+        ]
+    }
+    fn recast_to_length(v: LengthPossiblyPer<Z0>) -> Length {
+        std::convert::identity(v)
+    }
+}
+
+impl<In> LengthBasedComponents<In, N1> for Vector<In, N1> {
+    fn from_cartesian([x, y, z]: [Velocity; 3]) -> Self {
+        Self::from_nalgebra_vector(Vector3::new(
+            x.get::<meter_per_second>(),
+            y.get::<meter_per_second>(),
+            z.get::<meter_per_second>(),
+        ))
+    }
+    fn to_cartesian(&self) -> [Velocity; 3] {
+        [
+            Velocity::new::<meter_per_second>(self.inner.x),
+            Velocity::new::<meter_per_second>(self.inner.y),
+            Velocity::new::<meter_per_second>(self.inner.z),
+        ]
+    }
+    fn recast_to_length(v: LengthPossiblyPer<N1>) -> Length {
+        Length::new::<meter>(v.get::<meter_per_second>())
+    }
+}
+
+impl<In> LengthBasedComponents<In, N2> for Vector<In, N2> {
+    fn from_cartesian([x, y, z]: [Acceleration; 3]) -> Self {
+        Self::from_nalgebra_vector(Vector3::new(
+            x.get::<meter_per_second_squared>(),
+            y.get::<meter_per_second_squared>(),
+            z.get::<meter_per_second_squared>(),
+        ))
+    }
+    fn to_cartesian(&self) -> [Acceleration; 3] {
+        [
+            Acceleration::new::<meter_per_second_squared>(self.inner.x),
+            Acceleration::new::<meter_per_second_squared>(self.inner.y),
+            Acceleration::new::<meter_per_second_squared>(self.inner.z),
+        ]
+    }
+    fn recast_to_length(v: LengthPossiblyPer<N2>) -> Length {
+        Length::new::<meter>(v.get::<meter_per_second_squared>())
+    }
+}
+
+mod private {
+    pub trait Sealed {}
+
+    impl<In> Sealed for super::Vector<In, typenum::Z0> {}
+    impl<In> Sealed for super::Vector<In, typenum::N1> {}
+    impl<In> Sealed for super::Vector<In, typenum::N2> {}
 }
 
 // manual impls of Clone and Copy to avoid requiring In: Copy + Clone
-impl<In> Clone for Vector<In> {
+impl<In, Time: Integer> Clone for Vector<In, Time> {
     fn clone(&self) -> Self {
         *self
     }
 }
-impl<In> Copy for Vector<In> {}
+impl<In, Time: Integer> Copy for Vector<In, Time> {}
 
 /// Quickly construct a [`Vector`] using named components.
 ///
@@ -135,34 +369,68 @@ impl<In> Copy for Vector<In> {}
 /// }
 /// # ;
 /// ```
+///
+/// The macro automatically determines the vector unit type based on the units provided:
+///
+/// ```rust
+/// # use sguaba::{system, vector};
+/// # use uom::si::f64::{Length, Velocity, Acceleration};
+/// # use uom::si::{length::meter, velocity::meter_per_second, acceleration::meter_per_second_squared};
+/// # system!(struct PlaneFrd using FRD);
+///
+/// // Creates Vector<PlaneFrd, Z0> / LengthVector (length vector)
+/// let position = vector!(
+///     f = Length::new::<meter>(1.0),
+///     r = Length::new::<meter>(0.0),
+///     d = Length::new::<meter>(0.0);
+///     in PlaneFrd
+/// );
+///
+/// // Creates Vector<PlaneFrd, N1> / VelocityVector (velocity vector)
+/// let velocity = vector!(
+///     f = Velocity::new::<meter_per_second>(5.0),
+///     r = Velocity::new::<meter_per_second>(0.0),
+///     d = Velocity::new::<meter_per_second>(0.0);
+///     in PlaneFrd
+/// );
+///
+/// // Creates Vector<PlaneFrd, N2> / AccelerationVector (acceleration vector)
+/// let acceleration = vector!(
+///     f = Acceleration::new::<meter_per_second_squared>(2.0),
+///     r = Acceleration::new::<meter_per_second_squared>(0.0),
+///     d = Acceleration::new::<meter_per_second_squared>(0.0);
+///     in PlaneFrd
+/// );
+/// ```
+///
 #[macro_export]
 macro_rules! vector {
     ($x:tt = $xx:expr, $y:tt = $yy:expr, $z:tt = $zz:expr $(,)?) => {
         vector!($x = $xx, $y = $yy, $z = $zz; in _)
     };
     (n = $n:expr, e = $e:expr, d = $d:expr; in $in:ty) => {
-        $crate::Vector::<$in>::build($crate::systems::NedComponents {
+        $crate::Vector::<$in, _>::build($crate::systems::NedComponents {
             north: $n.into(),
             east: $e.into(),
             down: $d.into(),
         })
     };
     (e = $e:expr, n = $n:expr, u = $u:expr; in $in:ty) => {
-        $crate::Vector::<$in>::build($crate::systems::EnuComponents {
+        $crate::Vector::<$in, _>::build($crate::systems::EnuComponents {
             east: $e.into(),
             north: $n.into(),
             up: $u.into(),
         })
     };
     (f = $f:expr, r = $r:expr, d = $d:expr; in $in:ty) => {
-        $crate::Vector::<$in>::build($crate::systems::FrdComponents {
+        $crate::Vector::<$in, _>::build($crate::systems::FrdComponents {
             front: $f.into(),
             right: $r.into(),
             down: $d.into(),
         })
     };
     (x = $x:expr, y = $y:expr, z = $z:expr; in $in:ty) => {
-        $crate::Vector::<$in>::build($crate::systems::XyzComponents {
+        $crate::Vector::<$in, _>::build($crate::systems::XyzComponents {
             x: $x.into(),
             y: $y.into(),
             z: $z.into(),
@@ -170,20 +438,25 @@ macro_rules! vector {
     };
 }
 
-impl<In> Vector<In> {
+impl<In, Time> Vector<In, Time>
+where
+    Time: Integer,
+    Self: LengthBasedComponents<In, Time>,
+{
     pub(crate) fn from_nalgebra_vector(value: Vector3) -> Self {
         Self {
             inner: value,
-            system: PhantomData,
+            system: PhantomData::<In>,
+            unit: PhantomData::<LengthPossiblyPer<Time>>,
         }
     }
 
     /// Constructs a [`Vector`] at the given (x, y, z) Cartesian point in the [`CoordinateSystem`]
     /// `In`.
-    pub fn build(components: <In::Convention as HasComponents>::Components) -> Self
+    pub fn build(components: <In::Convention as HasComponents<Time>>::Components) -> Self
     where
         In: CoordinateSystem,
-        In::Convention: HasComponents,
+        In::Convention: HasComponents<Time>,
     {
         let [x, y, z] = components.into();
         #[allow(deprecated)]
@@ -191,7 +464,7 @@ impl<In> Vector<In> {
     }
 
     /// Provides a constructor for a [`Coordinate`] in the [`CoordinateSystem`] `In`.
-    pub fn builder() -> Builder<In, Unset, Unset, Unset>
+    pub fn builder() -> Builder<In, Unset, Unset, Unset, Time>
     where
         In: CoordinateSystem,
     {
@@ -223,15 +496,11 @@ impl<In> Vector<In> {
     /// gravity).
     #[deprecated = "prefer `Vector::builder` to avoid risk of argument order confusion"]
     pub fn from_cartesian(
-        x: impl Into<Length>,
-        y: impl Into<Length>,
-        z: impl Into<Length>,
+        x: impl Into<LengthPossiblyPer<Time>>,
+        y: impl Into<LengthPossiblyPer<Time>>,
+        z: impl Into<LengthPossiblyPer<Time>>,
     ) -> Self {
-        Self::from_nalgebra_vector(Vector3::new(
-            x.into().get::<meter>(),
-            y.into().get::<meter>(),
-            z.into().get::<meter>(),
-        ))
+        LengthBasedComponents::from_cartesian([x.into(), y.into(), z.into()])
     }
 
     /// Constructs a vector with the given (r, θ, φ) spherical components in the
@@ -291,17 +560,17 @@ impl<In> Vector<In> {
     ///
     /// [sph]: https://en.wikipedia.org/wiki/Spherical_coordinate_system
     pub fn from_spherical(
-        radius: impl Into<Length>,
+        radius: impl Into<LengthPossiblyPer<Time>>,
         polar: impl Into<Angle>,
         azimuth: impl Into<Angle>,
     ) -> Self {
-        let radius = radius.into();
+        let radius: LengthPossiblyPer<Time> = radius.into();
         let azimuth = azimuth.into();
         let polar = polar.into();
 
-        let x = radius * polar.sin() * azimuth.cos();
-        let y = radius * polar.sin() * azimuth.sin();
-        let z = radius * polar.cos();
+        let x = radius * polar.sin().value * azimuth.cos().value;
+        let y = radius * polar.sin().value * azimuth.sin().value;
+        let z = radius * polar.cos().value;
 
         #[allow(deprecated)]
         Self::from_cartesian(x, y, z)
@@ -366,7 +635,7 @@ impl<In> Vector<In> {
     ///
     /// [bearing]: https://en.wikipedia.org/wiki/Bearing_%28navigation%29
     /// [azel]: https://en.wikipedia.org/wiki/Horizontal_coordinate_system
-    pub fn from_bearing(bearing: Bearing<In>, range: impl Into<Length>) -> Self
+    pub fn from_bearing(bearing: Bearing<In>, range: impl Into<LengthPossiblyPer<Time>>) -> Self
     where
         In: crate::systems::BearingDefined,
     {
@@ -391,7 +660,7 @@ impl<In> Vector<In> {
     /// you'll want to use [`RigidBodyTransform`].
     ///
     /// This is exactly equivalent to re-constructing the vector with the same component values
-    /// using `<NewIn>` instead of `<In>`, just more concise and legible. That is, it is exactly
+    /// using `<NewIn>` instead of `<In, Time>`, just more concise and legible. That is, it is exactly
     /// equal to:
     ///
     /// ```
@@ -417,10 +686,11 @@ impl<In> Vector<In> {
     /// );
     /// ```
     #[must_use]
-    pub fn with_same_components_in<NewIn>(self) -> Vector<NewIn> {
+    pub fn with_same_components_in<NewIn>(self) -> Vector<NewIn, Time> {
         Vector {
             inner: self.inner,
             system: PhantomData::<NewIn>,
+            unit: self.unit,
         }
     }
 
@@ -458,7 +728,7 @@ impl<In> Vector<In> {
     /// );
     /// ```
     #[must_use]
-    pub fn cast<NewIn>(self) -> Vector<NewIn>
+    pub fn cast<NewIn>(self) -> Vector<NewIn, Time>
     where
         In: EquivalentTo<NewIn>,
     {
@@ -491,6 +761,7 @@ impl<In> Vector<In> {
         Self {
             inner: self.inner.lerp(&rhs.inner, t),
             system: self.system,
+            unit: self.unit,
         }
     }
 
@@ -504,8 +775,14 @@ impl<In> Vector<In> {
     where
         In: crate::systems::BearingDefined,
     {
-        let from_origin = Coordinate::origin() + *self;
-        from_origin.bearing_from_origin()
+        // This is obviously a little sneaky since we're coercing to meters, but since we're
+        // coercing all the components the same way, the resulting bearing should remain the same.
+        let [x, y, z] = self.to_cartesian();
+        let x = Vector::recast_to_length(x);
+        let y = Vector::recast_to_length(y);
+        let z = Vector::recast_to_length(z);
+        #[allow(deprecated)]
+        Coordinate::from_cartesian(x, y, z).bearing_from_origin()
     }
 
     /// Constructs a vector in coordinate system `In` whose components are all 0.
@@ -519,18 +796,23 @@ impl<In> Vector<In> {
     pub fn zero() -> Self {
         Self {
             inner: Vector3::zeros(),
-            system: PhantomData,
+            system: PhantomData::<In>,
+            unit: PhantomData::<LengthPossiblyPer<Time>>,
         }
     }
 }
 
-impl<In> From<Coordinate<In>> for Vector<In> {
+impl<In> From<Coordinate<In>> for Vector<In, Z0> {
     fn from(value: Coordinate<In>) -> Self {
         Self::from_nalgebra_vector(value.point.coords)
     }
 }
 
-impl<In> Default for Vector<In> {
+impl<In, Time> Default for Vector<In, Time>
+where
+    Time: Integer,
+    Self: LengthBasedComponents<In, Time>,
+{
     fn default() -> Self {
         Self::zero()
     }
@@ -543,7 +825,7 @@ macro_rules! accessors {
         // TODO: https://github.com/rust-lang/rust/issues/124225
         + $x_ax:ident, $y_ax:ident, $z_ax:ident
     } => {
-        impl<In> Vector<In> where In: CoordinateSystem<Convention = $convention> {
+        impl<In, Time: typenum::Integer> Vector<In, Time> where In: CoordinateSystem<Convention = $convention> {
             #[must_use]
             pub fn $x(&self) -> Length { Length::new::<meter>(self.inner.x) }
             #[must_use]
@@ -552,24 +834,27 @@ macro_rules! accessors {
             pub fn $z(&self) -> Length { Length::new::<meter>(self.inner.z) }
 
             #[must_use]
-            pub fn $x_ax() -> Vector<In> {
+            pub fn $x_ax() -> Vector<In, Time> {
                 Self {
                     inner: *Vector3::x_axis(),
-                    system: core::marker::PhantomData,
+                    system: core::marker::PhantomData::<In>,
+                    unit: core::marker::PhantomData::<LengthPossiblyPer<Time>>,
                 }
             }
             #[must_use]
-            pub fn $y_ax() -> Vector<In> {
+            pub fn $y_ax() -> Vector<In, Time> {
                 Self {
                     inner: *Vector3::y_axis(),
-                    system: core::marker::PhantomData,
+                    system: core::marker::PhantomData::<In>,
+                    unit: core::marker::PhantomData::<LengthPossiblyPer<Time>>,
                 }
             }
             #[must_use]
-            pub fn $z_ax() -> Vector<In> {
+            pub fn $z_ax() -> Vector<In, Time> {
                 Self {
                     inner: *Vector3::z_axis(),
-                    system: core::marker::PhantomData,
+                    system: core::marker::PhantomData::<In>,
+                    unit: core::marker::PhantomData::<LengthPossiblyPer<Time>>,
                 }
             }
         }
@@ -581,7 +866,7 @@ accessors!(NedLike using ned_north, ned_east, ned_down + ned_north_axis, ned_eas
 accessors!(FrdLike using frd_front, frd_right, frd_down + frd_front_axis, frd_right_axis, frd_down_axis);
 accessors!(EnuLike using enu_east, enu_north, enu_up + enu_east_axis, enu_north_axis, enu_up_axis);
 
-impl<In> Vector<In> {
+impl<In> Vector<In, Z0> {
     /// Returns the cartesian components of this vector in XYZ order.
     ///
     /// To turn this into a simple (ie, unitless) `[f64; 3]`, use [`array::map`] combined with
@@ -589,11 +874,7 @@ impl<In> Vector<In> {
     #[doc(alias = "components")]
     #[must_use]
     pub fn to_cartesian(&self) -> [Length; 3] {
-        [
-            Length::new::<meter>(self.inner.x),
-            Length::new::<meter>(self.inner.y),
-            Length::new::<meter>(self.inner.z),
-        ]
+        LengthBasedComponents::to_cartesian(self)
     }
 
     /// Computes the magnitude of the vector (ie, its length).
@@ -606,80 +887,145 @@ impl<In> Vector<In> {
     }
 }
 
-impl<In> Neg for Vector<In> {
+impl<In> Vector<In, N1> {
+    /// Returns the cartesian components of this velocity vector in XYZ order.
+    ///
+    /// To turn this into a simple (ie, unitless) `[f64; 3]`, use [`array::map`] combined with
+    /// `.get::<meter_per_second>()`.
+    #[doc(alias = "components")]
+    #[must_use]
+    pub fn to_cartesian(&self) -> [Velocity; 3] {
+        LengthBasedComponents::to_cartesian(self)
+    }
+
+    /// Computes the magnitude of the vector (ie, its velocity).
+    #[doc(alias = "norm")]
+    #[doc(alias = "speed")]
+    #[must_use]
+    pub fn magnitude(&self) -> Velocity {
+        Velocity::new::<meter_per_second>(self.inner.norm())
+    }
+}
+
+impl<In> Vector<In, N2> {
+    /// Returns the cartesian components of this vector in XYZ order.
+    ///
+    /// To turn this into a simple (ie, unitless) `[f64; 3]`, use [`array::map`] combined with
+    /// `.get::<meter_per_second_squared>()`.
+    #[doc(alias = "components")]
+    #[must_use]
+    pub fn to_cartesian(&self) -> [Acceleration; 3] {
+        LengthBasedComponents::to_cartesian(self)
+    }
+
+    /// Computes the magnitude of the vector (ie, its acceleration).
+    #[doc(alias = "norm")]
+    #[doc(alias = "acceleration")]
+    #[must_use]
+    pub fn magnitude(&self) -> Acceleration {
+        Acceleration::new::<meter_per_second_squared>(self.inner.norm())
+    }
+}
+
+impl<In, Time: Integer> Neg for Vector<In, Time> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
         Self {
             inner: -self.inner,
             system: self.system,
+            unit: self.unit,
         }
     }
 }
 
-impl<In> Add<Self> for Vector<In> {
+impl<In, Time: Integer> Add<Self> for Vector<In, Time> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
         Self {
             inner: self.inner + rhs.inner,
             system: self.system,
+            unit: self.unit,
         }
     }
 }
 
-impl<In> AddAssign<Self> for Vector<In> {
+impl<In, Time: Integer> AddAssign<Self> for Vector<In, Time> {
     fn add_assign(&mut self, rhs: Self) {
         self.inner += rhs.inner;
     }
 }
 
-impl<In> Sub<Self> for Vector<In> {
+impl<In, Time: Integer> Sub<Self> for Vector<In, Time> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
         Self {
             inner: self.inner - rhs.inner,
             system: self.system,
+            unit: self.unit,
         }
     }
 }
 
-impl<In> SubAssign<Self> for Vector<In> {
+impl<In, Time: Integer> SubAssign<Self> for Vector<In, Time> {
     fn sub_assign(&mut self, rhs: Self) {
         self.inner -= rhs.inner;
     }
 }
 
-impl<In> Sum for Vector<In> {
+impl<In, Time: Integer> Sum for Vector<In, Time>
+where
+    Self: LengthBasedComponents<In, Time>,
+{
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Self::zero(), |sum, v| sum + v)
     }
 }
 
-impl<In> Mul<f64> for Vector<In> {
+// multiplying an acceleration vector by time gives you a velocity vector
+impl<In> Mul<uom::si::f64::Time> for Vector<In, N2> {
+    type Output = Vector<In, N1>;
+
+    fn mul(self, duration: uom::si::f64::Time) -> Self::Output {
+        LengthBasedComponents::from_cartesian(self.to_cartesian().map(|v| v * duration))
+    }
+}
+// multiplying a velocity vector by time gives you a length vector
+impl<In> Mul<uom::si::f64::Time> for Vector<In, N1> {
+    type Output = Vector<In, Z0>;
+
+    fn mul(self, duration: uom::si::f64::Time) -> Self::Output {
+        LengthBasedComponents::from_cartesian(self.to_cartesian().map(|v| v * duration))
+    }
+}
+
+impl<In, Time: Integer> Mul<f64> for Vector<In, Time> {
     type Output = Self;
 
     fn mul(self, scalar: f64) -> Self::Output {
         Self {
             inner: self.inner * scalar,
             system: self.system,
+            unit: self.unit,
         }
     }
 }
 
-impl<In> Div<f64> for Vector<In> {
+impl<In, Time: Integer> Div<f64> for Vector<In, Time> {
     type Output = Self;
 
     fn div(self, scalar: f64) -> Self::Output {
         Self {
             inner: self.inner / scalar,
             system: self.system,
+            unit: self.unit,
         }
     }
 }
 
-impl<In> Div<Length> for Vector<In> {
+impl<In, Time: Integer> Div<Length> for Vector<In, Time> {
     type Output = Self;
 
     fn div(self, rhs: Length) -> Self::Output {
@@ -687,7 +1033,7 @@ impl<In> Div<Length> for Vector<In> {
     }
 }
 
-impl<In> Mul<Length> for Vector<In> {
+impl<In, Time: Integer> Mul<Length> for Vector<In, Time> {
     type Output = Self;
 
     fn mul(self, rhs: Length) -> Self::Output {
@@ -695,20 +1041,20 @@ impl<In> Mul<Length> for Vector<In> {
     }
 }
 
-impl<In> PartialEq<Self> for Vector<In> {
+impl<In, Time: Integer> PartialEq<Self> for Vector<In, Time> {
     fn eq(&self, other: &Self) -> bool {
         self.inner.eq(&other.inner)
     }
 }
 
-impl<In> Display for Vector<In> {
+impl<In, Time: Integer> Display for Vector<In, Time> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.inner)
     }
 }
 
 #[cfg(any(test, feature = "approx"))]
-impl<In> AbsDiffEq<Self> for Vector<In> {
+impl<In, Time: Integer> AbsDiffEq<Self> for Vector<In, Time> {
     type Epsilon = <f64 as AbsDiffEq>::Epsilon;
 
     fn default_epsilon() -> Self::Epsilon {
@@ -722,7 +1068,7 @@ impl<In> AbsDiffEq<Self> for Vector<In> {
 }
 
 #[cfg(any(test, feature = "approx"))]
-impl<In> RelativeEq for Vector<In> {
+impl<In, Time: Integer> RelativeEq for Vector<In, Time> {
     fn default_max_relative() -> Self::Epsilon {
         Point3::default_max_relative()
     }
@@ -744,11 +1090,18 @@ impl<In> RelativeEq for Vector<In> {
 /// [Builder]: https://rust-unofficial.github.io/patterns/patterns/creational/builder.html
 #[derive(Debug)]
 #[must_use]
-pub struct Builder<In, X, Y, Z> {
-    under_construction: Vector<In>,
+pub struct Builder<In, X, Y, Z, Time = Z0>
+where
+    Time: Integer,
+{
+    under_construction: Vector<In, Time>,
     set: (PhantomData<X>, PhantomData<Y>, PhantomData<Z>),
 }
-impl<In> Default for Builder<In, Unset, Unset, Unset> {
+impl<In, Time> Default for Builder<In, Unset, Unset, Unset, Time>
+where
+    Time: Integer,
+    Vector<In, Time>: LengthBasedComponents<In, Time>,
+{
     fn default() -> Self {
         Self {
             under_construction: Vector::default(),
@@ -757,23 +1110,24 @@ impl<In> Default for Builder<In, Unset, Unset, Unset> {
     }
 }
 
-impl<In> Builder<In, Set, Set, Set> {
+impl<In, Time: Integer> Builder<In, Set, Set, Set, Time> {
     /// Constructs a [`Vector`] at the currently set (x, y, z) Cartesian point in the
     /// [`CoordinateSystem`] `In`.
     #[must_use]
-    pub fn build(self) -> Vector<In> {
+    pub fn build(self) -> Vector<In, Time> {
         self.under_construction
     }
 }
 
 macro_rules! constructor {
     ($like:ident, [$x:ident, $y:ident, $z:ident]) => {
-        impl<In, X, Y, Z> Builder<In, X, Y, Z>
+        impl<In, X, Y, Z, Time> Builder<In, X, Y, Z, Time>
         where
             In: CoordinateSystem<Convention = $like>,
+            Time: typenum::Integer,
         {
             /// Sets the X component of this [`Vector`]-to-be.
-            pub fn $x(mut self, length: impl Into<Length>) -> Builder<In, Set, Y, Z> {
+            pub fn $x(mut self, length: impl Into<Length>) -> Builder<In, Set, Y, Z, Time> {
                 self.under_construction.inner.x = length.into().get::<meter>();
                 Builder {
                     under_construction: self.under_construction,
@@ -782,7 +1136,7 @@ macro_rules! constructor {
             }
 
             /// Sets the Y component of this [`Vector`]-to-be.
-            pub fn $y(mut self, length: impl Into<Length>) -> Builder<In, X, Set, Z> {
+            pub fn $y(mut self, length: impl Into<Length>) -> Builder<In, X, Set, Z, Time> {
                 self.under_construction.inner.y = length.into().get::<meter>();
                 Builder {
                     under_construction: self.under_construction,
@@ -791,7 +1145,7 @@ macro_rules! constructor {
             }
 
             /// Sets the Z component of this [`Vector`]-to-be.
-            pub fn $z(mut self, length: impl Into<Length>) -> Builder<In, X, Y, Set> {
+            pub fn $z(mut self, length: impl Into<Length>) -> Builder<In, X, Y, Set, Time> {
                 self.under_construction.inner.z = length.into().get::<meter>();
                 Builder {
                     under_construction: self.under_construction,
@@ -807,4 +1161,462 @@ constructor!(FrdLike, [frd_front, frd_right, frd_down]);
 constructor!(EnuLike, [enu_east, enu_north, enu_up]);
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use crate::systems::EquivalentTo;
+    use crate::{coordinate, system, vector};
+    use approx::assert_abs_diff_eq;
+    use typenum::{N1, N2, Z0};
+    use uom::si::f64::{Acceleration, Angle, Length, Velocity};
+    use uom::si::{
+        acceleration::meter_per_second_squared, angle::degree, length::meter,
+        velocity::meter_per_second,
+    };
+
+    // Define test coordinate systems
+    system!(struct TestFrd using FRD);
+    system!(struct TestNed using NED);
+    system!(struct TestEnu using ENU);
+    system!(struct TestXyz using right-handed XYZ);
+
+    // Define equivalent coordinate systems for testing
+    system!(struct TestFrd2 using FRD);
+    unsafe impl EquivalentTo<TestFrd> for TestFrd2 {}
+    unsafe impl EquivalentTo<TestFrd2> for TestFrd {}
+
+    // Helper functions for creating units
+    fn m(meters: f64) -> Length {
+        Length::new::<meter>(meters)
+    }
+
+    fn mps(meters_per_second: f64) -> Velocity {
+        Velocity::new::<meter_per_second>(meters_per_second)
+    }
+
+    fn mps2(meters_per_second_squared: f64) -> Acceleration {
+        Acceleration::new::<meter_per_second_squared>(meters_per_second_squared)
+    }
+
+    // Tests for Length vectors (Time = Z0)
+    mod length_vectors {
+        use super::*;
+
+        #[test]
+        fn constructor_from_cartesian_works() {
+            #[allow(deprecated)]
+            let v = Vector::<TestFrd, Z0>::from_cartesian(m(1.0), m(2.0), m(3.0));
+            assert_eq!(v.to_cartesian(), [m(1.0), m(2.0), m(3.0)]);
+        }
+
+        #[test]
+        fn builder_pattern_works() {
+            let v = Vector::<TestFrd>::builder()
+                .frd_front(m(1.0))
+                .frd_right(m(2.0))
+                .frd_down(m(3.0))
+                .build();
+            assert_eq!(v.frd_front(), m(1.0));
+            assert_eq!(v.frd_right(), m(2.0));
+            assert_eq!(v.frd_down(), m(3.0));
+        }
+
+        #[test]
+        fn vector_macro_works() {
+            let v = vector!(f = m(1.0), r = m(2.0), d = m(3.0); in TestFrd);
+            assert_eq!(v.frd_front(), m(1.0));
+            assert_eq!(v.frd_right(), m(2.0));
+            assert_eq!(v.frd_down(), m(3.0));
+        }
+
+        #[test]
+        fn build_with_components_works() {
+            use crate::systems::FrdComponents;
+            let v = Vector::<TestFrd>::build(FrdComponents {
+                front: m(1.0),
+                right: m(2.0),
+                down: m(3.0),
+            });
+            assert_eq!(v.frd_front(), m(1.0));
+            assert_eq!(v.frd_right(), m(2.0));
+            assert_eq!(v.frd_down(), m(3.0));
+        }
+
+        #[test]
+        fn from_spherical_works() {
+            let v = Vector::<TestFrd>::from_spherical(
+                m(10.0),
+                Angle::new::<degree>(90.0), // polar angle (90 degrees)
+                Angle::new::<degree>(0.0),  // azimuth angle (0 degrees)
+            );
+            assert_abs_diff_eq!(v.frd_front().get::<meter>(), 10.0, epsilon = 1e-10);
+            assert_abs_diff_eq!(v.frd_right().get::<meter>(), 0.0, epsilon = 1e-10);
+            assert_abs_diff_eq!(v.frd_down().get::<meter>(), 0.0, epsilon = 1e-10);
+        }
+
+        #[test]
+        fn magnitude_works() {
+            let v = vector!(f = m(3.0), r = m(4.0), d = m(0.0); in TestFrd);
+            assert_eq!(v.magnitude(), m(5.0));
+        }
+
+        #[test]
+        fn axis_vectors_work() {
+            let front = Vector::<TestFrd>::frd_front_axis();
+            let right = Vector::<TestFrd>::frd_right_axis();
+            let down = Vector::<TestFrd>::frd_down_axis();
+
+            assert_eq!(front.frd_front(), m(1.0));
+            assert_eq!(front.frd_right(), m(0.0));
+            assert_eq!(front.frd_down(), m(0.0));
+
+            assert_eq!(right.frd_front(), m(0.0));
+            assert_eq!(right.frd_right(), m(1.0));
+            assert_eq!(right.frd_down(), m(0.0));
+
+            assert_eq!(down.frd_front(), m(0.0));
+            assert_eq!(down.frd_right(), m(0.0));
+            assert_eq!(down.frd_down(), m(1.0));
+        }
+
+        #[test]
+        fn arithmetic_operations_work() {
+            let v1 = vector!(f = m(1.0), r = m(2.0), d = m(3.0); in TestFrd);
+            let v2 = vector!(f = m(4.0), r = m(5.0), d = m(6.0); in TestFrd);
+
+            let sum = v1 + v2;
+            assert_eq!(sum.to_cartesian(), [m(5.0), m(7.0), m(9.0)]);
+
+            let diff = v2 - v1;
+            assert_eq!(diff.to_cartesian(), [m(3.0), m(3.0), m(3.0)]);
+
+            let neg = -v1;
+            assert_eq!(neg.to_cartesian(), [m(-1.0), m(-2.0), m(-3.0)]);
+
+            let scaled = v1 * 2.0;
+            assert_eq!(scaled.to_cartesian(), [m(2.0), m(4.0), m(6.0)]);
+        }
+
+        #[test]
+        fn zero_vector_works() {
+            let v = Vector::<TestFrd>::zero();
+            assert_eq!(v.to_cartesian(), [m(0.0), m(0.0), m(0.0)]);
+        }
+
+        #[test]
+        fn lerp_works() {
+            let v1 = vector!(f = m(0.0), r = m(0.0), d = m(0.0); in TestFrd);
+            let v2 = vector!(f = m(10.0), r = m(20.0), d = m(30.0); in TestFrd);
+
+            let mid = v1.lerp(&v2, 0.5);
+            assert_eq!(mid.to_cartesian(), [m(5.0), m(10.0), m(15.0)]);
+        }
+
+        #[test]
+        fn cast_equivalent_coordinate_systems() {
+            let v_frd = vector!(f = m(1.0), r = m(2.0), d = m(3.0); in TestFrd);
+            let v_frd2: Vector<TestFrd2> = v_frd.cast();
+
+            assert_eq!(v_frd2.to_cartesian(), v_frd.to_cartesian());
+        }
+
+        #[test]
+        fn with_same_components_in_works() {
+            let v_frd = vector!(f = m(1.0), r = m(2.0), d = m(3.0); in TestFrd);
+            let v_ned: Vector<TestNed> = v_frd.with_same_components_in();
+
+            // Same underlying values, different coordinate system
+            assert_eq!(v_ned.to_cartesian(), v_frd.to_cartesian());
+        }
+
+        #[test]
+        fn ned_accessors_work() {
+            let v = vector!(n = m(1.0), e = m(2.0), d = m(3.0); in TestNed);
+            assert_eq!(v.ned_north(), m(1.0));
+            assert_eq!(v.ned_east(), m(2.0));
+            assert_eq!(v.ned_down(), m(3.0));
+
+            let north = Vector::<TestNed>::ned_north_axis();
+            let east = Vector::<TestNed>::ned_east_axis();
+            let down = Vector::<TestNed>::ned_down_axis();
+
+            assert_eq!(north.ned_north(), m(1.0));
+            assert_eq!(east.ned_east(), m(1.0));
+            assert_eq!(down.ned_down(), m(1.0));
+        }
+
+        #[test]
+        fn enu_accessors_work() {
+            let v = vector!(e = m(1.0), n = m(2.0), u = m(3.0); in TestEnu);
+            assert_eq!(v.enu_east(), m(1.0));
+            assert_eq!(v.enu_north(), m(2.0));
+            assert_eq!(v.enu_up(), m(3.0));
+        }
+
+        #[test]
+        fn xyz_accessors_work() {
+            let v = vector!(x = m(1.0), y = m(2.0), z = m(3.0); in TestXyz);
+            assert_eq!(v.x(), m(1.0));
+            assert_eq!(v.y(), m(2.0));
+            assert_eq!(v.z(), m(3.0));
+        }
+    }
+
+    // Tests for Velocity vectors (Time = N1)
+    mod velocity_vectors {
+        use super::*;
+
+        #[test]
+        fn constructor_from_cartesian_works() {
+            #[allow(deprecated)]
+            let v = Vector::<TestFrd, N1>::from_cartesian(mps(1.0), mps(2.0), mps(3.0));
+            assert_eq!(v.to_cartesian(), [mps(1.0), mps(2.0), mps(3.0)]);
+        }
+
+        #[test]
+        fn build_with_components_works() {
+            use crate::systems::FrdComponents;
+            let v = Vector::<TestFrd, N1>::build(FrdComponents {
+                front: mps(1.0),
+                right: mps(2.0),
+                down: mps(3.0),
+            });
+            let cartesian = v.to_cartesian();
+            assert_eq!(cartesian, [mps(1.0), mps(2.0), mps(3.0)]);
+        }
+
+        #[test]
+        fn magnitude_works() {
+            let v = vector!(f = mps(3.0), r = mps(4.0), d = mps(0.0); in TestFrd);
+            assert_eq!(v.magnitude(), mps(5.0));
+        }
+
+        #[test]
+        fn from_spherical_works() {
+            let v = Vector::<TestFrd, N1>::from_spherical(
+                mps(10.0),
+                Angle::new::<degree>(90.0), // polar angle
+                Angle::new::<degree>(0.0),  // azimuth angle
+            );
+            let cartesian = v.to_cartesian();
+            assert_abs_diff_eq!(
+                cartesian[0].get::<meter_per_second>(),
+                10.0,
+                epsilon = 1e-10
+            );
+            assert_abs_diff_eq!(cartesian[1].get::<meter_per_second>(), 0.0, epsilon = 1e-10);
+            assert_abs_diff_eq!(cartesian[2].get::<meter_per_second>(), 0.0, epsilon = 1e-10);
+        }
+
+        #[test]
+        fn axis_vectors_work() {
+            let front = Vector::<TestFrd, N1>::frd_front_axis();
+            let right = Vector::<TestFrd, N1>::frd_right_axis();
+            let down = Vector::<TestFrd, N1>::frd_down_axis();
+
+            let front_cart = front.to_cartesian();
+            let right_cart = right.to_cartesian();
+            let down_cart = down.to_cartesian();
+
+            assert_eq!(front_cart, [mps(1.0), mps(0.0), mps(0.0)]);
+            assert_eq!(right_cart, [mps(0.0), mps(1.0), mps(0.0)]);
+            assert_eq!(down_cart, [mps(0.0), mps(0.0), mps(1.0)]);
+        }
+
+        #[test]
+        fn arithmetic_operations_work() {
+            let v1 = vector!(f = mps(1.0), r = mps(2.0), d = mps(3.0); in TestFrd);
+            let v2 = vector!(f = mps(4.0), r = mps(5.0), d = mps(6.0); in TestFrd);
+
+            let sum = v1 + v2;
+            assert_eq!(sum.to_cartesian(), [mps(5.0), mps(7.0), mps(9.0)]);
+
+            let diff = v2 - v1;
+            assert_eq!(diff.to_cartesian(), [mps(3.0), mps(3.0), mps(3.0)]);
+
+            let neg = -v1;
+            assert_eq!(neg.to_cartesian(), [mps(-1.0), mps(-2.0), mps(-3.0)]);
+
+            let scaled = v1 * 2.0;
+            assert_eq!(scaled.to_cartesian(), [mps(2.0), mps(4.0), mps(6.0)]);
+        }
+
+        #[test]
+        fn zero_vector_works() {
+            let v = Vector::<TestFrd, N1>::zero();
+            assert_eq!(v.to_cartesian(), [mps(0.0), mps(0.0), mps(0.0)]);
+        }
+
+        #[test]
+        fn lerp_works() {
+            let v1 = vector!(f = mps(0.0), r = mps(0.0), d = mps(0.0); in TestFrd);
+            let v2 = vector!(f = mps(10.0), r = mps(20.0), d = mps(30.0); in TestFrd);
+
+            let mid = v1.lerp(&v2, 0.5);
+            assert_eq!(mid.to_cartesian(), [mps(5.0), mps(10.0), mps(15.0)]);
+        }
+
+        #[test]
+        fn with_same_components_in_works() {
+            let v_frd = vector!(f = mps(1.0), r = mps(2.0), d = mps(3.0); in TestFrd);
+            let v_ned: Vector<TestNed, N1> = v_frd.with_same_components_in();
+
+            assert_eq!(v_ned.to_cartesian(), v_frd.to_cartesian());
+        }
+
+        #[test]
+        fn cast_equivalent_coordinate_systems() {
+            let v_frd = vector!(f = mps(1.0), r = mps(2.0), d = mps(3.0); in TestFrd);
+            let v_frd2: Vector<TestFrd2, N1> = v_frd.cast();
+
+            assert_eq!(v_frd2.to_cartesian(), v_frd.to_cartesian());
+        }
+    }
+
+    // Tests for Acceleration vectors (Time = N2)
+    mod acceleration_vectors {
+        use super::*;
+
+        #[test]
+        fn constructor_from_cartesian_works() {
+            #[allow(deprecated)]
+            let v = Vector::<TestFrd, N2>::from_cartesian(mps2(1.0), mps2(2.0), mps2(3.0));
+            assert_eq!(v.to_cartesian(), [mps2(1.0), mps2(2.0), mps2(3.0)]);
+        }
+
+        #[test]
+        fn build_with_components_works() {
+            use crate::systems::FrdComponents;
+            let v = Vector::<TestFrd, N2>::build(FrdComponents {
+                front: mps2(1.0),
+                right: mps2(2.0),
+                down: mps2(3.0),
+            });
+            let cartesian = v.to_cartesian();
+            assert_eq!(cartesian, [mps2(1.0), mps2(2.0), mps2(3.0)]);
+        }
+
+        #[test]
+        fn magnitude_works() {
+            let v = vector!(f = mps2(3.0), r = mps2(4.0), d = mps2(0.0); in TestFrd);
+            assert_eq!(v.magnitude(), mps2(5.0));
+        }
+
+        #[test]
+        fn from_spherical_works() {
+            let v = Vector::<TestFrd, N2>::from_spherical(
+                mps2(10.0),
+                Angle::new::<degree>(90.0), // polar angle
+                Angle::new::<degree>(0.0),  // azimuth angle
+            );
+            let cartesian = v.to_cartesian();
+            assert_abs_diff_eq!(
+                cartesian[0].get::<meter_per_second_squared>(),
+                10.0,
+                epsilon = 1e-10
+            );
+            assert_abs_diff_eq!(
+                cartesian[1].get::<meter_per_second_squared>(),
+                0.0,
+                epsilon = 1e-10
+            );
+            assert_abs_diff_eq!(
+                cartesian[2].get::<meter_per_second_squared>(),
+                0.0,
+                epsilon = 1e-10
+            );
+        }
+
+        #[test]
+        fn axis_vectors_work() {
+            let front = Vector::<TestFrd, N2>::frd_front_axis();
+            let right = Vector::<TestFrd, N2>::frd_right_axis();
+            let down = Vector::<TestFrd, N2>::frd_down_axis();
+
+            let front_cart = front.to_cartesian();
+            let right_cart = right.to_cartesian();
+            let down_cart = down.to_cartesian();
+
+            assert_eq!(front_cart, [mps2(1.0), mps2(0.0), mps2(0.0)]);
+            assert_eq!(right_cart, [mps2(0.0), mps2(1.0), mps2(0.0)]);
+            assert_eq!(down_cart, [mps2(0.0), mps2(0.0), mps2(1.0)]);
+        }
+
+        #[test]
+        fn arithmetic_operations_work() {
+            let v1 = vector!(f = mps2(1.0), r = mps2(2.0), d = mps2(3.0); in TestFrd);
+            let v2 = vector!(f = mps2(4.0), r = mps2(5.0), d = mps2(6.0); in TestFrd);
+
+            let sum = v1 + v2;
+            assert_eq!(sum.to_cartesian(), [mps2(5.0), mps2(7.0), mps2(9.0)]);
+
+            let diff = v2 - v1;
+            assert_eq!(diff.to_cartesian(), [mps2(3.0), mps2(3.0), mps2(3.0)]);
+
+            let neg = -v1;
+            assert_eq!(neg.to_cartesian(), [mps2(-1.0), mps2(-2.0), mps2(-3.0)]);
+
+            let scaled = v1 * 2.0;
+            assert_eq!(scaled.to_cartesian(), [mps2(2.0), mps2(4.0), mps2(6.0)]);
+        }
+
+        #[test]
+        fn zero_vector_works() {
+            let v = Vector::<TestFrd, N2>::zero();
+            assert_eq!(v.to_cartesian(), [mps2(0.0), mps2(0.0), mps2(0.0)]);
+        }
+
+        #[test]
+        fn lerp_works() {
+            let v1 = vector!(f = mps2(0.0), r = mps2(0.0), d = mps2(0.0); in TestFrd);
+            let v2 = vector!(f = mps2(10.0), r = mps2(20.0), d = mps2(30.0); in TestFrd);
+
+            let mid = v1.lerp(&v2, 0.5);
+            assert_eq!(mid.to_cartesian(), [mps2(5.0), mps2(10.0), mps2(15.0)]);
+        }
+
+        #[test]
+        fn with_same_components_in_works() {
+            let v_frd = vector!(f = mps2(1.0), r = mps2(2.0), d = mps2(3.0); in TestFrd);
+            let v_ned: Vector<TestNed, N2> = v_frd.with_same_components_in();
+
+            assert_eq!(v_ned.to_cartesian(), v_frd.to_cartesian());
+        }
+
+        #[test]
+        fn cast_equivalent_coordinate_systems() {
+            let v_frd = vector!(f = mps2(1.0), r = mps2(2.0), d = mps2(3.0); in TestFrd);
+            let v_frd2: Vector<TestFrd2, N2> = v_frd.cast();
+
+            assert_eq!(v_frd2.to_cartesian(), v_frd.to_cartesian());
+        }
+    }
+
+    // Tests for coordinate/vector interconversion
+    mod coordinate_vector_conversions {
+        use super::*;
+
+        #[test]
+        fn coordinate_to_vector_conversion_works() {
+            let coord = coordinate!(f = m(1.0), r = m(2.0), d = m(3.0); in TestFrd);
+            let vec: Vector<TestFrd> = coord.into();
+
+            assert_eq!(vec.to_cartesian(), [m(1.0), m(2.0), m(3.0)]);
+        }
+
+        #[test]
+        fn multiply_acceleration_by_time_gives_velocity() {
+            let acc = vector!(f = mps2(1.0), r = mps2(2.0), d = mps2(3.0); in TestFrd);
+            let vel: Vector<TestFrd, N1> =
+                acc * uom::si::f64::Time::new::<uom::si::time::second>(2.0);
+            assert_eq!(vel.to_cartesian(), [mps(2.0), mps(4.0), mps(6.0)]);
+        }
+
+        #[test]
+        fn multiply_velocity_by_time_gives_length() {
+            let vel = vector!(f = mps(1.0), r = mps(2.0), d = mps(3.0); in TestFrd);
+            let len: Vector<TestFrd, Z0> =
+                vel * uom::si::f64::Time::new::<uom::si::time::second>(2.0);
+            assert_eq!(len.to_cartesian(), [m(2.0), m(4.0), m(6.0)]);
+        }
+    }
+}

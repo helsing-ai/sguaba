@@ -49,7 +49,7 @@ const ECEF_TO_WGS84_MAX_GEO_CENTER_DISTANCE_M_SQ: f64 = (SEMI_MAJOR_AXIS
     + ECEF_TO_WGS84_MAX_ALTITUDE_M)
     * (SEMI_MAJOR_AXIS + ECEF_TO_WGS84_MAX_ALTITUDE_M);
 
-/// Representing an Earth-bound location using the [World Geodedic System
+/// Representing an Earth-bound location using the [World Geodetic System
 /// '84](https://en.wikipedia.org/wiki/World_Geodetic_System#WGS_84).
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -524,6 +524,118 @@ impl Builder<HasLatitude, HasLongitude, HasAltitude> {
     }
 }
 
+/// Constructs a [`Wgs84`] coordinate with compile-time validated angles using unit suffixes.
+///
+/// This macro provides a safe way to construct WGS84 coordinates with compile-time known angles,
+/// eliminating the need for `.expect()` calls on the latitude validation.
+///
+/// # Supported Units
+/// - `deg` - degrees (for latitude and longitude)
+/// - `rad` - radians (for latitude and longitude)
+/// - `m` - meters (for altitude)
+/// - `km` - kilometers (for altitude)
+///
+/// # Examples
+/// ```rust
+/// use sguaba::wgs84;
+///
+/// // Using degrees and meters
+/// let location1 = wgs84!(latitude = deg(35.3619), longitude = deg(138.7280), altitude = m(2294.0));
+///
+/// // Using degrees and kilometers
+/// let location2 = wgs84!(latitude = deg(35.3619), longitude = deg(138.7280), altitude = km(2.294));
+///
+/// // Using radians and meters
+/// let location3 = wgs84!(latitude = rad(0.617), longitude = rad(2.413), altitude = m(2294.0));
+/// ```
+///
+/// # Compile-time validation
+///
+/// The following examples should fail to compile because latitude is out of range:
+///
+/// ```compile_fail
+/// # use sguaba::wgs84;
+/// // Latitude > 90° should fail
+/// let location = wgs84!(latitude = deg(91.0), longitude = deg(0.0), altitude = m(0.0));
+/// ```
+///
+/// ```compile_fail
+/// # use sguaba::wgs84;
+/// // Latitude < -90° should fail
+/// let location = wgs84!(latitude = deg(-91.0), longitude = deg(0.0), altitude = m(0.0));
+/// ```
+///
+/// ```compile_fail
+/// # use sguaba::wgs84;
+/// // Latitude > π/2 radians should fail
+/// let location = wgs84!(latitude = rad(1.58), longitude = rad(0.0), altitude = m(0.0));
+/// ```
+///
+/// ```compile_fail
+/// # use sguaba::wgs84;
+/// // Latitude < -π/2 radians should fail
+/// let location = wgs84!(latitude = rad(-1.58), longitude = rad(0.0), altitude = m(0.0));
+/// ```
+#[macro_export]
+macro_rules! wgs84 {
+    (latitude = deg($lat:expr), longitude = deg($lng:expr), altitude = m($alt:expr)) => {{
+        const _: () = assert!(
+            $lat >= -90.0 && $lat <= 90.0,
+            "latitude must be in [-90°, 90°]"
+        );
+        $crate::systems::Wgs84::builder()
+            .latitude(::uom::si::f64::Angle::new::<::uom::si::angle::degree>($lat))
+            .expect("latitude is valid because it was checked at compile time")
+            .longitude(::uom::si::f64::Angle::new::<::uom::si::angle::degree>($lng))
+            .altitude(::uom::si::f64::Length::new::<::uom::si::length::meter>(
+                $alt,
+            ))
+            .build()
+    }};
+    (latitude = deg($lat:expr), longitude = deg($lng:expr), altitude = km($alt:expr)) => {{
+        const _: () = assert!(
+            $lat >= -90.0 && $lat <= 90.0,
+            "latitude must be in [-90°, 90°]"
+        );
+        $crate::systems::Wgs84::builder()
+            .latitude(::uom::si::f64::Angle::new::<::uom::si::angle::degree>($lat))
+            .expect("latitude is valid because it was checked at compile time")
+            .longitude(::uom::si::f64::Angle::new::<::uom::si::angle::degree>($lng))
+            .altitude(::uom::si::f64::Length::new::<::uom::si::length::kilometer>(
+                $alt,
+            ))
+            .build()
+    }};
+    (latitude = rad($lat:expr), longitude = rad($lng:expr), altitude = m($alt:expr)) => {{
+        const _: () = assert!(
+            $lat >= -std::f64::consts::FRAC_PI_2 && $lat <= std::f64::consts::FRAC_PI_2,
+            "latitude must be in [-π/2, π/2] radians"
+        );
+        $crate::systems::Wgs84::builder()
+            .latitude(::uom::si::f64::Angle::new::<::uom::si::angle::radian>($lat))
+            .expect("latitude is valid because it was checked at compile time")
+            .longitude(::uom::si::f64::Angle::new::<::uom::si::angle::radian>($lng))
+            .altitude(::uom::si::f64::Length::new::<::uom::si::length::meter>(
+                $alt,
+            ))
+            .build()
+    }};
+    (latitude = rad($lat:expr), longitude = rad($lng:expr), altitude = km($alt:expr)) => {{
+        const _: () = assert!(
+            $lat >= -std::f64::consts::FRAC_PI_2 && $lat <= std::f64::consts::FRAC_PI_2,
+            "latitude must be in [-π/2, π/2] radians"
+        );
+        $crate::systems::Wgs84::builder()
+            .latitude(::uom::si::f64::Angle::new::<::uom::si::angle::radian>($lat))
+            .expect("latitude is valid because it was checked at compile time")
+            .longitude(::uom::si::f64::Angle::new::<::uom::si::angle::radian>($lng))
+            .altitude(::uom::si::f64::Length::new::<::uom::si::length::kilometer>(
+                $alt,
+            ))
+            .build()
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use std::panic;
@@ -532,7 +644,7 @@ mod tests {
     use crate::coordinate;
     use crate::coordinate_systems::Ecef;
     use crate::coordinates::Coordinate;
-    use crate::geodedic::{Components, ECEF_TO_WGS84_MAX_ALTITUDE_M, ECEF_TO_WGS84_MIN_ALTITUDE_M};
+    use crate::geodetic::{Components, ECEF_TO_WGS84_MAX_ALTITUDE_M, ECEF_TO_WGS84_MIN_ALTITUDE_M};
     use crate::util::BoundedAngle;
     use approx::{assert_relative_eq, AbsDiffEq};
     use quickcheck::quickcheck;
@@ -621,6 +733,80 @@ mod tests {
                 }))
             }
         }
+    }
+
+    #[test]
+    fn wgs84_macro() {
+        // Test degrees with meters
+        let location1 = wgs84!(
+            latitude = deg(35.3619),
+            longitude = deg(138.7280),
+            altitude = m(2294.0)
+        );
+        assert_eq!(location1.latitude(), d(35.3619));
+        assert_eq!(location1.longitude(), d(138.7280));
+        assert_eq!(location1.altitude(), m(2294.0));
+
+        // Test degrees with kilometers
+        let location2 = wgs84!(
+            latitude = deg(35.3619),
+            longitude = deg(138.7280),
+            altitude = km(2.294)
+        );
+        assert_eq!(location2.latitude(), d(35.3619));
+        assert_eq!(location2.longitude(), d(138.7280));
+        assert_eq!(location2.altitude(), m(2294.0)); // Should be converted to meters
+
+        // Test radians with meters
+        let location3 = wgs84!(
+            latitude = rad(0.617),
+            longitude = rad(2.413),
+            altitude = m(1000.0)
+        );
+        assert_relative_eq!(location3.latitude().get::<radian>(), 0.617);
+        assert_relative_eq!(location3.longitude().get::<radian>(), 2.413);
+        assert_eq!(location3.altitude(), m(1000.0));
+
+        // Test radians with kilometers
+        let location4 = wgs84!(
+            latitude = rad(0.617),
+            longitude = rad(2.413),
+            altitude = km(1.0)
+        );
+        assert_relative_eq!(location4.latitude().get::<radian>(), 0.617);
+        assert_relative_eq!(location4.longitude().get::<radian>(), 2.413);
+        assert_eq!(location4.altitude(), m(1000.0)); // Should be converted to meters
+
+        // Test boundary values for latitude
+        let location5 = wgs84!(
+            latitude = deg(90.0),
+            longitude = deg(0.0),
+            altitude = m(0.0)
+        );
+        assert_eq!(location5.latitude(), d(90.0));
+
+        let location6 = wgs84!(
+            latitude = deg(-90.0),
+            longitude = deg(0.0),
+            altitude = m(0.0)
+        );
+        assert_eq!(location6.latitude(), d(-90.0));
+
+        // Test with radians at boundaries
+        use std::f64::consts::FRAC_PI_2;
+        let location7 = wgs84!(
+            latitude = rad(1.5707963267948966),
+            longitude = rad(0.0),
+            altitude = m(0.0)
+        );
+        assert_relative_eq!(location7.latitude().get::<radian>(), FRAC_PI_2);
+
+        let location8 = wgs84!(
+            latitude = rad(-1.5707963267948966),
+            longitude = rad(0.0),
+            altitude = m(0.0)
+        );
+        assert_relative_eq!(location8.latitude().get::<radian>(), -FRAC_PI_2);
     }
 
     #[test]
