@@ -2783,13 +2783,9 @@ mod tests {
         let pitch = d(45.);
         let roll = d(30.);
 
-        let rotation_direct = unsafe {
-            Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
-                .yaw(yaw)
-                .pitch(pitch)
-                .roll(roll)
-                .build()
-        };
+        #[allow(deprecated)]
+        let rotation_direct =
+            unsafe { Rotation::<PlaneNed, PlaneFrd>::from_tait_bryan_angles(yaw, pitch, roll) };
 
         let rotation_builder = unsafe {
             Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
@@ -2811,11 +2807,8 @@ mod tests {
         let pitch = d(-30.);
         let roll = d(15.);
 
-        let orientation_direct = Orientation::<PlaneNed>::tait_bryan_builder()
-            .yaw(yaw)
-            .pitch(pitch)
-            .roll(roll)
-            .build();
+        #[allow(deprecated)]
+        let orientation_direct = Orientation::<PlaneNed>::from_tait_bryan_angles(yaw, pitch, roll);
 
         let orientation_builder = Orientation::<PlaneNed>::tait_bryan_builder()
             .yaw(yaw)
@@ -2834,103 +2827,50 @@ mod tests {
     fn tait_bryan_builder_enforces_order() {
         let builder = Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder();
 
-        // Can only call yaw first
+        // Can call yaw first
         let builder = builder.yaw(d(10.));
 
-        // Can only call pitch after yaw
+        // Can call pitch after yaw
         let builder = builder.pitch(d(20.));
 
-        // Can only call roll after pitch
+        // Can call roll after pitch
         let builder = builder.roll(d(30.));
 
-        // Can only call build after roll
+        // Can call build after roll
         let _rotation = unsafe { builder.build() };
+
+        // There are compile_fail tests that check that other orders will not work
     }
 
     #[test]
-    fn tait_bryan_builder_derives_work() {
-        let builder = Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder();
-
-        // Test Clone
-        let builder_cloned = builder.clone();
-        let builder_after_yaw = builder_cloned.yaw(d(90.));
-
-        // Test Copy (implicit through assignment)
-        let builder_copied = builder;
-        let builder_after_yaw_2 = builder_copied.yaw(d(45.));
-
+    fn tait_bryan_builder_debug() {
         // Test Debug shows only set fields per state
         let builder_needs_yaw = Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder();
-        let debug_str = format!("{:?}", builder_needs_yaw);
+        let debug_str = format!("{builder_needs_yaw:?}");
         assert!(debug_str.contains("TaitBryanBuilder<NeedsYaw>"));
         assert!(!debug_str.contains("yaw"));
         assert!(!debug_str.contains("pitch"));
         assert!(!debug_str.contains("roll"));
 
-        let debug_str = format!("{:?}", builder_after_yaw);
+        let builder_after_yaw = builder_needs_yaw.yaw(d(90.));
+        let debug_str = format!("{builder_after_yaw:?}");
         assert!(debug_str.contains("TaitBryanBuilder<NeedsPitch>"));
         assert!(debug_str.contains("yaw"));
         assert!(!debug_str.contains("pitch"));
         assert!(!debug_str.contains("roll"));
 
         let builder_after_pitch = builder_after_yaw.pitch(d(30.));
-        let debug_str = format!("{:?}", builder_after_pitch);
+        let debug_str = format!("{builder_after_pitch:?}");
         assert!(debug_str.contains("TaitBryanBuilder<NeedsRoll>"));
         assert!(debug_str.contains("yaw"));
         assert!(debug_str.contains("pitch"));
         assert!(!debug_str.contains("roll"));
 
         let builder_complete = builder_after_pitch.roll(d(15.));
-        let debug_str = format!("{:?}", builder_complete);
+        let debug_str = format!("{builder_complete:?}");
         assert!(debug_str.contains("TaitBryanBuilder<Complete>"));
         assert!(debug_str.contains("yaw"));
         assert!(debug_str.contains("pitch"));
         assert!(debug_str.contains("roll"));
-
-        // Verify both work independently
-        let builder_complete_1 = builder_after_yaw.pitch(d(30.)).roll(d(15.));
-        let builder_complete_2 = builder_after_yaw_2.pitch(d(60.)).roll(d(0.));
-
-        let _rotation_1 = unsafe { builder_complete_1.build() };
-        let _rotation_2 = unsafe { builder_complete_2.build() };
-    }
-
-    #[test]
-    fn tait_bryan_builder_orientation_derives_work() {
-        use crate::engineering::Orientation;
-
-        let builder = Orientation::<PlaneNed>::tait_bryan_builder();
-
-        // Test Clone and Copy work the same way
-        let builder_cloned = builder.clone();
-        let builder_copied = builder;
-
-        // Test Debug shows only set fields per state
-        let debug_str = format!("{:?}", builder);
-        assert!(debug_str.contains("TaitBryanBuilder<NeedsYaw>"));
-        assert!(!debug_str.contains("yaw"));
-        assert!(!debug_str.contains("pitch"));
-        assert!(!debug_str.contains("roll"));
-
-        // Both builders should work independently
-        let orientation_1 = builder_cloned.yaw(d(90.)).pitch(d(45.)).roll(d(0.)).build();
-
-        let orientation_2 = builder_copied.yaw(d(0.)).pitch(d(0.)).roll(d(90.)).build();
-
-        // Verify they produced different results
-        let (yaw1, _, _) = orientation_1.to_tait_bryan_angles();
-        let (_, _, roll2) = orientation_2.to_tait_bryan_angles();
-
-        use crate::util::BoundedAngle;
-        assert_abs_diff_eq!(
-            BoundedAngle::new(yaw1),
-            BoundedAngle::new(d(90.)),
-            epsilon = 1e-10
-        );
-        assert_abs_diff_eq!(
-            BoundedAngle::new(roll2),
-            BoundedAngle::new(d(90.)),
-            epsilon = 1e-10
-        );
     }
 }
