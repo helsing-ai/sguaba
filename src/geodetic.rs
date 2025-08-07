@@ -156,7 +156,7 @@ impl Wgs84 {
 
     /// Returns the number of degrees longitude north of the equator ("northing").
     ///
-    /// The returned value is always in [-90, 90).
+    /// The returned value is always in [-90, 90) ± N × 360°.
     #[must_use]
     pub fn latitude(&self) -> Angle {
         Angle::new::<radian>(BoundedAngle::new(self.latitude).to_signed_range())
@@ -164,6 +164,8 @@ impl Wgs84 {
 
     /// Returns the number of degrees longitude east of the [IERS Reference Meridian] near
     /// Greenwich ("easting").
+    ///
+    /// There is no guarantee on the numeric range of the longitudinal angle.
     ///
     /// [IERS Reference Meridian]: https://en.wikipedia.org/wiki/IERS_Reference_Meridian
     #[must_use]
