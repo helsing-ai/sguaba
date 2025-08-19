@@ -418,9 +418,7 @@ macro_rules! system {
 
                 // azimuth should be 0° when elevation is +/- 90° as promised by
                 // bearing_from_origin; the 90° shift is removed to uphold this promise.
-                if elevation == $crate::AngleForBearingTrait::HALF_TURN/2.
-                    || elevation == -$crate::AngleForBearingTrait::HALF_TURN/2.
-                {
+                if elevation.abs() == $crate::AngleForBearingTrait::HALF_TURN/2. {
                     azimuth -= $crate::AngleForBearingTrait::HALF_TURN/2.;
                 }
 
