@@ -386,6 +386,8 @@ macro_rules! system {
         }
     };
     (_clockwise_from_y_and_positive_z_bearing, $name:ident) => {
+        use uom::ConstZero;
+
         /// For this coordinate system:
         ///
         /// - azimuth is the angle clockwise about positive Z along the XY plane from the
@@ -419,7 +421,7 @@ macro_rules! system {
                 // azimuth should be 0° when elevation is +/- 90° as promised by
                 // bearing_from_origin; the 90° shift is removed to uphold this promise.
                 if elevation.abs() == $crate::AngleForBearingTrait::HALF_TURN/2. {
-                    azimuth -= $crate::AngleForBearingTrait::HALF_TURN/2.;
+                    azimuth = $crate::AngleForBearingTrait::ZERO;
                 }
 
 
