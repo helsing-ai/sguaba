@@ -231,7 +231,7 @@
 use typenum::{P1, Z0};
 use uom::{
     si::{f64::V, Quantity, ISQ, SI},
-    Kind,
+    ConstZero, Kind,
 };
 
 #[macro_use]
@@ -254,6 +254,9 @@ pub(crate) type Isometry3 = nalgebra::Isometry3<f64>;
 
 #[doc(hidden)]
 pub type AngleForBearingTrait = uom::si::f64::Angle;
+
+#[doc(hidden)]
+pub const ZERO_FOR_BEARING: AngleForBearingTrait = AngleForBearingTrait::ZERO;
 
 /// Type alias for a quantity whose unit is one-dimensional in length and has a zero- or
 /// negative-valued time dimension (ie, [`uom::si::f64::Length`], [`uom::si::f64::Velocity`], and
