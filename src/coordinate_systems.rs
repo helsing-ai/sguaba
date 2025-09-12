@@ -403,7 +403,7 @@ macro_rules! system {
                 let polar = $crate::AngleForBearingTrait::HALF_TURN/2. - bearing.elevation();
 
                 // azimuth is flipped and shifted by 90°; in spherical coordinates azimuth increases
-                // counterclockwise about positive Z along the XY place from the positive X axis.
+                // counterclockwise about positive Z along the XY plane from the positive X axis.
                 let azimuth = $crate::AngleForBearingTrait::HALF_TURN/2. - bearing.azimuth();
 
                 (polar, azimuth)
@@ -414,7 +414,14 @@ macro_rules! system {
             ) -> Option<$crate::Bearing<Self>> {
                 // just the inverse of the above
                 let elevation = $crate::AngleForBearingTrait::HALF_TURN/2. - polar.into();
-                let azimuth = $crate::AngleForBearingTrait::HALF_TURN/2. - azimuth.into();
+                let mut azimuth = $crate::AngleForBearingTrait::HALF_TURN/2. - azimuth.into();
+
+                // azimuth should be 0° when elevation is +/- 90° as promised by
+                // bearing_from_origin; the 90° shift is removed to uphold this promise.
+                if elevation.abs() == $crate::AngleForBearingTrait::HALF_TURN/2. {
+                    azimuth = $crate::ZERO_FOR_BEARING;
+                }
+
 
                 Some($crate::Bearing::builder().azimuth(azimuth).elevation(elevation)?.build())
             }

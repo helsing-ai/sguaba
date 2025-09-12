@@ -848,7 +848,8 @@ constructor!(EnuLike, [enu_east, enu_north, enu_up]);
 #[cfg(test)]
 mod tests {
     use super::Length;
-    use crate::coordinate_systems::{Ecef, Frd, Ned};
+    use crate::bearing;
+    use crate::coordinate_systems::{Ecef, Enu, Frd, Ned};
     use crate::coordinates::Coordinate;
     use crate::Point3;
     use approx::assert_relative_eq;
@@ -881,5 +882,23 @@ mod tests {
         assert_relative_eq!(-ned, coordinate!(n = m(-10.), e = m(5.), d = m(-3.5)));
 
         assert_relative_eq!(-ecef, coordinate!(x = m(-10.), y = m(5.), z = m(-3.5)));
+    }
+
+    // Test promise made by `bearing_from_origin` that when elevation is 90,
+    // azimuth is 0 for ENU.
+    #[test]
+    fn enu_bearing_from_origin() {
+        let up = coordinate!(e = m(0.), n = m(0.), u = m(10.0); in Enu);
+        let down = coordinate!(e = m(0.), n = m(0.), u = m(-10.0); in Enu);
+
+        assert_relative_eq!(
+            up.bearing_from_origin().expect("up is not at origin"),
+            bearing!(azimuth = deg(0.), elevation = deg(90.); in Enu)
+        );
+
+        assert_relative_eq!(
+            down.bearing_from_origin().expect("down is not at origin"),
+            bearing!(azimuth = deg(0.), elevation = deg(-90.); in Enu)
+        );
     }
 }
