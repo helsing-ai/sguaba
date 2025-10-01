@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.9.6]
+
+### Added
+
+- Add `Vector::orientation_at_origin`
+  ([#40](https://github.com/helsing-ai/sguaba/pull/40)).
+
 ## [0.9.5]
 
 ### Changed
