@@ -789,14 +789,16 @@ where
 
     /// Computes the orientation of the vector as if the vector starts at the origin of `In`.
     ///
-    /// Since vectors do not include roll information, the roll of the returned orientation will be
-    /// 0º.
+    /// Since vectors do not include roll information, the desired roll must be passed in. It's
+    /// worth reading the documentation on [`Orientation`] for a reminder about the meaning of roll
+    /// here. Very briefly, it is intrinsic, and 0º roll means the object's positive Z axis is
+    /// aligned with `In`'s positive Z axis.
     ///
     /// Returns `None` if the vector has zero length, as the yaw is then ill-defined.
     ///
     /// Returns a yaw of zero if the vector points directly along the Z axis.
     #[must_use]
-    pub fn orientation_at_origin(&self) -> Option<Orientation<In>> {
+    pub fn orientation_at_origin(&self, roll: impl Into<Angle>) -> Option<Orientation<In>> {
         // The vector is effectively an axis-angle representation of the Tait-Bryan orientation
         // we're after (with the angle of rotation being 0º). But, when angle is 0º, the axis-angle
         // representation ends up being a noop from what I can tell. Instead, we compute this from
@@ -823,8 +825,8 @@ where
         // (since we're using intrinsic rotations). Per the right-hand rule, positive pitch
         // rotates from +X toward -Z, so we negate z to get the correct sign.
         let pitch = (-z).atan2((x.powi(P2::new()) + y.powi(P2::new())).sqrt());
-        // And roll is zero for vectors.
-        let roll = Angle::ZERO;
+        // And the roll is passed in.
+        let roll = roll.into();
 
         Some(
             Orientation::tait_bryan_builder()
@@ -1413,14 +1415,16 @@ mod tests {
         #[test]
         fn orientation_at_origin_zero_vector_returns_none() {
             let v = Vector::<TestXyz>::zero();
-            assert_eq!(v.orientation_at_origin(), None);
+            assert_eq!(v.orientation_at_origin(Angle::ZERO), None);
         }
 
         #[test]
         fn orientation_at_origin_positive_x_axis() {
             // Vector pointing along +X should have yaw=0º, pitch=0º
             let v = vector!(x = m(1.0), y = m(0.0), z = m(0.0); in TestXyz);
-            let orientation = v.orientation_at_origin().expect("non-zero vector");
+            let orientation = v
+                .orientation_at_origin(Angle::ZERO)
+                .expect("non-zero vector");
             let (yaw, pitch, roll) = orientation.to_tait_bryan_angles();
 
             assert_abs_diff_eq!(yaw.get::<degree>(), 0.0, epsilon = 1e-10);
@@ -1432,7 +1436,9 @@ mod tests {
         fn orientation_at_origin_positive_y_axis() {
             // Vector pointing along +Y should have yaw=90º, pitch=0º
             let v = vector!(x = m(0.0), y = m(1.0), z = m(0.0); in TestXyz);
-            let orientation = v.orientation_at_origin().expect("non-zero vector");
+            let orientation = v
+                .orientation_at_origin(Angle::ZERO)
+                .expect("non-zero vector");
             let (yaw, pitch, roll) = orientation.to_tait_bryan_angles();
 
             assert_abs_diff_eq!(yaw.get::<degree>(), 90.0, epsilon = 1e-10);
@@ -1444,7 +1450,9 @@ mod tests {
         fn orientation_at_origin_positive_z_axis() {
             // Vector pointing along +Z should have yaw=0º (arbitrary), pitch=-90º
             let v = vector!(x = m(0.0), y = m(0.0), z = m(1.0); in TestXyz);
-            let orientation = v.orientation_at_origin().expect("non-zero vector");
+            let orientation = v
+                .orientation_at_origin(Angle::ZERO)
+                .expect("non-zero vector");
             let (yaw, pitch, roll) = orientation.to_tait_bryan_angles();
 
             assert_abs_diff_eq!(yaw.get::<degree>(), 0.0, epsilon = 1e-10);
@@ -1456,7 +1464,9 @@ mod tests {
         fn orientation_at_origin_negative_x_axis() {
             // Vector pointing along -X should have yaw=180º or -180º, pitch=0º
             let v = vector!(x = m(-1.0), y = m(0.0), z = m(0.0); in TestXyz);
-            let orientation = v.orientation_at_origin().expect("non-zero vector");
+            let orientation = v
+                .orientation_at_origin(Angle::ZERO)
+                .expect("non-zero vector");
             let (yaw, pitch, roll) = orientation.to_tait_bryan_angles();
 
             // atan2(0, -1) = 180º or -180º depending on convention
@@ -1469,7 +1479,9 @@ mod tests {
         fn orientation_at_origin_45_degree_xy_plane() {
             // Vector at 45º in XY plane should have yaw=45º, pitch=0º
             let v = vector!(x = m(1.0), y = m(1.0), z = m(0.0); in TestXyz);
-            let orientation = v.orientation_at_origin().expect("non-zero vector");
+            let orientation = v
+                .orientation_at_origin(Angle::ZERO)
+                .expect("non-zero vector");
             let (yaw, pitch, roll) = orientation.to_tait_bryan_angles();
 
             assert_abs_diff_eq!(yaw.get::<degree>(), 45.0, epsilon = 1e-10);
@@ -1481,7 +1493,9 @@ mod tests {
         fn orientation_at_origin_45_degree_xz_plane() {
             // Vector at 45º in XZ plane should have yaw=0º, pitch=-45º
             let v = vector!(x = m(1.0), y = m(0.0), z = m(1.0); in TestXyz);
-            let orientation = v.orientation_at_origin().expect("non-zero vector");
+            let orientation = v
+                .orientation_at_origin(Angle::ZERO)
+                .expect("non-zero vector");
             let (yaw, pitch, roll) = orientation.to_tait_bryan_angles();
 
             assert_abs_diff_eq!(yaw.get::<degree>(), 0.0, epsilon = 1e-10);
@@ -1495,7 +1509,9 @@ mod tests {
             // Expected yaw = atan2(4, 3) ≈ 53.13º
             // Expected pitch = atan2(-5, sqrt(3² + 4²)) = atan2(-5, 5) = -45º
             let v = vector!(x = m(3.0), y = m(4.0), z = m(5.0); in TestXyz);
-            let orientation = v.orientation_at_origin().expect("non-zero vector");
+            let orientation = v
+                .orientation_at_origin(Angle::ZERO)
+                .expect("non-zero vector");
             let (yaw, pitch, roll) = orientation.to_tait_bryan_angles();
 
             assert_abs_diff_eq!(yaw.get::<degree>(), 53.13010235415598, epsilon = 1e-10);
@@ -1522,7 +1538,9 @@ mod tests {
             //
             // so a 45º-nose-up east vector should have yaw=90º and pitch=45º
             let v = vector!(n = m(0.0), e = m(1.0), d = m(-1.0); in TestNed);
-            let orientation = v.orientation_at_origin().expect("non-zero vector");
+            let orientation = v
+                .orientation_at_origin(Angle::ZERO)
+                .expect("non-zero vector");
             let (yaw, pitch, roll) = orientation.to_tait_bryan_angles();
 
             assert_abs_diff_eq!(yaw.get::<degree>(), 90.0, epsilon = 1e-10);
@@ -1541,7 +1559,9 @@ mod tests {
             //
             // so a 45º-nose-up north vector should have yaw=90º and pitch=-45º
             let v = vector!(e = m(0.0), n = m(1.0), u = m(1.0); in TestEnu);
-            let orientation = v.orientation_at_origin().expect("non-zero vector");
+            let orientation = v
+                .orientation_at_origin(Angle::ZERO)
+                .expect("non-zero vector");
             let (yaw, pitch, roll) = orientation.to_tait_bryan_angles();
 
             assert_abs_diff_eq!(yaw.get::<degree>(), 90.0, epsilon = 1e-10);
