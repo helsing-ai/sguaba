@@ -79,7 +79,7 @@
 //! Assume that a pilot of a plane observes something out of their window at a given bearing and
 //! elevation angles (ie, measured in the plane's [FRD](systems::FrdLike)) and wants to know the
 //! location of that thing in terms of Earth-bound Latitude and Longitude coordinates (ie,
-//! [WGS84](systems::Wgs84).
+//! [WGS84](systems::Wgs84)).
 //!
 //! ```
 //! # use sguaba::{system, Bearing, Coordinate, engineering::Orientation, systems::Wgs84};
