@@ -1,6 +1,7 @@
 use crate::builder::{Set, Unset};
 use crate::coordinate_systems::HasComponents;
 use crate::directions::Bearing;
+use crate::engineering::Orientation;
 use crate::{
     systems::{EnuLike, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike},
     Coordinate, CoordinateSystem,
@@ -13,6 +14,7 @@ use std::{fmt, iter::Sum};
 use typenum::{Integer, N1, N2, P2, Z0};
 use uom::si::f64::{Acceleration, Angle, Length, Velocity};
 use uom::si::{acceleration::meter_per_second_squared, length::meter, velocity::meter_per_second};
+use uom::ConstZero;
 
 #[cfg(any(test, feature = "approx"))]
 use {
@@ -23,14 +25,12 @@ use {
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::engineering::Orientation;
 #[cfg(doc)]
 use crate::{
     math::RigidBodyTransform,
     systems::BearingDefined,
     vector::{AccelerationVector, LengthVector, VelocityVector},
 };
-use uom::ConstZero;
 
 /// Defines a vector (ie, direction with magnitude) in the coordinate system specified by `In`.
 ///
