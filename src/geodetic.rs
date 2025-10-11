@@ -1043,7 +1043,7 @@ mod tests {
         })
         .unwrap();
 
-        let mut original_ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
+        let original_ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
         let mut current = original_ecef;
         for _ in 0..iterations {
             let current_wgs84 = current.to_wgs84();
@@ -1053,6 +1053,9 @@ mod tests {
 
         let drift = Length::new::<meter>((original_ecef.point - current.point).norm());
 
-        assert!(drift <= max_drift, "drift {drift:?} > max_drift {max_drift:?}");
+        assert!(
+            drift <= max_drift,
+            "drift {drift:?} > max_drift {max_drift:?}"
+        );
     }
 }
