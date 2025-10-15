@@ -305,10 +305,16 @@ impl Coordinate<Ecef> {
         loop {
             let p = a + b * k;
             let q = b + a * k;
-            let f_k = 2. * (b * p * q.powi(2) + a * p.powi(2) * q - a * r2 * q - b * z2 * p);
+
+            let p2 = p.powi(2);
+            let q2 = q.powi(2);
+
+            let f_k_value = p2 * q2 - r2 * q2 - z2 * p2;
+            let f_k_derivative = 2. * (b * p * q2 + a * p2 * q - a * r2 * q - b * z2 * p);
+
             // NOTE(jon): dk here is the delta to the angle of the tangent _of the earth's
             // surface_, so it will get very small very quickly.
-            let dk = -1. / f_k;
+            let dk = -f_k_value / f_k_derivative;
 
             if !dk.is_normal() || dk.abs() < f64::EPSILON {
                 // don't propagate NaNs and stop if there's no further refinement
@@ -654,7 +660,7 @@ mod tests {
     use uom::si::f64::{Angle, Length};
     use uom::si::{
         angle::{degree, radian},
-        length::meter,
+        length::{meter, micrometer},
     };
 
     fn m(meters: f64) -> Length {
@@ -1015,5 +1021,41 @@ mod tests {
             let ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
             assert_relative_eq!(ecef, coordinate!(x = m(x), y = m(y), z = m(z)),);
         }
+    }
+
+    #[rstest]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 5, Length::new::<micrometer>(1.))]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 50, Length::new::<micrometer>(1.))]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 500, Length::new::<micrometer>(1.))]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 5000, Length::new::<micrometer>(1.))]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 50000, Length::new::<micrometer>(1.))]
+    fn wgs84_to_ecef_round_trip_accumulated_drift(
+        #[case] lat: Angle,
+        #[case] long: Angle,
+        #[case] alt: Length,
+        #[case] iterations: usize,
+        #[case] max_drift: Length,
+    ) {
+        let wgs84 = Wgs84::build(Components {
+            latitude: lat,
+            longitude: long,
+            altitude: alt,
+        })
+        .unwrap();
+
+        let original_ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
+        let mut current = original_ecef;
+        for _ in 0..iterations {
+            let current_wgs84 = current.to_wgs84();
+            let ecef = Coordinate::<Ecef>::from_wgs84(&current_wgs84);
+            current = ecef;
+        }
+
+        let drift = Length::new::<meter>((original_ecef.point - current.point).norm());
+
+        assert!(
+            drift <= max_drift,
+            "drift {drift:?} > max_drift {max_drift:?}"
+        );
     }
 }
