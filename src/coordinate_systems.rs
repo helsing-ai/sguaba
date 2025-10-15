@@ -462,22 +462,31 @@ system! {
     pub struct Ecef using right-handed XYZ
 }
 
-system! {
-    // this is just a test to make sure "using NED" works.
-    // we expect consuming crates to define their own strongly typed versions of these systems that
-    // correspond to particular frames of reference (eg, `PlaneNed` or `EmitterNed`).
-    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-    pub(crate) struct Ned using NED
+#[cfg(test)]
+mod testing {
+    use super::*;
+
+    system! {
+        // this is just a test to make sure "using NED" works.
+        // we expect consuming crates to define their own strongly typed versions of these systems that
+        // correspond to particular frames of reference (eg, `PlaneNed` or `EmitterNed`).
+        #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+        pub(crate) struct Ned using NED
+    }
+
+    system! {
+        // ditto for "using FRD"
+        #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+        pub(crate) struct Frd using FRD
+    }
+
+    system! {
+        // ditto for "using ENU"
+        #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+        pub(crate) struct Enu using ENU
+    }
 }
 
-system! {
-    // ditto for "using FRD"
-    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-    pub(crate) struct Frd using FRD
-}
-
-system! {
-    // ditto for "using ENU"
-    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-    pub(crate) struct Enu using ENU
-}
+#[cfg(test)]
+#[allow(clippy::items_after_test_module)]
+pub(crate) use testing::*;
