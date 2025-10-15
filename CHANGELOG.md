@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.9.7]
+
+### Changed
+
+- Reduce drift in ECEF-WGS84 conversion
+  ([#42](https://github.com/helsing-ai/sguaba/pull/42)).
+
 ## [0.9.6]
 
 ### Added
@@ -111,7 +118,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial public release.
 
-[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.4...HEAD
+[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.7...HEAD
+[0.9.7]: https://github.com/helsing-ai/sguaba/compare/v0.9.6...v0.9.7
+[0.9.6]: https://github.com/helsing-ai/sguaba/compare/v0.9.5...v0.9.6
+[0.9.5]: https://github.com/helsing-ai/sguaba/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/helsing-ai/sguaba/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/helsing-ai/sguaba/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/helsing-ai/sguaba/compare/v0.9.1...v0.9.2
