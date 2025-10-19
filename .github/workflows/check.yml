@@ -130,5 +130,9 @@ jobs:
         uses: dtolnay/rust-toolchain@6d653acede28d24f02e3cd41383119e8b1b35921 # branch=master
         with:
           toolchain: ${{ matrix.msrv }}
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # tag=v4.3.0
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo
       - name: cargo +${{ matrix.msrv }} check
         run: cargo check
