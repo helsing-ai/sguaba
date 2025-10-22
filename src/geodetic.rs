@@ -51,6 +51,9 @@ const ECEF_TO_WGS84_MAX_GEO_CENTER_DISTANCE_M_SQ: f64 = (SEMI_MAJOR_AXIS
 
 /// Representing an Earth-bound location using the [World Geodetic System
 /// '84](https://en.wikipedia.org/wiki/World_Geodetic_System#WGS_84).
+///
+/// Note that across longer time scales, WGS84 drifts, which you can read more about in the
+/// crate-level docs on temporal drift.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Wgs84 {

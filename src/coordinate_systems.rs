@@ -111,7 +111,8 @@ pub trait BearingDefined: Sized {
 /// NED-like coordinate systems, but for each aircraft, (0, 0, 0) corresponds to the location of
 /// that aircraft. Thus, an object observed at, say, (10, 20, 30) in one aircraft's local NED-like
 /// coordinate system will have completely different coordinates in the other aircraft's local
-/// NED-like coordinate system.
+/// NED-like coordinate system. NED systems also vary by time for moving observers, which you can
+/// read more about in the crate-level docs on temporal drift.
 ///
 /// Since NED has earth bounded axes, two observers that are located in the same place but face in
 /// different directions, they will still have the same NED-like coordinates to a given emitter.
@@ -162,7 +163,8 @@ impl<Time: typenum::Integer> HasComponents<Time> for NedLike {
 /// FRD-like coordinate systems, but for each aircraft, (0, 0, 0) corresponds to the center of mass
 /// of that aircraft. Thus, an object observed at, say, (10, 20, 30) in one aircraft's local
 /// FRD-like coordinate system will have completely different coordinates in the other aircraft's
-/// local FRD-like coordinate system.
+/// local FRD-like coordinate system. FRD systems also vary by time for moving observers, which you
+/// can read more about in the crate-level docs on temporal drift.
 ///
 /// Further note that, unlike [`NedLike`], two FRD-like systems with a colocated origin may also be
 /// rotated with respect to each other. In other words, two observers that are located in the same
@@ -215,7 +217,8 @@ impl<Time: typenum::Integer> HasComponents<Time> for FrdLike {
 /// ENU-like coordinate systems, but for each aircraft, (0, 0, 0) corresponds to the location of
 /// that aircraft. Thus, an object observed at, say, (10, 20, 30) in one aircraft's local ENU-like
 /// coordinate system will have completely different coordinates in the other aircraft's local
-/// ENU-like coordinate system.
+/// ENU-like coordinate system. ENU systems also vary by time for moving observers, which you can
+/// read more about in the crate-level docs on temporal drift.
 ///
 /// Since ENU has earth bounded axes, two observers that are located in the same place but face in
 /// different directions, they will still have the same ENU-like coordinates to a given emitter.
@@ -455,6 +458,9 @@ system! {
     /// This system has global coordinates; two observers with arbitrary position and orientation
     /// that name the same coordinate in this system are referring to the same absolute Earth-bound
     /// position.
+    ///
+    /// Note that across longer time scales, ECEF drifts, which you can read more about in the
+    /// crate-level docs on temporal drift.
     ///
     /// [ecef]: https://en.wikipedia.org/wiki/Earth-centered,_Earth-fixed_coordinate_system
     #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

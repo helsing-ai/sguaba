@@ -5,9 +5,8 @@
 //! points and vectors in coordinate spaces respectively. They are all generic over a
 //! [`CoordinateSystem`] so that coordinates from one system cannot (easily) be incorrectly misused
 //! as though they were in a different one. The [`system!`] macro allows you to define additional
-//! coordinate systems with particular semantics (eg, [`NedLike`](systems::NedLike) or
-//! [`FrdLike`](systems::FrdLike)) such that you can distinguish between coordinates in, say,
-//! `PlaneFrd` and `EmitterFrd`.
+//! coordinate systems with particular semantics (eg, [`NedLike`] or [`FrdLike`]) such that you can
+//! distinguish between coordinates in, say, `PlaneFrd` and `EmitterFrd`.
 //!
 //! To move between coordinate systems, you'll want to use the mathematical constructs from the
 //! [`math`] submodule like [rigid body transforms](math::RigidBodyTransform) and
@@ -30,7 +29,7 @@
 //! Earth-fixed"), [NED] ("North, East, Down"), [FRD] ("Front, Right, Down"), and [ENU] ("East,
 //! North, Up").
 //!
-//! [WGS84] ([`Wgs84`](systems::Wgs84)) and [ECEF] ([`Ecef`](systems::Ecef)) are both Earth-bound
+//! [WGS84] ([`Wgs84`]) and [ECEF] ([`Ecef`]) are both Earth-bound
 //! coordinate systems that describe points in space on or near Earth. They do this by describing
 //! positions relative to Earth's major and minor axes, often by making slightly simplifying
 //! assumptions about the Earth's shape. WGS84 does this by using latitude and longitude (degrees
@@ -39,8 +38,8 @@
 //! towards specific points on the Earth's surface. One can convert between them [without too much
 //! trouble][trouble].
 //!
-//! [NED] ([`NedLike`](systems::NedLike)), [FRD] ([`FrdLike`](systems::FrdLike)), and [ENU]
-//! ([`EnuLike`](systems::EnuLike)) on the other hand are "local" coordinate systems that are
+//! [NED] ([`NedLike`]), [FRD] ([`FrdLike`]), and [ENU] ([`EnuLike`]) on the other hand are "local"
+//! coordinate systems that are
 //! descriptions of relative positions to the location of the observer. [NED] and [ENU] are
 //! Earth-bound in that they describe positions in terms of how far North, East, and Down (for NED)
 //! or East, North, and Up (for ENU) they are relative to the observer. [FRD], meanwhile, is a
@@ -69,10 +68,40 @@
 //! once one of these transforms have been constructed, they allow you to freely convert between
 //! the _types_ representing each coordinate system. Thus, if a transform is constructed with
 //! incorrect parameters, such as giving a coordinate to `ecef_to_ned_at` that does not correspond
-//! to the location of the origin of the `To` [`NedLike`](systems::NedLike) system, _type_ safety
+//! to the location of the origin of the `To` [`NedLike`] system, _type_ safety
 //! would be violated. This is a slight abuse of Rust's `unsafe` mechanism, which tends to focus on
 //! memory safety, but has proven to be valuable in highlighting areas where frame of reference
 //! bugs are most likely to manifest.
+//!
+//! # Temporal drift
+//!
+//! Sguaba does not attempt to provide time-variant type safety. For example, if you have a
+//! `Coordinate<PlaneNed>` for the position of a moving plane, there are really an infinite number
+//! of NED systems, one for each point along the plane's trajectory. Trivially, (0, 0, 0) in the
+//! plane's NED frame at time t = 0 is not at the same real-world location as (0, 0, 0) in the
+//! frame at time t = 1. But Sguaba does not let you express this in the type system as you'd end
+//! up with an infinite number of coordinate system types. Instead, the expectation is that your
+//! code ensures that it does not mix up frames of reference from different points in time. This is
+//! unfortunate, and a potential source of errors, but not one with an obvious remedy.
+//!
+//! Perhaps surprisingly, this is _also_ the case for non-local frames like ECEF and WGS84. Due to
+//! plate tectonics, a spot measured relative to a point on earth's _surface_ technically "moves"
+//! over time. Consider, for example, the Eiffel tower, which is located at
+//! 48.85851298170608ºN, 2.2944746521697468ºE (according to Google Maps at least). Since the
+//! Eurasian plate drifts over time, if you measured its location a millennium from now, it would
+//! technically be at a different place relative to, say, the Statue of Liberty. So, how does that
+//! affect its latitude and longitude? The answer is that "it depends". There isn't really just
+//! _one_ ECEF/WGS84, there are multiple, each defined through an [International Terrestrial
+//! Reference Frame (ITRF)][ITRF], and over time, WGS84 [is "updated"][WGSup] to use a newer ITRF.
+//! At the time of writing, WGS84 is "really" [G2296], which was released on 7 January 2024, which
+//! is in turn aligned to [ITRF2020]. Sguaba's [`Ecef`] and [`Wgs84`] types do _not_ attempt to capture
+//! this time-variance, just as the [`NedLike`], [`EnuLike`], and [`FrdLike`] systems do not
+//! attempt to capture that these systems also change over time as the observer's location changes.
+//!
+//! [ITRF]: https://en.wikipedia.org/wiki/International_Terrestrial_Reference_System_and_Frame
+//! [WGSup]: https://en.wikipedia.org/wiki/World_Geodetic_System#Updates_and_new_standards
+//! [G2296]: https://earth-info.nga.mil/php/download.php?file=WGS%2084(G2296).pdf
+//! [ITRF2020]: https://itrf.ign.fr/en/solutions/ITRF2020
 //!
 //! # Examples
 //!
@@ -133,7 +162,7 @@
 //! In the ["engineering-focused" API](engineering), we can directly talk about an object's
 //! orientation and its "pose" (ie, position + orientation) in the world. Using these, we can
 //! transform between different coordinate systems to go from `PlaneFrd` to `PlaneNed` to
-//! [`Ecef`](systems::Ecef) (cartesian world location) to [`Wgs84`](systems::Wgs84). Note that one
+//! [`Ecef`] (cartesian world location) to [`Wgs84`]. Note that one
 //! must know the observer's body orientation relative to NED to go from FRD to NED, and the
 //! observer's ECEF position to go from NED to ECEF.
 //!
@@ -233,6 +262,10 @@ use uom::{
     si::{f64::V, Quantity, ISQ, SI},
     ConstZero, Kind,
 };
+
+// for easier linking from docs above
+#[cfg(doc)]
+use systems::{Ecef, EnuLike, FrdLike, NedLike, Wgs84};
 
 #[macro_use]
 mod coordinate_systems;
