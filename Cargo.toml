@@ -23,7 +23,7 @@ uom = { version = "0.37.0", default-features = false, features = ["autoconvert",
 
 [dev-dependencies]
 nav-types = "0.5.2"
-rstest = "0.25.0"
+rstest = "0.26.1"
 serde_yaml = "0.9.34"
 insta = "1.41.1"
 quickcheck = "1.0.3"
