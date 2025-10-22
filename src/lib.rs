@@ -5,9 +5,8 @@
 //! points and vectors in coordinate spaces respectively. They are all generic over a
 //! [`CoordinateSystem`] so that coordinates from one system cannot (easily) be incorrectly misused
 //! as though they were in a different one. The [`system!`] macro allows you to define additional
-//! coordinate systems with particular semantics (eg, [`NedLike`](systems::NedLike) or
-//! [`FrdLike`](systems::FrdLike)) such that you can distinguish between coordinates in, say,
-//! `PlaneFrd` and `EmitterFrd`.
+//! coordinate systems with particular semantics (eg, [`NedLike`] or [`FrdLike`]) such that you can
+//! distinguish between coordinates in, say, `PlaneFrd` and `EmitterFrd`.
 //!
 //! To move between coordinate systems, you'll want to use the mathematical constructs from the
 //! [`math`] submodule like [rigid body transforms](math::RigidBodyTransform) and
@@ -30,7 +29,7 @@
 //! Earth-fixed"), [NED] ("North, East, Down"), [FRD] ("Front, Right, Down"), and [ENU] ("East,
 //! North, Up").
 //!
-//! [WGS84] ([`Wgs84`](systems::Wgs84)) and [ECEF] ([`Ecef`](systems::Ecef)) are both Earth-bound
+//! [WGS84] ([`Wgs84`]) and [ECEF] ([`Ecef`]) are both Earth-bound
 //! coordinate systems that describe points in space on or near Earth. They do this by describing
 //! positions relative to Earth's major and minor axes, often by making slightly simplifying
 //! assumptions about the Earth's shape. WGS84 does this by using latitude and longitude (degrees
@@ -39,8 +38,8 @@
 //! towards specific points on the Earth's surface. One can convert between them [without too much
 //! trouble][trouble].
 //!
-//! [NED] ([`NedLike`](systems::NedLike)), [FRD] ([`FrdLike`](systems::FrdLike)), and [ENU]
-//! ([`EnuLike`](systems::EnuLike)) on the other hand are "local" coordinate systems that are
+//! [NED] ([`NedLike`]), [FRD] ([`FrdLike`]), and [ENU] ([`EnuLike`]) on the other hand are "local"
+//! coordinate systems that are
 //! descriptions of relative positions to the location of the observer. [NED] and [ENU] are
 //! Earth-bound in that they describe positions in terms of how far North, East, and Down (for NED)
 //! or East, North, and Up (for ENU) they are relative to the observer. [FRD], meanwhile, is a
@@ -69,7 +68,7 @@
 //! once one of these transforms have been constructed, they allow you to freely convert between
 //! the _types_ representing each coordinate system. Thus, if a transform is constructed with
 //! incorrect parameters, such as giving a coordinate to `ecef_to_ned_at` that does not correspond
-//! to the location of the origin of the `To` [`NedLike`](systems::NedLike) system, _type_ safety
+//! to the location of the origin of the `To` [`NedLike`] system, _type_ safety
 //! would be violated. This is a slight abuse of Rust's `unsafe` mechanism, which tends to focus on
 //! memory safety, but has proven to be valuable in highlighting areas where frame of reference
 //! bugs are most likely to manifest.
@@ -133,7 +132,7 @@
 //! In the ["engineering-focused" API](engineering), we can directly talk about an object's
 //! orientation and its "pose" (ie, position + orientation) in the world. Using these, we can
 //! transform between different coordinate systems to go from `PlaneFrd` to `PlaneNed` to
-//! [`Ecef`](systems::Ecef) (cartesian world location) to [`Wgs84`](systems::Wgs84). Note that one
+//! [`Ecef`] (cartesian world location) to [`Wgs84`]. Note that one
 //! must know the observer's body orientation relative to NED to go from FRD to NED, and the
 //! observer's ECEF position to go from NED to ECEF.
 //!
@@ -233,6 +232,10 @@ use uom::{
     si::{f64::V, Quantity, ISQ, SI},
     ConstZero, Kind,
 };
+
+// for easier linking from docs above
+#[cfg(doc)]
+use systems::{Ecef, EnuLike, FrdLike, NedLike, Wgs84};
 
 #[macro_use]
 mod coordinate_systems;
