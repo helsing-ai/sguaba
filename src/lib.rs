@@ -73,6 +73,36 @@
 //! memory safety, but has proven to be valuable in highlighting areas where frame of reference
 //! bugs are most likely to manifest.
 //!
+//! # Temporal drift
+//!
+//! Sguaba does not attempt to provide time-variant type safety. For example, if you have a
+//! `Coordinate<PlaneNed>` for the position of a moving plane, there are really an infinite number
+//! of NED systems, one for each point along the plane's trajectory. Trivially, (0, 0, 0) in the
+//! plane's NED frame at time t = 0 is not at the same real-world location as (0, 0, 0) in the
+//! frame at time t = 1. But Sguaba does not let you express this in the type system as you'd end
+//! up with an infinite number of coordinate system types. Instead, the expectation is that your
+//! code ensures that it does not mix up frames of reference from different points in time. This is
+//! unfortunate, and a potential source of errors, but not one with an obvious remedy.
+//!
+//! Perhaps surprisingly, this is _also_ the case for non-local frames like ECEF and WGS84. Due to
+//! plate tectonics, a spot measured relative to a point on earth's _surface_ technically "moves"
+//! over time. Consider, for example, the Eiffel tower, which is located at
+//! 48.85851298170608ºN, 2.2944746521697468ºE (according to Google Maps at least). Since the
+//! Eurasian plate drifts over time, if you measured its location a millennium from now, it would
+//! technically be at a different place relative to, say, the Statue of Liberty. So, how does that
+//! affect its latitude and longitude? The answer is that "it depends". There isn't really just
+//! _one_ ECEF/WGS84, there are multiple, each defined through an [International Terrestrial
+//! Reference Frame (ITRF)][ITRF], and over time, WGS84 [is "updated"][WGSup] to use a newer ITRF.
+//! At the time of writing, WGS84 is "really" [G2296], which was released on 7 January 2024, which
+//! is in turn aligned to [ITRF2020]. Sguaba's [`Ecef`] and [`Wgs84`] types do _not_ attempt to capture
+//! this time-variance, just as the [`NedLike`], [`EnuLike`], and [`FrdLike`] systems do not
+//! attempt to capture that these systems also change over time as the observer's location changes.
+//!
+//! [ITRF]: https://en.wikipedia.org/wiki/International_Terrestrial_Reference_System_and_Frame
+//! [WGSup]: https://en.wikipedia.org/wiki/World_Geodetic_System#Updates_and_new_standards
+//! [G2296]: https://earth-info.nga.mil/php/download.php?file=WGS%2084(G2296).pdf
+//! [ITRF2020]: https://itrf.ign.fr/en/solutions/ITRF2020
+//!
 //! # Examples
 //!
 //! Assume that a pilot of a plane observes something out of their window at a given bearing and
