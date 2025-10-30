@@ -49,6 +49,13 @@ const ECEF_TO_WGS84_MAX_GEO_CENTER_DISTANCE_M_SQ: f64 = (SEMI_MAJOR_AXIS
     + ECEF_TO_WGS84_MAX_ALTITUDE_M)
     * (SEMI_MAJOR_AXIS + ECEF_TO_WGS84_MAX_ALTITUDE_M);
 
+// Iteration limit used in `to_wgs84()` as recommended in section 5.2 of
+// the paper:
+//   An iterative algorithm to compute geodetic coordinates
+//   Chanfang Shu a,b,n, Fei Li
+//   https://www.sciencedirect.com/science/article/pii/S0098300410001238
+const GEODETIC_ITER_LIMIT: usize = 20;
+
 /// Representing an Earth-bound location using the [World Geodetic System
 /// '84](https://en.wikipedia.org/wiki/World_Geodetic_System#WGS_84).
 ///
@@ -305,7 +312,8 @@ impl Coordinate<Ecef> {
 
         let k0 = (((a2 * z2 + b2 * r2).sqrt() - ab) * bigr2) / (a2 * z2 + b2 * r2);
         let mut k = k0;
-        loop {
+
+        for _ in 0..GEODETIC_ITER_LIMIT {
             let p = a + b * k;
             let q = b + a * k;
 
@@ -1060,5 +1068,18 @@ mod tests {
             drift <= max_drift,
             "drift {drift:?} > max_drift {max_drift:?}"
         );
+    }
+
+    #[rstest]
+    #[case(0.0, 0.0, 6378142.405664505)]
+    #[case(0.0, 6378142.405664505, 0.0)]
+    #[case(6378142.405664505, 0.0, 0.0)]
+    fn test_to_wgs84_does_not_loop_forever(#[case] x: f64, #[case] y: f64, #[case] z: f64) {
+        let coord: Coordinate<Ecef> = coordinate! {
+            x = Length::new::<meter>(x),
+            y = Length::new::<meter>(y),
+            z = Length::new::<meter>(z),
+        };
+        let _ = coord.to_wgs84();
     }
 }
