@@ -257,6 +257,9 @@
 //! println!("{:?}", observation_in_ecef.to_wgs84());
 //! ```
 
+// fixme: uncomment once transition to no_std is done
+// #![cfg_attr(not(feature = "std"), no_std)]
+
 use typenum::{P1, Z0};
 use uom::{
     si::{f64::V, Quantity, ISQ, SI},
