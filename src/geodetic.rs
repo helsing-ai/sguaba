@@ -1,3 +1,4 @@
+use crate::std_wrappers::sin;
 use crate::{systems::Ecef, util::BoundedAngle, Coordinate, Point3};
 use std::fmt;
 use std::fmt::Display;
@@ -230,8 +231,8 @@ impl Coordinate<Ecef> {
         let n_phi = SEMI_MAJOR_AXIS / (1. - ECCENTRICITY_SQ / (1. + cot_2_phi)).sqrt();
 
         let x = (n_phi + height_h) * lat_phi.cos() * lon_lambda.cos();
-        let y = (n_phi + height_h) * lat_phi.cos() * lon_lambda.sin();
-        let z = ((1. - ECCENTRICITY_SQ) * n_phi + height_h) * lat_phi.sin();
+        let y = (n_phi + height_h) * lat_phi.cos() * sin(lon_lambda);
+        let z = ((1. - ECCENTRICITY_SQ) * n_phi + height_h) * sin(lat_phi);
 
         Self::from_nalgebra_point(Point3::new(x, y, z))
     }

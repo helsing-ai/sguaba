@@ -273,6 +273,7 @@ mod coordinate_systems;
 mod coordinates;
 mod directions;
 mod geodetic;
+mod std_wrappers;
 mod util;
 mod vectors;
 
