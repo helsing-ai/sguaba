@@ -21,6 +21,11 @@ serde = { version = "1.0.215", features = ["derive"], optional = true }
 typenum = "1.18.0"
 uom = { version = "0.37.0", default-features = false, features = ["autoconvert", "std", "si", "f64"] }
 
+# to make -Zminimal-versions work
+[target.'cfg(any())'.dependencies]
+# nav-types brings in old nalgebra, which has a broken min-dependency
+nalgebra-macros = { version = "0.2.2", optional = true }
+
 [dev-dependencies]
 nav-types = "0.5.2"
 rstest = "0.25.0"

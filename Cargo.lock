@@ -641,6 +641,7 @@ dependencies = [
  "approx",
  "insta",
  "nalgebra 0.34.1",
+ "nalgebra-macros 0.2.2",
  "nav-types",
  "quickcheck",
  "rstest",
