@@ -10,12 +10,15 @@ keywords = ["spatial", "rigid-body", "coordinates", "coordinate-systems"]
 categories = ["aerospace", "mathematics"]
 
 [features]
-default = ["serde", "approx"]
+default = ["serde", "approx", "libm"]
 serde = ["dep:serde", "nalgebra/serde-serialize", "uom/use_serde"]
 approx = ["dep:approx"]
+std = []
+libm = ["dep:libm"] # aka no_std
 
 [dependencies]
 approx = { version = "0.5.1", optional = true }
+libm = { version = "0.2.15", optional = true }
 nalgebra = { version = "0.33.2" }
 serde = { version = "1.0.215", features = ["derive"], optional = true }
 typenum = "1.18.0"

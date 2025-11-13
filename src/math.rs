@@ -19,6 +19,7 @@
 use crate::coordinate_systems::Ecef;
 use crate::coordinates::Coordinate;
 use crate::geodetic::Wgs84;
+use crate::std_wrappers::sin;
 use crate::systems::EquivalentTo;
 use crate::vectors::Vector;
 use crate::Bearing;
@@ -163,9 +164,9 @@ where
         let phi = latitude.into().get::<radian>();
         let lambda = longitude.into().get::<radian>();
 
-        let sin_phi = phi.sin();
+        let sin_phi = sin(phi);
         let cos_phi = phi.cos();
-        let sin_lambda = lambda.sin();
+        let sin_lambda = sin(lambda);
         let cos_lambda = lambda.cos();
 
         // Equation 3 has column E, N, U
@@ -219,9 +220,9 @@ where
         let phi = latitude.into().get::<radian>();
         let lambda = longitude.into().get::<radian>();
 
-        let sin_phi = phi.sin();
+        let sin_phi = sin(phi);
         let cos_phi = phi.cos();
-        let sin_lambda = lambda.sin();
+        let sin_lambda = sin(lambda);
         let cos_lambda = lambda.cos();
 
         // Standard ENU transformation matrix from ECEF coordinates

@@ -2,6 +2,7 @@ use crate::builder::{Set, Unset};
 use crate::coordinate_systems::HasComponents;
 use crate::directions::Bearing;
 use crate::engineering::Orientation;
+use crate::std_wrappers::sin;
 use crate::{
     systems::{EnuLike, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike},
     Coordinate, CoordinateSystem,
@@ -570,8 +571,8 @@ where
         let azimuth = azimuth.into();
         let polar = polar.into();
 
-        let x = radius * polar.sin().value * azimuth.cos().value;
-        let y = radius * polar.sin().value * azimuth.sin().value;
+        let x = radius * sin(polar.value) * azimuth.cos().value;
+        let y = radius * sin(polar.value) * sin(azimuth.value);
         let z = radius * polar.cos().value;
 
         #[allow(deprecated)]
