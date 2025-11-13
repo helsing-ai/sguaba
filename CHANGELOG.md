@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.9.10]
+
+### Changed
+
+- Upgraded nalgebra to 0.34
+  ([#48](https://github.com/helsing-ai/sguaba/pull/48)).
+
 ## [0.9.9]
 
 ### Fixed
@@ -132,7 +139,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial public release.
 
-[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.9...HEAD
+[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.10...HEAD
+[0.9.10]: https://github.com/helsing-ai/sguaba/compare/v0.9.9...v0.9.10
 [0.9.9]: https://github.com/helsing-ai/sguaba/compare/v0.9.8...v0.9.9
 [0.9.8]: https://github.com/helsing-ai/sguaba/compare/v0.9.7...v0.9.8
 [0.9.7]: https://github.com/helsing-ai/sguaba/compare/v0.9.6...v0.9.7
