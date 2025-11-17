@@ -19,7 +19,7 @@ approx = ["dep:approx"]
 approx = { version = "0.5.1", optional = true }
 libm = "0.2.8"
 nalgebra = { version = "0.34.1", default-features = false, features = ["libm"] }
-serde = { version = "1.0.215", features = ["derive"], optional = true }
+serde = { version = "1.0.215", default-features = false, features = ["derive"], optional = true }
 typenum = "1.18.0"
 uom = { version = "0.37.0", default-features = false, features = ["autoconvert", "si", "f64"] }
 
