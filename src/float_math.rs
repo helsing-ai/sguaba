@@ -16,6 +16,7 @@ pub mod consts {
 pub trait FloatMath {
     fn sin(self) -> Self;
     fn cos(self) -> Self;
+    #[allow(dead_code)]
     fn tan(self) -> Self;
     fn asin(self) -> Self;
     fn acos(self) -> Self;

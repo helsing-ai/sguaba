@@ -1,4 +1,4 @@
-use crate::float_math::consts::{FRAC_PI_2, PI, TAU};
+use crate::float_math::consts::FRAC_PI_2;
 use crate::float_math::FloatMath;
 use crate::{systems::Ecef, util::BoundedAngle, Coordinate, Point3};
 use core::fmt;
@@ -11,9 +11,9 @@ use uom::si::{
 
 #[cfg(any(test, feature = "approx"))]
 use approx::{AbsDiffEq, RelativeEq};
+use core::marker::PhantomData;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use core::marker::PhantomData;
 use uom::ConstZero;
 
 // Parameters required for WGS84 ellipsoid
@@ -70,9 +70,9 @@ pub struct Wgs84 {
     // be [-180,180) or [0,360), or something else altogether. we do not normalize them ourselves
     // because callers will generally not care (they're more likely to feed the value into some
     // other formula that also doesn't care.
-    pub(crate) latitude: uom::si::f64::Angle,
-    pub(crate) longitude: uom::si::f64::Angle,
-    altitude: uom::si::f64::Length,
+    pub(crate) latitude: Angle,
+    pub(crate) longitude: Angle,
+    altitude: Length,
 }
 
 impl Wgs84 {
@@ -204,7 +204,7 @@ impl Display for &Wgs84 {
         let lon = self.longitude();
         let lon_is_positive = lon.is_sign_positive();
         let lon = lon.abs().get::<degree>();
-        let alt = self.altitude.get::<uom::si::length::meter>();
+        let alt = self.altitude.get::<meter>();
         match (lat_is_positive, lon_is_positive) {
             (true, true) => write!(f, "{lat}°N, {lon}°E, {alt}m"),
             (true, false) => write!(f, "{lat}°N, {lon}°W, {alt}m"),
@@ -340,7 +340,9 @@ impl Coordinate<Ecef> {
         let p = a + b * k;
         let q = b + a * k;
         let lat = FloatMath::atan((a * p * self.point.z) / (b * q * r));
-        let altitude = k * FloatMath::sqrt((b2 * r2 / FloatMath::powi(p, 2)) + (a2 * z2 / FloatMath::powi(q, 2)));
+        let altitude = k * FloatMath::sqrt(
+            (b2 * r2 / FloatMath::powi(p, 2)) + (a2 * z2 / FloatMath::powi(q, 2)),
+        );
 
         let wgs84 = Wgs84::builder()
             .latitude(Angle::new::<radian>(lat))
@@ -394,8 +396,9 @@ pub(crate) fn central_angle_by_inverse_haversine(
     let delta_lat = lat_b - lat_a;
     let delta_lon = lon_b - lon_a;
 
-    let inner = 1. - FloatMath::cos(delta_lat) + FloatMath::cos(lat_a) * FloatMath::cos(lat_b) * (1. - FloatMath::cos(delta_lon));
-    uom::si::f64::Angle::new::<uom::si::angle::radian>(2. * FloatMath::asin(FloatMath::sqrt(inner / 2.)))
+    let inner = 1. - FloatMath::cos(delta_lat)
+        + FloatMath::cos(lat_a) * FloatMath::cos(lat_b) * (1. - FloatMath::cos(delta_lon));
+    Angle::new::<radian>(2. * FloatMath::asin(FloatMath::sqrt(inner / 2.)))
 }
 
 #[cfg(any(test, feature = "approx"))]
@@ -412,10 +415,10 @@ impl AbsDiffEq<Self> for Wgs84 {
 
     fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
         self.haversine_distance_on_surface(other) < epsilon
-            && self.altitude.get::<uom::si::length::meter>().abs_diff_eq(
-                &other.altitude.get::<uom::si::length::meter>(),
-                epsilon.get::<meter>(),
-            )
+            && self
+                .altitude
+                .get::<meter>()
+                .abs_diff_eq(&other.altitude.get::<meter>(), epsilon.get::<meter>())
     }
 }
 
@@ -504,9 +507,7 @@ impl<L1, L2, A> Builder<L1, L2, A> {
     pub fn latitude(mut self, latitude: impl Into<Angle>) -> Option<Builder<HasLatitude, L2, A>> {
         let latitude = latitude.into();
         let latitude_in_signed_radians = BoundedAngle::new(latitude).to_signed_range();
-        if !(-FRAC_PI_2..=FRAC_PI_2)
-            .contains(&latitude_in_signed_radians)
-        {
+        if !(-FRAC_PI_2..=FRAC_PI_2).contains(&latitude_in_signed_radians) {
             None
         } else {
             self.under_construction.latitude = latitude;
@@ -629,7 +630,7 @@ macro_rules! wgs84 {
     }};
     (latitude = rad($lat:expr), longitude = rad($lng:expr), altitude = m($alt:expr)) => {{
         const _: () = assert!(
-            $lat >= -::crate::float_math::consts::FRAC_PI_2 && $lat <= ::crate::float_math::consts::FRAC_PI_2,
+            $lat >= -::core::f64::consts::FRAC_PI_2 && $lat <= ::core::f64::consts::FRAC_PI_2,
             "latitude must be in [-π/2, π/2] radians"
         );
         $crate::systems::Wgs84::builder()
@@ -643,7 +644,7 @@ macro_rules! wgs84 {
     }};
     (latitude = rad($lat:expr), longitude = rad($lng:expr), altitude = km($alt:expr)) => {{
         const _: () = assert!(
-            $lat >= -::crate::float_math::consts::FRAC_PI_2 && $lat <= ::crate::float_math::consts::FRAC_PI_2,
+            $lat >= -::core::f64::consts::FRAC_PI_2 && $lat <= ::core::f64::consts::FRAC_PI_2,
             "latitude must be in [-π/2, π/2] radians"
         );
         $crate::systems::Wgs84::builder()
@@ -671,6 +672,8 @@ mod tests {
     use approx::{assert_relative_eq, AbsDiffEq};
     use quickcheck::quickcheck;
     use rstest::rstest;
+    use std::boxed::Box;
+    use std::f64::consts::{FRAC_PI_2, PI, TAU};
     use uom::si::f64::{Angle, Length};
     use uom::si::{
         angle::{degree, radian},
@@ -709,9 +712,7 @@ mod tests {
                 }
             };
             Self {
-                latitude: Angle::new::<radian>(
-                    latitude.rem_euclid(PI) - FRAC_PI_2,
-                ),
+                latitude: Angle::new::<radian>(latitude.rem_euclid(PI) - FRAC_PI_2),
                 longitude: Angle::new::<radian>(longitude.rem_euclid(TAU)),
                 altitude: Length::new::<meter>(
                     // Generates values ranged ECEF_TO_WGS84_MIN_ALTITUDE_M..ECEF_TO_WGS84_MAX_ALTITUDE_M
@@ -736,16 +737,11 @@ mod tests {
                         altitude,
                     }))
                 } else {
-                    Box::new(
-                        longitude
-                            .get::<uom::si::angle::radian>()
-                            .shrink()
-                            .map(move |lon| Self {
-                                latitude,
-                                longitude: Angle::new::<radian>(lon),
-                                altitude,
-                            }),
-                    )
+                    Box::new(longitude.get::<radian>().shrink().map(move |lon| Self {
+                        latitude,
+                        longitude: Angle::new::<radian>(lon),
+                        altitude,
+                    }))
                 }
             } else {
                 Box::new(altitude.get::<meter>().shrink().map(move |alt| Self {
@@ -816,14 +812,14 @@ mod tests {
 
         // Test with radians at boundaries
         let location7 = wgs84!(
-            latitude = rad(1.5707963267948966),
+            latitude = rad(FRAC_PI_2),
             longitude = rad(0.0),
             altitude = m(0.0)
         );
         assert_relative_eq!(location7.latitude().get::<radian>(), FRAC_PI_2);
 
         let location8 = wgs84!(
-            latitude = rad(-1.5707963267948966),
+            latitude = rad(-FRAC_PI_2),
             longitude = rad(0.0),
             altitude = m(0.0)
         );
@@ -977,7 +973,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "conversion from ECEF to WGS84 outside altitude range")]
-    fn wgs_ecef_conversion_fails_for_ecef_origin() -> () {
+    fn wgs_ecef_conversion_fails_for_ecef_origin() {
         let _should_panic = Coordinate::<Ecef>::origin().to_wgs84();
     }
 

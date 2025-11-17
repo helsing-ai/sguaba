@@ -27,12 +27,12 @@ use crate::{
     systems::{EnuLike, NedLike},
     CoordinateSystem, Isometry3, UnitQuaternion,
 };
-use nalgebra::{Matrix3, Rotation3, Translation3};
 use core::convert::From;
 use core::fmt;
 use core::fmt::{Display, Formatter};
 use core::marker::PhantomData;
 use core::ops::{Mul, Neg};
+use nalgebra::{Matrix3, Rotation3, Translation3};
 use uom::si::angle::radian;
 use uom::si::f64::Angle;
 
@@ -252,8 +252,8 @@ fn swap_x_y_negate_z_quaternion() -> UnitQuaternion {
     use nalgebra::{Matrix3, Rotation3, UnitQuaternion};
 
     const SWAP_X_Y_NEGATE_Z: [f64; 9] = [
-        0.0, 1.0, 0.0,  // swap x and y
-        1.0, 0.0, 0.0,  // swap x and y
+        0.0, 1.0, 0.0, // swap x and y
+        1.0, 0.0, 0.0, // swap x and y
         0.0, 0.0, -1.0, // negate z
     ];
     let m = Matrix3::from_row_slice(&SWAP_X_Y_NEGATE_Z);
@@ -1584,6 +1584,7 @@ mod tests {
     use approx::assert_abs_diff_eq;
     use approx::assert_relative_eq;
     use rstest::rstest;
+    use std::format;
     use uom::si::f64::{Angle, Length};
     use uom::si::{angle::degree, length::meter};
 

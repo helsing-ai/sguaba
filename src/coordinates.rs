@@ -13,8 +13,6 @@ use core::marker::PhantomData;
 use core::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 use uom::si::f64::{Angle, Length};
 use uom::si::length::meter;
-use uom::si::quantities::Ratio;
-use uom::typenum::P2;
 use uom::ConstZero;
 
 #[cfg(any(test, feature = "approx"))]
@@ -645,7 +643,7 @@ impl<In> Coordinate<In> {
         let polar_value = (Length::new::<meter>(self.point.z) / r).value;
         let polar = Angle::new::<radian>(FloatMath::acos(polar_value));
         let xy = Length::new::<meter>(FloatMath::sqrt(
-            FloatMath::powi(self.point.x, 2) + FloatMath::powi(self.point.y, 2)
+            FloatMath::powi(self.point.x, 2) + FloatMath::powi(self.point.y, 2),
         ));
         if xy == Length::ZERO {
             // as promised by bearing_from_origin
@@ -654,7 +652,7 @@ impl<In> Coordinate<In> {
         let azimuth_value = (Length::new::<meter>(self.point.x) / xy).value;
         let azimuth = Angle::new::<radian>(FloatMath::copysign(
             FloatMath::acos(azimuth_value),
-            self.point.y
+            self.point.y,
         ));
 
         Some((polar, azimuth))

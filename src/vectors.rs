@@ -12,7 +12,7 @@ use core::fmt::{Display, Formatter};
 use core::marker::PhantomData;
 use core::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 use core::{fmt, iter::Sum};
-use typenum::{Integer, N1, N2, P2, Z0};
+use typenum::{Integer, N1, N2, Z0};
 use uom::si::f64::{Acceleration, Angle, Length, Velocity};
 use uom::si::{acceleration::meter_per_second_squared, length::meter, velocity::meter_per_second};
 use uom::ConstZero;
@@ -826,7 +826,10 @@ where
         // Pitch is the rotation about the Y axis, with 0º pitch being aligned with the yaw axis
         // (since we're using intrinsic rotations). Per the right-hand rule, positive pitch
         // rotates from +X toward -Z, so we negate z to get the correct sign.
-        let pitch = Angle::new::<radian>(FloatMath::atan2(-z.value, FloatMath::sqrt(FloatMath::powi(x.value, 2) + FloatMath::powi(y.value, 2))));
+        let pitch = Angle::new::<radian>(FloatMath::atan2(
+            -z.value,
+            FloatMath::sqrt(FloatMath::powi(x.value, 2) + FloatMath::powi(y.value, 2)),
+        ));
         // And the roll is passed in.
         let roll = roll.into();
 
