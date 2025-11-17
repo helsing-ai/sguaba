@@ -18,6 +18,7 @@
 
 use crate::coordinate_systems::Ecef;
 use crate::coordinates::Coordinate;
+use crate::float_math::FloatMath;
 use crate::geodetic::Wgs84;
 use crate::systems::EquivalentTo;
 use crate::vectors::Vector;
@@ -27,11 +28,11 @@ use crate::{
     CoordinateSystem, Isometry3, UnitQuaternion,
 };
 use nalgebra::{Matrix3, Rotation3, Translation3};
-use std::convert::From;
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use std::marker::PhantomData;
-use std::ops::{Mul, Neg};
+use core::convert::From;
+use core::fmt;
+use core::fmt::{Display, Formatter};
+use core::marker::PhantomData;
+use core::ops::{Mul, Neg};
 use uom::si::angle::radian;
 use uom::si::f64::Angle;
 
@@ -163,10 +164,10 @@ where
         let phi = latitude.into().get::<radian>();
         let lambda = longitude.into().get::<radian>();
 
-        let sin_phi = phi.sin();
-        let cos_phi = phi.cos();
-        let sin_lambda = lambda.sin();
-        let cos_lambda = lambda.cos();
+        let sin_phi = FloatMath::sin(phi);
+        let cos_phi = FloatMath::cos(phi);
+        let sin_lambda = FloatMath::sin(lambda);
+        let cos_lambda = FloatMath::cos(lambda);
 
         // Equation 3 has column E, N, U
         // With N, E, D = N, E, -U
@@ -219,10 +220,10 @@ where
         let phi = latitude.into().get::<radian>();
         let lambda = longitude.into().get::<radian>();
 
-        let sin_phi = phi.sin();
-        let cos_phi = phi.cos();
-        let sin_lambda = lambda.sin();
-        let cos_lambda = lambda.cos();
+        let sin_phi = FloatMath::sin(phi);
+        let cos_phi = FloatMath::cos(phi);
+        let sin_lambda = FloatMath::sin(lambda);
+        let cos_lambda = FloatMath::cos(lambda);
 
         // Standard ENU transformation matrix from ECEF coordinates
         // East, North, Up = E, N, U (no column swapping or negation like NED)
@@ -250,12 +251,12 @@ where
 fn swap_x_y_negate_z_quaternion() -> UnitQuaternion {
     use nalgebra::{Matrix3, Rotation3, UnitQuaternion};
 
-    const SWAP_X_Y_NEGATE_Z: [[f64; 3]; 3] = [
-        [0.0, 1.0, 0.0],  // swap x and y
-        [1.0, 0.0, 0.0],  // swap x and y
-        [0.0, 0.0, -1.0], // negate z
+    const SWAP_X_Y_NEGATE_Z: [f64; 9] = [
+        0.0, 1.0, 0.0,  // swap x and y
+        1.0, 0.0, 0.0,  // swap x and y
+        0.0, 0.0, -1.0, // negate z
     ];
-    let m = Matrix3::from_row_slice(&SWAP_X_Y_NEGATE_Z.concat());
+    let m = Matrix3::from_row_slice(&SWAP_X_Y_NEGATE_Z);
     UnitQuaternion::from_rotation_matrix(&Rotation3::from_matrix(&m))
 }
 
@@ -1404,7 +1405,7 @@ impl<From, To> RelativeEq for RigidBodyTransform<From, To> {
 pub mod tait_bryan_builder {
     use super::*;
     use crate::engineering::Orientation;
-    use std::marker::PhantomData;
+    use core::marker::PhantomData;
     use uom::si::f64::Angle;
     use uom::ConstZero;
 
@@ -1444,22 +1445,22 @@ pub mod tait_bryan_builder {
 
     impl<State, Target> Copy for TaitBryanBuilder<State, Target> {}
 
-    impl<Target> std::fmt::Debug for TaitBryanBuilder<NeedsYaw, Target> {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    impl<Target> core::fmt::Debug for TaitBryanBuilder<NeedsYaw, Target> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("TaitBryanBuilder<NeedsYaw>").finish()
         }
     }
 
-    impl<Target> std::fmt::Debug for TaitBryanBuilder<NeedsPitch, Target> {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    impl<Target> core::fmt::Debug for TaitBryanBuilder<NeedsPitch, Target> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("TaitBryanBuilder<NeedsPitch>")
                 .field("yaw", &self.yaw)
                 .finish()
         }
     }
 
-    impl<Target> std::fmt::Debug for TaitBryanBuilder<NeedsRoll, Target> {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    impl<Target> core::fmt::Debug for TaitBryanBuilder<NeedsRoll, Target> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("TaitBryanBuilder<NeedsRoll>")
                 .field("yaw", &self.yaw)
                 .field("pitch", &self.pitch)
@@ -1467,8 +1468,8 @@ pub mod tait_bryan_builder {
         }
     }
 
-    impl<Target> std::fmt::Debug for TaitBryanBuilder<Complete, Target> {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    impl<Target> core::fmt::Debug for TaitBryanBuilder<Complete, Target> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             f.debug_struct("TaitBryanBuilder<Complete>")
                 .field("yaw", &self.yaw)
                 .field("pitch", &self.pitch)

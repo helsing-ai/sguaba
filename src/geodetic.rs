@@ -1,6 +1,8 @@
+use crate::float_math::consts::{FRAC_PI_2, PI, TAU};
+use crate::float_math::FloatMath;
 use crate::{systems::Ecef, util::BoundedAngle, Coordinate, Point3};
-use std::fmt;
-use std::fmt::Display;
+use core::fmt;
+use core::fmt::Display;
 use uom::si::f64::{Angle, Length};
 use uom::si::{
     angle::{degree, radian},
@@ -11,7 +13,7 @@ use uom::si::{
 use approx::{AbsDiffEq, RelativeEq};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 use uom::ConstZero;
 
 // Parameters required for WGS84 ellipsoid
@@ -269,7 +271,7 @@ impl Coordinate<Ecef> {
             }
         }
 
-        let lon = self.point.y.atan2(self.point.x);
+        let lon = FloatMath::atan2(self.point.y, self.point.x);
 
         // interestingly, there is no single way to convert from ECEF to WGS84.
         // however, there are a number of algorithms, some closed-form (non-iterative) and some
@@ -301,24 +303,24 @@ impl Coordinate<Ecef> {
         // paper specifically calls out convergence problems within 50km of earth center.
         let a = SEMI_MAJOR_AXIS;
         let b = SEMI_MINOR_AXIS;
-        let a2 = a.powi(2);
-        let b2 = b.powi(2);
+        let a2 = FloatMath::powi(a, 2);
+        let b2 = FloatMath::powi(b, 2);
         let ab = a * b;
-        let z2 = self.point.z.powi(2);
-        let x2y2 = self.point.x.powi(2) + self.point.y.powi(2);
+        let z2 = FloatMath::powi(self.point.z, 2);
+        let x2y2 = FloatMath::powi(self.point.x, 2) + FloatMath::powi(self.point.y, 2);
         let r2 = x2y2;
-        let r = x2y2.sqrt();
+        let r = FloatMath::sqrt(x2y2);
         let bigr2 = x2y2 + z2;
 
-        let k0 = (((a2 * z2 + b2 * r2).sqrt() - ab) * bigr2) / (a2 * z2 + b2 * r2);
+        let k0 = ((FloatMath::sqrt(a2 * z2 + b2 * r2) - ab) * bigr2) / (a2 * z2 + b2 * r2);
         let mut k = k0;
 
         for _ in 0..GEODETIC_ITER_LIMIT {
             let p = a + b * k;
             let q = b + a * k;
 
-            let p2 = p.powi(2);
-            let q2 = q.powi(2);
+            let p2 = FloatMath::powi(p, 2);
+            let q2 = FloatMath::powi(q, 2);
 
             let f_k_value = p2 * q2 - r2 * q2 - z2 * p2;
             let f_k_derivative = 2. * (b * p * q2 + a * p2 * q - a * r2 * q - b * z2 * p);
@@ -327,7 +329,7 @@ impl Coordinate<Ecef> {
             // surface_, so it will get very small very quickly.
             let dk = -f_k_value / f_k_derivative;
 
-            if !dk.is_normal() || dk.abs() < f64::EPSILON {
+            if !dk.is_normal() || FloatMath::abs(dk) < f64::EPSILON {
                 // don't propagate NaNs and stop if there's no further refinement
                 break;
             }
@@ -337,8 +339,8 @@ impl Coordinate<Ecef> {
 
         let p = a + b * k;
         let q = b + a * k;
-        let lat = ((a * p * self.point.z) / (b * q * r)).atan();
-        let altitude = k * ((b2 * r2 / p.powi(2)) + (a2 * z2 / q.powi(2))).sqrt();
+        let lat = FloatMath::atan((a * p * self.point.z) / (b * q * r));
+        let altitude = k * FloatMath::sqrt((b2 * r2 / FloatMath::powi(p, 2)) + (a2 * z2 / FloatMath::powi(q, 2)));
 
         let wgs84 = Wgs84::builder()
             .latitude(Angle::new::<radian>(lat))
@@ -392,8 +394,8 @@ pub(crate) fn central_angle_by_inverse_haversine(
     let delta_lat = lat_b - lat_a;
     let delta_lon = lon_b - lon_a;
 
-    let inner = 1. - delta_lat.cos() + lat_a.cos() * lat_b.cos() * (1. - delta_lon.cos());
-    uom::si::f64::Angle::new::<uom::si::angle::radian>(2. * (inner / 2.).sqrt().asin())
+    let inner = 1. - FloatMath::cos(delta_lat) + FloatMath::cos(lat_a) * FloatMath::cos(lat_b) * (1. - FloatMath::cos(delta_lon));
+    uom::si::f64::Angle::new::<uom::si::angle::radian>(2. * FloatMath::asin(FloatMath::sqrt(inner / 2.)))
 }
 
 #[cfg(any(test, feature = "approx"))]
@@ -502,7 +504,7 @@ impl<L1, L2, A> Builder<L1, L2, A> {
     pub fn latitude(mut self, latitude: impl Into<Angle>) -> Option<Builder<HasLatitude, L2, A>> {
         let latitude = latitude.into();
         let latitude_in_signed_radians = BoundedAngle::new(latitude).to_signed_range();
-        if !(-std::f64::consts::FRAC_PI_2..=std::f64::consts::FRAC_PI_2)
+        if !(-FRAC_PI_2..=FRAC_PI_2)
             .contains(&latitude_in_signed_radians)
         {
             None
@@ -627,7 +629,7 @@ macro_rules! wgs84 {
     }};
     (latitude = rad($lat:expr), longitude = rad($lng:expr), altitude = m($alt:expr)) => {{
         const _: () = assert!(
-            $lat >= -std::f64::consts::FRAC_PI_2 && $lat <= std::f64::consts::FRAC_PI_2,
+            $lat >= -::crate::float_math::consts::FRAC_PI_2 && $lat <= ::crate::float_math::consts::FRAC_PI_2,
             "latitude must be in [-π/2, π/2] radians"
         );
         $crate::systems::Wgs84::builder()
@@ -641,7 +643,7 @@ macro_rules! wgs84 {
     }};
     (latitude = rad($lat:expr), longitude = rad($lng:expr), altitude = km($alt:expr)) => {{
         const _: () = assert!(
-            $lat >= -std::f64::consts::FRAC_PI_2 && $lat <= std::f64::consts::FRAC_PI_2,
+            $lat >= -::crate::float_math::consts::FRAC_PI_2 && $lat <= ::crate::float_math::consts::FRAC_PI_2,
             "latitude must be in [-π/2, π/2] radians"
         );
         $crate::systems::Wgs84::builder()
@@ -657,6 +659,7 @@ macro_rules! wgs84 {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "std")]
     use std::panic;
 
     use super::Wgs84;
@@ -707,9 +710,9 @@ mod tests {
             };
             Self {
                 latitude: Angle::new::<radian>(
-                    latitude.rem_euclid(std::f64::consts::PI) - std::f64::consts::FRAC_PI_2,
+                    latitude.rem_euclid(PI) - FRAC_PI_2,
                 ),
-                longitude: Angle::new::<radian>(longitude.rem_euclid(std::f64::consts::TAU)),
+                longitude: Angle::new::<radian>(longitude.rem_euclid(TAU)),
                 altitude: Length::new::<meter>(
                     // Generates values ranged ECEF_TO_WGS84_MIN_ALTITUDE_M..ECEF_TO_WGS84_MAX_ALTITUDE_M
                     altitude
@@ -812,7 +815,6 @@ mod tests {
         assert_eq!(location6.latitude(), d(-90.0));
 
         // Test with radians at boundaries
-        use std::f64::consts::FRAC_PI_2;
         let location7 = wgs84!(
             latitude = rad(1.5707963267948966),
             longitude = rad(0.0),

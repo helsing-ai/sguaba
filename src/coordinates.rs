@@ -2,14 +2,15 @@ use crate::coordinate_systems::{
     CoordinateSystem, EnuLike, FrdLike, HasComponents, NedLike, RightHandedXyzLike,
 };
 use crate::directions::Bearing;
+use crate::float_math::FloatMath;
 use crate::math::RigidBodyTransform;
 use crate::systems::EquivalentTo;
 use crate::vectors::Vector;
 use crate::{engineering, Point3};
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use std::marker::PhantomData;
-use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
+use core::fmt;
+use core::fmt::{Display, Formatter};
+use core::marker::PhantomData;
+use core::ops::{Add, AddAssign, Neg, Sub, SubAssign};
 use uom::si::f64::{Angle, Length};
 use uom::si::length::meter;
 use uom::si::quantities::Ratio;
@@ -640,16 +641,21 @@ impl<In> Coordinate<In> {
             return None;
         }
 
-        let polar = Ratio::from(Length::new::<meter>(self.point.z) / r).acos();
-        let xy = (Length::new::<meter>(self.point.x).powi(P2::new())
-            + Length::new::<meter>(self.point.y).powi(P2::new()))
-        .sqrt();
+        use uom::si::angle::radian;
+        let polar_value = (Length::new::<meter>(self.point.z) / r).value;
+        let polar = Angle::new::<radian>(FloatMath::acos(polar_value));
+        let xy = Length::new::<meter>(FloatMath::sqrt(
+            FloatMath::powi(self.point.x, 2) + FloatMath::powi(self.point.y, 2)
+        ));
         if xy == Length::ZERO {
             // as promised by bearing_from_origin
             return Some((polar, Angle::ZERO));
         }
-        let mut azimuth = Ratio::from(Length::new::<meter>(self.point.x) / xy).acos();
-        azimuth.value = azimuth.value.copysign(self.point.y);
+        let azimuth_value = (Length::new::<meter>(self.point.x) / xy).value;
+        let azimuth = Angle::new::<radian>(FloatMath::copysign(
+            FloatMath::acos(azimuth_value),
+            self.point.y
+        ));
 
         Some((polar, azimuth))
     }

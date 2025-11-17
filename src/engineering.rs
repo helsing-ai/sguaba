@@ -31,11 +31,12 @@
 //! [`RigidBodyTransform::ecef_to_ned_at`].
 
 use crate::coordinates::Coordinate;
+use crate::float_math::FloatMath;
 use crate::math::{RigidBodyTransform, Rotation};
 use crate::systems::EquivalentTo;
 use crate::{Point3, Vector};
-use std::marker::PhantomData;
-use std::ops::Mul;
+use core::marker::PhantomData;
+use core::ops::Mul;
 use uom::si::f64::{Angle, Length};
 use uom::ConstZero;
 
@@ -1059,7 +1060,7 @@ mod tests {
     #[case(
         Point3::new(10., 10., -10.),
         (d(0.), d(0.), d(0.)),
-        Bearing::build(BearingComponents { azimuth: d(45.), elevation: r((10. / (10_f64.powi(2) * 3.).sqrt()).asin()) }).unwrap()
+        Bearing::build(BearingComponents { azimuth: d(45.), elevation: r(FloatMath::asin(10. / FloatMath::sqrt(FloatMath::powi(10_f64, 2) * 3.))) }).unwrap()
     )]
     fn pose_direction_towards(
         #[case] position: Point3,
