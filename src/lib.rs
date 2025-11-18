@@ -300,12 +300,15 @@ type LengthPossiblyPer<Time> = Quantity<ISQ<P1, Z0, Time, Z0, Z0, Z0, Z0, dyn Ki
 
 // re-structure our impots slightly to better match user expectation
 /// Well-known coordinate systems and conventions.
+/// Well-known coordinate systems and conventions.
 pub mod systems {
     pub use super::coordinate_systems::{
         BearingDefined, Ecef, EnuLike, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike,
+        IcrsLike, MoonCenteredLike,  // Added these two types
     };
     pub use super::coordinate_systems::{
         EnuComponents, FrdComponents, HasComponents, NedComponents, XyzComponents,
+        IcrsComponents, MoonCenteredComponents,  // Add these if you want their components public too
     };
     pub use super::geodetic::Wgs84;
 }
