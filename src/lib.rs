@@ -360,3 +360,7 @@ pub mod vector {
 }
 
 pub use vectors::Vector;
+
+
+#[cfg(feature = "celestial")]
+pub mod celestial;
