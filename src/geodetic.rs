@@ -2,6 +2,7 @@ use crate::float_math::FloatMath;
 use crate::{systems::Ecef, util::BoundedAngle, Coordinate, Point3};
 use core::fmt;
 use core::fmt::Display;
+use core::marker::PhantomData;
 use uom::si::f64::{Angle, Length};
 use uom::si::{
     angle::{degree, radian},
@@ -11,7 +12,6 @@ use uom::si::{
 #[cfg(any(test, feature = "approx"))]
 use approx::{AbsDiffEq, RelativeEq};
 use core::f64::consts::FRAC_PI_2;
-use core::marker::PhantomData;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use uom::ConstZero;
@@ -660,7 +660,6 @@ macro_rules! wgs84 {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "std")]
     use std::panic;
 
     use super::Wgs84;

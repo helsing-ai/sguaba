@@ -1,35 +1,6 @@
 //! This library provides hard-to-misuse rigid body transforms (aka "spatial math") for engineers
 //! with other things to worry about than linear algebra.
 //!
-//! # Features
-//!
-//! This crate supports `no_std` environments. The following features are available:
-//!
-//! - **`std`** (enabled by default): Enables standard library support. When disabled, the crate
-//!   uses `libm` for mathematical operations and works in `no_std` environments.
-//! - **`serde`** (enabled by default): Enables serialization/deserialization support via serde.
-//!   Works in both `std` and `no_std` environments.
-//! - **`approx`** (enabled by default): Enables approximate equality comparisons for testing.
-//!   Works in both `std` and `no_std` environments.
-//!
-//! All features are additive and can be combined in any way.
-//!
-//! ## Examples
-//!
-//! For `no_std` usage with all optional features disabled:
-//! ```toml
-//! [dependencies]
-//! sguaba = { version = "0.9", default-features = false }
-//! ```
-//!
-//! For `no_std` with serialization support:
-//! ```toml
-//! [dependencies]
-//! sguaba = { version = "0.9", default-features = false, features = ["serde"] }
-//! ```
-//!
-//! # Overview
-//!
 //! First and foremost, the library provides [`Coordinate`] and [`Vector`] types for representing
 //! points and vectors in coordinate spaces respectively. They are all generic over a
 //! [`CoordinateSystem`] so that coordinates from one system cannot (easily) be incorrectly misused
