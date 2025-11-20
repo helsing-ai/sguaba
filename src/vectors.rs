@@ -821,7 +821,6 @@ where
         // with no sign flipping.
         //
         // Also note that atan2 guarantees that it returns 0 if both components are 0.
-        use uom::si::angle::radian;
         let yaw = Angle::new::<radian>(FloatMath::atan2(y.get::<meter>(), x.get::<meter>()));
         // Pitch is the rotation about the Y axis, with 0º pitch being aligned with the yaw axis
         // (since we're using intrinsic rotations). Per the right-hand rule, positive pitch
