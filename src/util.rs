@@ -1,5 +1,3 @@
-#[cfg(not(feature = "std"))]
-use uom::num_traits::Euclid;
 use uom::si::angle::radian;
 use uom::si::f64::Angle;
 
@@ -47,14 +45,9 @@ impl BoundedAngle {
     }
 
     fn into_bounds(angle: Angle) -> f64 {
+        use uom::num_traits::Euclid;
         let out_of_bounds: f64 = angle.get::<radian>();
-        #[cfg(feature = "std")]
-        let in_bounds = out_of_bounds.rem_euclid(Angle::FULL_TURN.get::<radian>());
-        #[cfg(not(feature = "std"))]
-        let in_bounds = {
-            use uom::num_traits::Euclid;
-            Euclid::rem_euclid(&out_of_bounds, &Angle::FULL_TURN.get::<radian>())
-        };
+        let in_bounds = Euclid::rem_euclid(&out_of_bounds, &Angle::FULL_TURN.get::<radian>());
         // `rem_euclid(self, rhs) == rhs` for specific inputs (e.g., `-f64::EPSILON`).
         // We correct for this explicitly to ensure we never return the upper bound.
         if in_bounds == Angle::FULL_TURN.get::<radian>() {
