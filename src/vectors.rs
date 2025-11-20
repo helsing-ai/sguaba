@@ -14,7 +14,7 @@ use core::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 use core::{fmt, iter::Sum};
 use typenum::{Integer, N1, N2, Z0};
 use uom::si::f64::{Acceleration, Angle, Length, Velocity};
-use uom::si::{acceleration::meter_per_second_squared, length::meter, velocity::meter_per_second};
+use uom::si::{acceleration::meter_per_second_squared, angle::radian, length::meter, velocity::meter_per_second};
 use uom::ConstZero;
 
 #[cfg(any(test, feature = "approx"))]
@@ -571,9 +571,9 @@ where
         let azimuth = azimuth.into();
         let polar = polar.into();
 
-        let x = radius * FloatMath::sin(polar.value) * FloatMath::cos(azimuth.value);
-        let y = radius * FloatMath::sin(polar.value) * FloatMath::sin(azimuth.value);
-        let z = radius * FloatMath::cos(polar.value);
+        let x = radius * FloatMath::sin(polar.get::<radian>()) * FloatMath::cos(azimuth.get::<radian>());
+        let y = radius * FloatMath::sin(polar.get::<radian>()) * FloatMath::sin(azimuth.get::<radian>());
+        let z = radius * FloatMath::cos(polar.get::<radian>());
 
         #[allow(deprecated)]
         Self::from_cartesian(x, y, z)
@@ -822,13 +822,13 @@ where
         //
         // Also note that atan2 guarantees that it returns 0 if both components are 0.
         use uom::si::angle::radian;
-        let yaw = Angle::new::<radian>(FloatMath::atan2(y.value, x.value));
+        let yaw = Angle::new::<radian>(FloatMath::atan2(y.get::<meter>(), x.get::<meter>()));
         // Pitch is the rotation about the Y axis, with 0º pitch being aligned with the yaw axis
         // (since we're using intrinsic rotations). Per the right-hand rule, positive pitch
         // rotates from +X toward -Z, so we negate z to get the correct sign.
         let pitch = Angle::new::<radian>(FloatMath::atan2(
-            -z.value,
-            FloatMath::sqrt(FloatMath::powi(x.value, 2) + FloatMath::powi(y.value, 2)),
+            -z.get::<meter>(),
+            FloatMath::sqrt(FloatMath::powi(x.get::<meter>(), 2) + FloatMath::powi(y.get::<meter>(), 2)),
         ));
         // And the roll is passed in.
         let roll = roll.into();
