@@ -18,7 +18,6 @@ use crate::{
     CoordinateSystem,
 };
 use uom::ConstZero;
-use crate::systems::BearingDefined;
 
 /// A direction (conceptually represented as a unit vector) in the [`CoordinateSystem`] `In`.
 ///
@@ -170,7 +169,7 @@ impl<In> Bearing<In> {
     #[must_use]
     pub fn to_unit_vector(&self) -> Vector<In>
     where
-        In: BearingDefined,
+        In: crate::systems::BearingDefined,
     {
         Vector::from_bearing(*self, Length::new::<meter>(1.))
     }
