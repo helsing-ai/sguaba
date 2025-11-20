@@ -1,4 +1,3 @@
-use crate::float_math::consts::FRAC_PI_2;
 use crate::float_math::FloatMath;
 use crate::{systems::Ecef, util::BoundedAngle, Coordinate, Point3};
 use core::fmt;
@@ -11,6 +10,7 @@ use uom::si::{
 
 #[cfg(any(test, feature = "approx"))]
 use approx::{AbsDiffEq, RelativeEq};
+use core::f64::consts::FRAC_PI_2;
 use core::marker::PhantomData;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

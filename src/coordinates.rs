@@ -18,12 +18,12 @@ use uom::ConstZero;
 #[cfg(any(test, feature = "approx"))]
 use approx::{AbsDiffEq, RelativeEq};
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
 use crate::builder::{Set, Unset};
 #[cfg(doc)]
 use crate::{engineering::Pose, systems::BearingDefined};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+use uom::si::angle::radian;
 
 /// Defines a point (ie, position) in the coordinate system specified by `In`.
 ///
@@ -602,7 +602,7 @@ impl<In> Coordinate<In> {
     #[doc(alias = "norm")]
     #[must_use]
     pub fn distance_from_origin(&self) -> Length {
-        Length::new::<uom::si::length::meter>(self.point.coords.norm())
+        Length::new::<meter>(self.point.coords.norm())
     }
 
     /// Computes the distance between this point and the given point.
@@ -639,7 +639,6 @@ impl<In> Coordinate<In> {
             return None;
         }
 
-        use uom::si::angle::radian;
         let polar_value = (Length::new::<meter>(self.point.z) / r).value;
         let polar = Angle::new::<radian>(FloatMath::acos(polar_value));
         let xy = Length::new::<meter>(FloatMath::sqrt(

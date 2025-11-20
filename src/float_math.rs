@@ -3,17 +3,8 @@
 //! This module provides a unified interface for mathematical operations that can use either
 //! the standard library (when the `std` feature is enabled) or `libm` (in no-std environments).
 
-/// Mathematical constants
-pub mod consts {
-    #[cfg(feature = "std")]
-    pub use std::f64::consts::*;
-
-    #[cfg(not(feature = "std"))]
-    pub use core::f64::consts::*;
-}
-
 /// Extension trait for f64 to provide math operations in a no-std compatible way
-pub trait FloatMath {
+pub(crate) trait FloatMath {
     fn sin(self) -> Self;
     fn cos(self) -> Self;
     #[allow(dead_code)]

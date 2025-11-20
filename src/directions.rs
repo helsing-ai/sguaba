@@ -1,6 +1,6 @@
-use crate::float_math::consts::FRAC_PI_2;
 use crate::util::BoundedAngle;
 use crate::Vector;
+use core::f64::consts::FRAC_PI_2;
 use core::fmt::{Display, Formatter};
 use core::marker::PhantomData;
 use uom::si::f64::{Angle, Length};
@@ -18,6 +18,7 @@ use crate::{
     CoordinateSystem,
 };
 use uom::ConstZero;
+use crate::systems::BearingDefined;
 
 /// A direction (conceptually represented as a unit vector) in the [`CoordinateSystem`] `In`.
 ///
@@ -169,7 +170,7 @@ impl<In> Bearing<In> {
     #[must_use]
     pub fn to_unit_vector(&self) -> Vector<In>
     where
-        In: crate::systems::BearingDefined,
+        In: BearingDefined,
     {
         Vector::from_bearing(*self, Length::new::<meter>(1.))
     }

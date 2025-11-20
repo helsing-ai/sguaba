@@ -281,7 +281,7 @@
 //! // SAFETY: `PlaneNed` is the orientation of the plane's FRD body axes (ie, `PlaneFrd`).
 //! let ecef_to_frd = unsafe { pose_in_ecef.map_as_zero_in::<PlaneFrd>() };
 //! // and we can apply that transform to the original observation to get it in ECEF
-//! let observation_in_ecef: Coordinate<Ecef> = ecef_to_frd.inverse_transform(observation);
+//! let observation_in_ecef: Coordinate<Ecef> = ecef_to_frd * observation;
 //! // which we can then turn into WGS84 lat/lon/altitude!
 //! println!("{:?}", observation_in_ecef.to_wgs84());
 //! ```
