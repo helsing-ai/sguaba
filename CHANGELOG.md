@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.9.11]
+
+### Changed
+
+- Also `impl Display` for non-`&` `Wgs84`
+  ([#63](https://github.com/helsing-ai/sguaba/pull/64)).
+
 ## [0.9.10]
 
 ### Changed
@@ -139,7 +146,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial public release.
 
-[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.10...HEAD
+[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.11...HEAD
+[0.9.11]: https://github.com/helsing-ai/sguaba/compare/v0.9.10...v0.9.11
 [0.9.10]: https://github.com/helsing-ai/sguaba/compare/v0.9.9...v0.9.10
 [0.9.9]: https://github.com/helsing-ai/sguaba/compare/v0.9.8...v0.9.9
 [0.9.8]: https://github.com/helsing-ai/sguaba/compare/v0.9.7...v0.9.8
