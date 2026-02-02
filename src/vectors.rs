@@ -203,7 +203,7 @@ where
 /// Only used to abstract over `Time`; should never be used in user code.
 ///
 /// This trait is sealed, and so also cannot be implemented by user code.
-#[doc(hidden = "users should never be implementing or using this trait")]
+#[doc(hidden)]
 pub trait LengthBasedComponents<In, Time>: private::Sealed
 where
     Time: Integer,
