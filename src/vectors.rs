@@ -213,20 +213,6 @@ where
     /// Deconstruct into constituent components.
     fn to_cartesian(&self) -> [LengthPossiblyPer<Time>; 3];
 
-    /// Get the X component.
-    fn x(&self) -> LengthPossiblyPer<Time>;
-    /// Get the Y component.
-    fn y(&self) -> LengthPossiblyPer<Time>;
-    /// Get the Z component.
-    fn z(&self) -> LengthPossiblyPer<Time>;
-
-    /// Set the X component.
-    fn set_x(&mut self, value: LengthPossiblyPer<Time>);
-    /// Set the Y component.
-    fn set_y(&mut self, value: LengthPossiblyPer<Time>);
-    /// Set the Z component.
-    fn set_z(&mut self, value: LengthPossiblyPer<Time>);
-
     /// Cast constituent component unit to [`Length`].
     ///
     /// This is entirely intended for _internal_ use, such as to allow conversion to and from
@@ -254,24 +240,6 @@ impl<In> LengthBasedComponents<In, Z0> for Vector<In, Z0> {
             Length::new::<meter>(self.inner.z),
         ]
     }
-    fn x(&self) -> Length {
-        Length::new::<meter>(self.inner.x)
-    }
-    fn y(&self) -> Length {
-        Length::new::<meter>(self.inner.y)
-    }
-    fn z(&self) -> Length {
-        Length::new::<meter>(self.inner.z)
-    }
-    fn set_x(&mut self, value: Length) {
-        self.inner.x = value.get::<meter>();
-    }
-    fn set_y(&mut self, value: Length) {
-        self.inner.y = value.get::<meter>();
-    }
-    fn set_z(&mut self, value: Length) {
-        self.inner.z = value.get::<meter>();
-    }
     fn recast_to_length(v: LengthPossiblyPer<Z0>) -> Length {
         std::convert::identity(v)
     }
@@ -292,24 +260,6 @@ impl<In> LengthBasedComponents<In, N1> for Vector<In, N1> {
             Velocity::new::<meter_per_second>(self.inner.z),
         ]
     }
-    fn x(&self) -> Velocity {
-        Velocity::new::<meter_per_second>(self.inner.x)
-    }
-    fn y(&self) -> Velocity {
-        Velocity::new::<meter_per_second>(self.inner.y)
-    }
-    fn z(&self) -> Velocity {
-        Velocity::new::<meter_per_second>(self.inner.z)
-    }
-    fn set_x(&mut self, value: Velocity) {
-        self.inner.x = value.get::<meter_per_second>();
-    }
-    fn set_y(&mut self, value: Velocity) {
-        self.inner.y = value.get::<meter_per_second>();
-    }
-    fn set_z(&mut self, value: Velocity) {
-        self.inner.z = value.get::<meter_per_second>();
-    }
     fn recast_to_length(v: LengthPossiblyPer<N1>) -> Length {
         Length::new::<meter>(v.get::<meter_per_second>())
     }
@@ -329,24 +279,6 @@ impl<In> LengthBasedComponents<In, N2> for Vector<In, N2> {
             Acceleration::new::<meter_per_second_squared>(self.inner.y),
             Acceleration::new::<meter_per_second_squared>(self.inner.z),
         ]
-    }
-    fn x(&self) -> Acceleration {
-        Acceleration::new::<meter_per_second_squared>(self.inner.x)
-    }
-    fn y(&self) -> Acceleration {
-        Acceleration::new::<meter_per_second_squared>(self.inner.y)
-    }
-    fn z(&self) -> Acceleration {
-        Acceleration::new::<meter_per_second_squared>(self.inner.z)
-    }
-    fn set_x(&mut self, value: Acceleration) {
-        self.inner.x = value.get::<meter_per_second_squared>();
-    }
-    fn set_y(&mut self, value: Acceleration) {
-        self.inner.y = value.get::<meter_per_second_squared>();
-    }
-    fn set_z(&mut self, value: Acceleration) {
-        self.inner.z = value.get::<meter_per_second_squared>();
     }
     fn recast_to_length(v: LengthPossiblyPer<N2>) -> Length {
         Length::new::<meter>(v.get::<meter_per_second_squared>())
@@ -948,15 +880,18 @@ macro_rules! accessors {
         impl<In, Time: typenum::Integer> Vector<In, Time> where In: CoordinateSystem<Convention = $convention>, Self: LengthBasedComponents<In, Time> {
             #[must_use]
             pub fn $x(&self) -> LengthPossiblyPer<Time> {
-                LengthBasedComponents::x(self)
+                let cartesian = LengthBasedComponents::to_cartesian(self);
+                cartesian[0]
             }
             #[must_use]
             pub fn $y(&self) -> LengthPossiblyPer<Time> {
-                LengthBasedComponents::y(self)
+                let cartesian = LengthBasedComponents::to_cartesian(self);
+                cartesian[1]
             }
             #[must_use]
             pub fn $z(&self) -> LengthPossiblyPer<Time> {
-                LengthBasedComponents::z(self)
+                let cartesian = LengthBasedComponents::to_cartesian(self);
+                cartesian[2]
             }
 
             #[must_use]
@@ -1258,7 +1193,9 @@ macro_rules! constructor {
                 mut self,
                 value: impl Into<LengthPossiblyPer<Time>>,
             ) -> Builder<In, Set, Y, Z, Time> {
-                LengthBasedComponents::set_x(&mut self.under_construction, value.into());
+                let mut cartesian = LengthBasedComponents::to_cartesian(&self.under_construction);
+                cartesian[0] = value.into();
+                self.under_construction = LengthBasedComponents::from_cartesian(cartesian);
                 Builder {
                     under_construction: self.under_construction,
                     set: (PhantomData::<Set>, self.set.1, self.set.2),
@@ -1270,7 +1207,9 @@ macro_rules! constructor {
                 mut self,
                 value: impl Into<LengthPossiblyPer<Time>>,
             ) -> Builder<In, X, Set, Z, Time> {
-                LengthBasedComponents::set_y(&mut self.under_construction, value.into());
+                let mut cartesian = LengthBasedComponents::to_cartesian(&self.under_construction);
+                cartesian[1] = value.into();
+                self.under_construction = LengthBasedComponents::from_cartesian(cartesian);
                 Builder {
                     under_construction: self.under_construction,
                     set: (self.set.0, PhantomData::<Set>, self.set.2),
@@ -1282,7 +1221,9 @@ macro_rules! constructor {
                 mut self,
                 value: impl Into<LengthPossiblyPer<Time>>,
             ) -> Builder<In, X, Y, Set, Time> {
-                LengthBasedComponents::set_z(&mut self.under_construction, value.into());
+                let mut cartesian = LengthBasedComponents::to_cartesian(&self.under_construction);
+                cartesian[2] = value.into();
+                self.under_construction = LengthBasedComponents::from_cartesian(cartesian);
                 Builder {
                     under_construction: self.under_construction,
                     set: (self.set.0, self.set.1, PhantomData::<Set>),
