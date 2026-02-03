@@ -3,6 +3,12 @@
 //! This module provides a unified interface for mathematical operations that can use either
 //! the standard library (when the `std` feature is enabled) or `libm` (in no-std environments).
 
+#[cfg(not(any(feature = "std", feature = "libm")))]
+compile_error!(
+    "sguaba requires floating-point math support. \
+     Enable either the `std` feature (default) or the `libm` feature for no-std environments."
+);
+
 /// Extension trait for f64 to provide math operations in a no-std compatible way
 pub(crate) trait FloatMath {
     fn sin(self) -> Self;
@@ -77,7 +83,7 @@ impl FloatMath for f64 {
     }
 }
 
-#[cfg(not(feature = "std"))]
+#[cfg(all(not(feature = "std"), feature = "libm"))]
 impl FloatMath for f64 {
     #[inline]
     fn sin(self) -> Self {
