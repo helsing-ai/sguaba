@@ -13,6 +13,7 @@ categories = ["aerospace", "mathematics"]
 default = ["std", "serde", "approx"]
 std = ["nalgebra/std", "uom/std", "serde/std"]
 libm = ["dep:libm", "nalgebra/libm"]
+
 serde = ["dep:serde", "nalgebra/serde-serialize", "uom/use_serde"]
 approx = ["dep:approx"]
 

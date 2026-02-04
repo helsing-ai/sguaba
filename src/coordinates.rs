@@ -1,3 +1,4 @@
+use crate::builder::{Set, Unset};
 use crate::coordinate_systems::{
     CoordinateSystem, EnuLike, FrdLike, HasComponents, NedLike, RightHandedXyzLike,
 };
@@ -11,20 +12,18 @@ use core::fmt;
 use core::fmt::{Display, Formatter};
 use core::marker::PhantomData;
 use core::ops::{Add, AddAssign, Neg, Sub, SubAssign};
+use uom::si::angle::radian;
 use uom::si::f64::{Angle, Length};
 use uom::si::length::meter;
 use uom::si::ratio::ratio;
 use uom::ConstZero;
 
-#[cfg(any(test, feature = "approx"))]
-use approx::{AbsDiffEq, RelativeEq};
-
-use crate::builder::{Set, Unset};
 #[cfg(doc)]
 use crate::{engineering::Pose, systems::BearingDefined};
+#[cfg(any(test, feature = "approx"))]
+use approx::{AbsDiffEq, RelativeEq};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use uom::si::angle::radian;
 
 /// Defines a point (ie, position) in the coordinate system specified by `In`.
 ///
