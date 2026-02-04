@@ -257,6 +257,10 @@
 //! println!("{:?}", observation_in_ecef.to_wgs84());
 //! ```
 
+#![no_std]
+#[cfg(feature = "std")]
+extern crate std;
+
 use typenum::{P1, Z0};
 use uom::{
     si::{f64::V, Quantity, ISQ, SI},
@@ -272,6 +276,7 @@ mod coordinate_systems;
 
 mod coordinates;
 mod directions;
+mod float_math;
 mod geodetic;
 mod util;
 mod vectors;
