@@ -74,7 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Uphold bearing azimuth guarantee for 90º elevation in ENU
+- Uphold bearing azimuth guarantee for 90° elevation in ENU
   ([#34](https://github.com/helsing-ai/sguaba/pull/34)).
 
 ## [0.9.4]
