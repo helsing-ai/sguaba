@@ -814,14 +814,14 @@ mod tests {
         // Test with radians at boundaries
         use std::f64::consts::FRAC_PI_2;
         let location7 = wgs84!(
-            latitude = rad(1.5707963267948966),
+            latitude = rad(FRAC_PI_2),
             longitude = rad(0.0),
             altitude = m(0.0)
         );
         assert_relative_eq!(location7.latitude().get::<radian>(), FRAC_PI_2);
 
         let location8 = wgs84!(
-            latitude = rad(-1.5707963267948966),
+            latitude = rad(-FRAC_PI_2),
             longitude = rad(0.0),
             altitude = m(0.0)
         );
@@ -975,7 +975,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "conversion from ECEF to WGS84 outside altitude range")]
-    fn wgs_ecef_conversion_fails_for_ecef_origin() -> () {
+    fn wgs_ecef_conversion_fails_for_ecef_origin() {
         let _should_panic = Coordinate::<Ecef>::origin().to_wgs84();
     }
 

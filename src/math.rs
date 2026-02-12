@@ -1577,9 +1577,7 @@ mod tests {
     use crate::math::{RigidBodyTransform, Rotation};
     use crate::util::BoundedAngle;
     use crate::vectors::Vector;
-    use crate::{coordinate, Point3};
-    use crate::{system, Bearing};
-    use crate::{vector, Vector3};
+    use crate::{coordinate, vector, Bearing, Point3, Vector3};
     use approx::assert_abs_diff_eq;
     use approx::assert_relative_eq;
     use rstest::rstest;

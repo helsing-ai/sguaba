@@ -506,10 +506,10 @@ mod tests {
 
         // Test with radians at boundaries
         use std::f64::consts::FRAC_PI_2;
-        let bearing7 = bearing!(azimuth = rad(0.0), elevation = rad(1.5707963267948966); in Frd);
+        let bearing7 = bearing!(azimuth = rad(0.0), elevation = rad(FRAC_PI_2); in Frd);
         assert_relative_eq!(bearing7.elevation().get::<radian>(), FRAC_PI_2);
 
-        let bearing8 = bearing!(azimuth = rad(0.0), elevation = rad(-1.5707963267948966); in Frd);
+        let bearing8 = bearing!(azimuth = rad(0.0), elevation = rad(-FRAC_PI_2); in Frd);
         assert_relative_eq!(bearing8.elevation().get::<radian>(), -FRAC_PI_2);
     }
 
