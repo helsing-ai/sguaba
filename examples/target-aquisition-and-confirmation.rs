@@ -29,7 +29,7 @@ fn main() {
     let plane_bearing: Bearing<PlaneNed> = Bearing::builder()
         .azimuth(Angle::new::<degree>(204.74)) // clockwise from North
         .elevation(Angle::new::<degree>(0.)) // level with the horizon
-        .expect("elevation is in [-90º, 90º]")
+        .expect("elevation is in [-90°, 90°]")
         .build();
 
     // Values from the pilot's range finder, manually picked to align with the actual target position (see bottom).
@@ -37,13 +37,13 @@ fn main() {
     let target_bearing: Bearing<PlaneFrd> = Bearing::builder()
         .azimuth(Angle::new::<degree>(10.)) // clockwise from forward
         .elevation(Angle::new::<degree>(5.342)) // above nose
-        .expect("elevation is in [-90º, 90º]")
+        .expect("elevation is in [-90°, 90°]")
         .build();
 
     // Value from the ground control's known location
     let ground_control_wgs84 = Wgs84::builder()
         .latitude(Angle::new::<degree>(33.6954))
-        .expect("latitude is in [-90º, 90º]")
+        .expect("latitude is in [-90°, 90°]")
         .longitude(Angle::new::<degree>(-78.8802))
         .altitude(Length::new::<meter>(3.))
         .build();
@@ -54,7 +54,7 @@ fn main() {
         Bearing::builder()
             .azimuth(Angle::new::<degree>(84.574)) // clockwise from North
             .elevation(Angle::new::<degree>(52.582)) // above the horizon
-            .expect("elevation is in [-90º, 90º]")
+            .expect("elevation is in [-90°, 90°]")
             .build(),
         Length::new::<meter>(22236.3), // distance to plane
     );
@@ -139,7 +139,7 @@ fn main() {
     // Sanity checking example against expected coordinates and manually calculated values
     let expected_plane_wgs84 = Wgs84::builder()
         .latitude(Angle::new::<degree>(33.7068))
-        .expect("latitude is in [-90º, 90º]")
+        .expect("latitude is in [-90°, 90°]")
         .longitude(Angle::new::<degree>(-78.7355))
         .altitude(Length::new::<meter>(17678.))
         .build();
@@ -147,7 +147,7 @@ fn main() {
 
     let expected_target_wgs84 = Wgs84::builder()
         .latitude(Angle::new::<degree>(33.597744245441966))
-        .expect("latitude is in [-90º, 90º]")
+        .expect("latitude is in [-90°, 90°]")
         .longitude(Angle::new::<degree>(-78.82584635802755))
         .altitude(Length::new::<meter>(19075.36499))
         .build();
@@ -158,7 +158,7 @@ fn main() {
     let expected_ground_bearing_to_target = Bearing::<GroundEnu>::builder()
         .azimuth(Angle::new::<degree>(155.02306))
         .elevation(Angle::new::<degree>(57.84293))
-        .expect("elevation is in [-90º, 90º]")
+        .expect("elevation is in [-90°, 90°]")
         .build();
 
     println!(

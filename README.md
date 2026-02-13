@@ -65,7 +65,7 @@ how far North, East, and Down (towards Earth's core) they are relative
 to the observer. [FRD], meanwhile, is a "body frame", and just describes
 positions relative to the observer's concept of Forward (eg, the
 direction pointing in the same direction as the nose of a plane), Right
-(eg, the direction 90º to the right when viewing along Forward), and
+(eg, the direction 90° to the right when viewing along Forward), and
 Down (eg, down through the belly of the plane). Converting between [FRD]
 and [NED] usually requires knowing the orientation of the observer
 relative to North, East, and Down, and converting between [NED] and
@@ -107,7 +107,7 @@ let observation = Coordinate::<PlaneFrd>::from_bearing(
         .azimuth(Angle::new::<degree>(20.))
         // upwards from straight-ahead
         .elevation(Angle::new::<degree>(10.))
-        .expect("elevation is in [-90º, 90º]")
+        .expect("elevation is in [-90°, 90°]")
         .build(),
     Length::new::<meter>(400.), // at this range
 );
@@ -115,7 +115,7 @@ let observation = Coordinate::<PlaneFrd>::from_bearing(
 // where the plane was at the time (eg, from GPS):
 let wgs84 = Wgs84::builder()
     .latitude(Angle::new::<degree>(12.))
-    .expect("latitude is in [-90º, 90º]")
+    .expect("latitude is in [-90°, 90°]")
     .longitude(Angle::new::<degree>(30.))
     .altitude(Length::new::<meter>(1000.))
     .build();

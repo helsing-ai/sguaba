@@ -45,7 +45,7 @@ use uom::ConstZero;
 ///     .azimuth(Angle::new::<degree>(20.))
 ///     // upwards from straight-ahead
 ///     .elevation(Angle::new::<degree>(10.))
-///     .expect("elevation is in [-90º, 90º]")
+///     .expect("elevation is in [-90°, 90°]")
 ///     .build();
 /// ```
 ///
@@ -61,7 +61,7 @@ use uom::ConstZero;
 ///   azimuth: Angle::new::<degree>(20.),
 ///   // upwards from straight-ahead
 ///   elevation: Angle::new::<degree>(10.),
-/// }).expect("elevation is in [-90º, 90º]");
+/// }).expect("elevation is in [-90°, 90°]");
 /// ```
 ///
 /// [bearing]: https://en.wikipedia.org/wiki/Bearing_%28navigation%29
@@ -506,10 +506,10 @@ mod tests {
 
         // Test with radians at boundaries
         use std::f64::consts::FRAC_PI_2;
-        let bearing7 = bearing!(azimuth = rad(0.0), elevation = rad(1.5707963267948966); in Frd);
+        let bearing7 = bearing!(azimuth = rad(0.0), elevation = rad(FRAC_PI_2); in Frd);
         assert_relative_eq!(bearing7.elevation().get::<radian>(), FRAC_PI_2);
 
-        let bearing8 = bearing!(azimuth = rad(0.0), elevation = rad(-1.5707963267948966); in Frd);
+        let bearing8 = bearing!(azimuth = rad(0.0), elevation = rad(-FRAC_PI_2); in Frd);
         assert_relative_eq!(bearing8.elevation().get::<radian>(), -FRAC_PI_2);
     }
 

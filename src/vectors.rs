@@ -791,7 +791,7 @@ where
     ///
     /// Since vectors do not include roll information, the desired roll must be passed in. It's
     /// worth reading the documentation on [`Orientation`] for a reminder about the meaning of roll
-    /// here. Very briefly, it is intrinsic, and 0º roll means the object's positive Z axis is
+    /// here. Very briefly, it is intrinsic, and 0° roll means the object's positive Z axis is
     /// aligned with `In`'s positive Z axis.
     ///
     /// Returns `None` if the vector has zero length, as the yaw is then ill-defined.
@@ -800,7 +800,7 @@ where
     #[must_use]
     pub fn orientation_at_origin(&self, roll: impl Into<Angle>) -> Option<Orientation<In>> {
         // The vector is effectively an axis-angle representation of the Tait-Bryan orientation
-        // we're after (with the angle of rotation being 0º). But, when angle is 0º, the axis-angle
+        // we're after (with the angle of rotation being 0°). But, when angle is 0°, the axis-angle
         // representation ends up being a noop from what I can tell. Instead, we compute this from
         // first principles. Note that we cast to the raw length, but that's okay since we only
         // care about the relative magnitudes for these as we're computing angles.
@@ -814,14 +814,14 @@ where
         }
 
         // Per `Orientation::from_tait_bryan_angles`, yaw is rotation about the Z axis with an
-        // object at 0º yaw facing along the positive X axis. Thus, it is rotation on the XY plane
+        // object at 0° yaw facing along the positive X axis. Thus, it is rotation on the XY plane
         // (and uses only the x and y coordinates). Positive yaw is counter-clockwise rotation
         // about Z (ie, towards +Y from +X), and thus we want the sin of the angle between X and Y
         // with no sign flipping.
         //
         // Also note that atan2 guarantees that it returns 0 if both components are 0.
         let yaw = y.atan2(x);
-        // Pitch is the rotation about the Y axis, with 0º pitch being aligned with the yaw axis
+        // Pitch is the rotation about the Y axis, with 0° pitch being aligned with the yaw axis
         // (since we're using intrinsic rotations). Per the right-hand rule, positive pitch
         // rotates from +X toward -Z, so we negate z to get the correct sign.
         let pitch = (-z).atan2((x.powi(P2::new()) + y.powi(P2::new())).sqrt());
@@ -1445,7 +1445,7 @@ mod tests {
 
         #[test]
         fn orientation_at_origin_positive_x_axis() {
-            // Vector pointing along +X should have yaw=0º, pitch=0º
+            // Vector pointing along +X should have yaw=0°, pitch=0°
             let v = vector!(x = m(1.0), y = m(0.0), z = m(0.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1459,7 +1459,7 @@ mod tests {
 
         #[test]
         fn orientation_at_origin_positive_y_axis() {
-            // Vector pointing along +Y should have yaw=90º, pitch=0º
+            // Vector pointing along +Y should have yaw=90°, pitch=0°
             let v = vector!(x = m(0.0), y = m(1.0), z = m(0.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1473,7 +1473,7 @@ mod tests {
 
         #[test]
         fn orientation_at_origin_positive_z_axis() {
-            // Vector pointing along +Z should have yaw=0º (arbitrary), pitch=-90º
+            // Vector pointing along +Z should have yaw=0° (arbitrary), pitch=-90°
             let v = vector!(x = m(0.0), y = m(0.0), z = m(1.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1487,14 +1487,14 @@ mod tests {
 
         #[test]
         fn orientation_at_origin_negative_x_axis() {
-            // Vector pointing along -X should have yaw=180º or -180º, pitch=0º
+            // Vector pointing along -X should have yaw=180° or -180°, pitch=0°
             let v = vector!(x = m(-1.0), y = m(0.0), z = m(0.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
                 .expect("non-zero vector");
             let (yaw, pitch, roll) = orientation.to_tait_bryan_angles();
 
-            // atan2(0, -1) = 180º or -180º depending on convention
+            // atan2(0, -1) = 180° or -180° depending on convention
             assert_abs_diff_eq!(yaw.get::<degree>().abs(), 180.0, epsilon = 1e-10);
             assert_abs_diff_eq!(pitch.get::<degree>(), 0.0, epsilon = 1e-10);
             assert_abs_diff_eq!(roll.get::<degree>(), 0.0, epsilon = 1e-10);
@@ -1502,7 +1502,7 @@ mod tests {
 
         #[test]
         fn orientation_at_origin_45_degree_xy_plane() {
-            // Vector at 45º in XY plane should have yaw=45º, pitch=0º
+            // Vector at 45° in XY plane should have yaw=45°, pitch=0°
             let v = vector!(x = m(1.0), y = m(1.0), z = m(0.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1516,7 +1516,7 @@ mod tests {
 
         #[test]
         fn orientation_at_origin_45_degree_xz_plane() {
-            // Vector at 45º in XZ plane should have yaw=0º, pitch=-45º
+            // Vector at 45° in XZ plane should have yaw=0°, pitch=-45°
             let v = vector!(x = m(1.0), y = m(0.0), z = m(1.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1531,8 +1531,8 @@ mod tests {
         #[test]
         fn orientation_at_origin_general_3d_vector() {
             // Vector at (3, 4, 5) - verify the full computation
-            // Expected yaw = atan2(4, 3) ≈ 53.13º
-            // Expected pitch = atan2(-5, sqrt(3² + 4²)) = atan2(-5, 5) = -45º
+            // Expected yaw = atan2(4, 3) ≈ 53.13°
+            // Expected pitch = atan2(-5, sqrt(3² + 4²)) = atan2(-5, 5) = -45°
             let v = vector!(x = m(3.0), y = m(4.0), z = m(5.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1561,7 +1561,7 @@ mod tests {
             // - positive yaw is from-north-towards-east
             // - positive pitch is towards -Z (as always), so "up"
             //
-            // so a 45º-nose-up east vector should have yaw=90º and pitch=45º
+            // so a 45°-nose-up east vector should have yaw=90° and pitch=45°
             let v = vector!(n = m(0.0), e = m(1.0), d = m(-1.0); in TestNed);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1582,7 +1582,7 @@ mod tests {
             // - positive yaw is from-east-towards-north
             // - positive pitch is towards -Z (as always), so "down"
             //
-            // so a 45º-nose-up north vector should have yaw=90º and pitch=-45º
+            // so a 45°-nose-up north vector should have yaw=90° and pitch=-45°
             let v = vector!(e = m(0.0), n = m(1.0), u = m(1.0); in TestEnu);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
