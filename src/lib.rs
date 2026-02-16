@@ -45,7 +45,7 @@
 //! or East, North, and Up (for ENU) they are relative to the observer. [FRD], meanwhile, is a
 //! "body frame", and just describes positions relative to the observer's concept of Forward (eg,
 //! the direction pointing in the same direction as the nose of a plane), Right (eg, the direction
-//! 90º to the right when viewing along Forward), and Down (eg, down through the belly of the
+//! 90° to the right when viewing along Forward), and Down (eg, down through the belly of the
 //! plane). Converting between [FRD] and [NED] or [ENU] usually requires knowing the orientation of
 //! the observer relative to North, East, and Down/Up, and converting between [NED]/[ENU] and
 //! [ECEF] (or [WGS84]) requires also knowing the position of the observer in Earth-bound
@@ -87,7 +87,7 @@
 //! Perhaps surprisingly, this is _also_ the case for non-local frames like ECEF and WGS84. Due to
 //! plate tectonics, a spot measured relative to a point on earth's _surface_ technically "moves"
 //! over time. Consider, for example, the Eiffel tower, which is located at
-//! 48.85851298170608ºN, 2.2944746521697468ºE (according to Google Maps at least). Since the
+//! 48.85851298170608°N, 2.2944746521697468°E (according to Google Maps at least). Since the
 //! Eurasian plate drifts over time, if you measured its location a millennium from now, it would
 //! technically be at a different place relative to, say, the Statue of Liberty. So, how does that
 //! affect its latitude and longitude? The answer is that "it depends". There isn't really just

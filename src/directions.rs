@@ -46,7 +46,7 @@ use uom::ConstZero;
 ///     .azimuth(Angle::new::<degree>(20.))
 ///     // upwards from straight-ahead
 ///     .elevation(Angle::new::<degree>(10.))
-///     .expect("elevation is in [-90º, 90º]")
+///     .expect("elevation is in [-90°, 90°]")
 ///     .build();
 /// ```
 ///
@@ -62,7 +62,7 @@ use uom::ConstZero;
 ///   azimuth: Angle::new::<degree>(20.),
 ///   // upwards from straight-ahead
 ///   elevation: Angle::new::<degree>(10.),
-/// }).expect("elevation is in [-90º, 90º]");
+/// }).expect("elevation is in [-90°, 90°]");
 /// ```
 ///
 /// [bearing]: https://en.wikipedia.org/wiki/Bearing_%28navigation%29

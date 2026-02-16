@@ -24,7 +24,7 @@ fn main() {
             .azimuth(Angle::new::<degree>(20.))
             // upwards from straight-ahead
             .elevation(Angle::new::<degree>(10.))
-            .expect("elevation is in [-90º, 90º]")
+            .expect("elevation is in [-90°, 90°]")
             .build(),
         Length::new::<meter>(400.), // at this range
     );
@@ -32,7 +32,7 @@ fn main() {
     // where the plane was at the time (eg, from GPS):
     let wgs84 = Wgs84::builder()
         .latitude(Angle::new::<degree>(12.))
-        .expect("latitude is in [-90º, 90º]")
+        .expect("latitude is in [-90°, 90°]")
         .longitude(Angle::new::<degree>(30.))
         .altitude(Length::new::<meter>(1000.))
         .build();

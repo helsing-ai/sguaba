@@ -196,7 +196,7 @@ impl Wgs84 {
     }
 }
 
-impl Display for &Wgs84 {
+impl Display for Wgs84 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let lat = self.latitude();
         let lat_is_positive = lat.is_sign_positive();

@@ -19,6 +19,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.9.12]
+
+### Fixed
+
+- Vector accessors and constructors for types with non-zero time
+  components ([#70](https://github.com/helsing-ai/sguaba/pull/70)).
+- Compile failure on beta
+  ([#71](https://github.com/helsing-ai/sguaba/pull/71)).
+
+## [0.9.11]
+
+### Changed
+
+- Also `impl Display` for non-`&` `Wgs84`
+  ([#63](https://github.com/helsing-ai/sguaba/pull/64)).
+
 ## [0.9.10]
 
 ### Changed
@@ -58,7 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Uphold bearing azimuth guarantee for 90º elevation in ENU
+- Uphold bearing azimuth guarantee for 90° elevation in ENU
   ([#34](https://github.com/helsing-ai/sguaba/pull/34)).
 
 ## [0.9.4]
@@ -139,7 +155,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial public release.
 
-[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.10...HEAD
+[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.12...HEAD
+[0.9.12]: https://github.com/helsing-ai/sguaba/compare/v0.9.11...v0.9.12
+[0.9.11]: https://github.com/helsing-ai/sguaba/compare/v0.9.10...v0.9.11
 [0.9.10]: https://github.com/helsing-ai/sguaba/compare/v0.9.9...v0.9.10
 [0.9.9]: https://github.com/helsing-ai/sguaba/compare/v0.9.8...v0.9.9
 [0.9.8]: https://github.com/helsing-ai/sguaba/compare/v0.9.7...v0.9.8

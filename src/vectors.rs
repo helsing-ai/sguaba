@@ -207,7 +207,7 @@ where
 /// Only used to abstract over `Time`; should never be used in user code.
 ///
 /// This trait is sealed, and so also cannot be implemented by user code.
-#[doc(hidden = "users should never be implementing or using this trait")]
+#[doc(hidden)]
 pub trait LengthBasedComponents<In, Time>: private::Sealed
 where
     Time: Integer,
@@ -799,7 +799,7 @@ where
     ///
     /// Since vectors do not include roll information, the desired roll must be passed in. It's
     /// worth reading the documentation on [`Orientation`] for a reminder about the meaning of roll
-    /// here. Very briefly, it is intrinsic, and 0º roll means the object's positive Z axis is
+    /// here. Very briefly, it is intrinsic, and 0° roll means the object's positive Z axis is
     /// aligned with `In`'s positive Z axis.
     ///
     /// Returns `None` if the vector has zero length, as the yaw is then ill-defined.
@@ -808,7 +808,7 @@ where
     #[must_use]
     pub fn orientation_at_origin(&self, roll: impl Into<Angle>) -> Option<Orientation<In>> {
         // The vector is effectively an axis-angle representation of the Tait-Bryan orientation
-        // we're after (with the angle of rotation being 0º). But, when angle is 0º, the axis-angle
+        // we're after (with the angle of rotation being 0°). But, when angle is 0°, the axis-angle
         // representation ends up being a noop from what I can tell. Instead, we compute this from
         // first principles. Note that we cast to the raw length, but that's okay since we only
         // care about the relative magnitudes for these as we're computing angles.
@@ -822,14 +822,14 @@ where
         }
 
         // Per `Orientation::from_tait_bryan_angles`, yaw is rotation about the Z axis with an
-        // object at 0º yaw facing along the positive X axis. Thus, it is rotation on the XY plane
+        // object at 0° yaw facing along the positive X axis. Thus, it is rotation on the XY plane
         // (and uses only the x and y coordinates). Positive yaw is counter-clockwise rotation
         // about Z (ie, towards +Y from +X), and thus we want the sin of the angle between X and Y
         // with no sign flipping.
         //
         // Also note that atan2 guarantees that it returns 0 if both components are 0.
         let yaw = Angle::new::<radian>(FloatMath::atan2(y.get::<meter>(), x.get::<meter>()));
-        // Pitch is the rotation about the Y axis, with 0º pitch being aligned with the yaw axis
+        // Pitch is the rotation about the Y axis, with 0° pitch being aligned with the yaw axis
         // (since we're using intrinsic rotations). Per the right-hand rule, positive pitch
         // rotates from +X toward -Z, so we negate z to get the correct sign.
         let pitch = Angle::new::<radian>(FloatMath::atan2(
@@ -890,13 +890,22 @@ macro_rules! accessors {
         // TODO: https://github.com/rust-lang/rust/issues/124225
         + $x_ax:ident, $y_ax:ident, $z_ax:ident
     } => {
-        impl<In, Time: typenum::Integer> Vector<In, Time> where In: CoordinateSystem<Convention = $convention> {
+        impl<In, Time: typenum::Integer> Vector<In, Time> where In: CoordinateSystem<Convention = $convention>, Self: LengthBasedComponents<In, Time> {
             #[must_use]
-            pub fn $x(&self) -> Length { Length::new::<meter>(self.inner.x) }
+            pub fn $x(&self) -> LengthPossiblyPer<Time> {
+                let cartesian = LengthBasedComponents::to_cartesian(self);
+                cartesian[0]
+            }
             #[must_use]
-            pub fn $y(&self) -> Length { Length::new::<meter>(self.inner.y) }
+            pub fn $y(&self) -> LengthPossiblyPer<Time> {
+                let cartesian = LengthBasedComponents::to_cartesian(self);
+                cartesian[1]
+            }
             #[must_use]
-            pub fn $z(&self) -> Length { Length::new::<meter>(self.inner.z) }
+            pub fn $z(&self) -> LengthPossiblyPer<Time> {
+                let cartesian = LengthBasedComponents::to_cartesian(self);
+                cartesian[2]
+            }
 
             #[must_use]
             pub fn $x_ax() -> Vector<In, Time> {
@@ -1190,10 +1199,16 @@ macro_rules! constructor {
         where
             In: CoordinateSystem<Convention = $like>,
             Time: typenum::Integer,
+            Vector<In, Time>: LengthBasedComponents<In, Time>,
         {
             /// Sets the X component of this [`Vector`]-to-be.
-            pub fn $x(mut self, length: impl Into<Length>) -> Builder<In, Set, Y, Z, Time> {
-                self.under_construction.inner.x = length.into().get::<meter>();
+            pub fn $x(
+                mut self,
+                value: impl Into<LengthPossiblyPer<Time>>,
+            ) -> Builder<In, Set, Y, Z, Time> {
+                let mut cartesian = LengthBasedComponents::to_cartesian(&self.under_construction);
+                cartesian[0] = value.into();
+                self.under_construction = LengthBasedComponents::from_cartesian(cartesian);
                 Builder {
                     under_construction: self.under_construction,
                     set: (PhantomData::<Set>, self.set.1, self.set.2),
@@ -1201,8 +1216,13 @@ macro_rules! constructor {
             }
 
             /// Sets the Y component of this [`Vector`]-to-be.
-            pub fn $y(mut self, length: impl Into<Length>) -> Builder<In, X, Set, Z, Time> {
-                self.under_construction.inner.y = length.into().get::<meter>();
+            pub fn $y(
+                mut self,
+                value: impl Into<LengthPossiblyPer<Time>>,
+            ) -> Builder<In, X, Set, Z, Time> {
+                let mut cartesian = LengthBasedComponents::to_cartesian(&self.under_construction);
+                cartesian[1] = value.into();
+                self.under_construction = LengthBasedComponents::from_cartesian(cartesian);
                 Builder {
                     under_construction: self.under_construction,
                     set: (self.set.0, PhantomData::<Set>, self.set.2),
@@ -1210,8 +1230,13 @@ macro_rules! constructor {
             }
 
             /// Sets the Z component of this [`Vector`]-to-be.
-            pub fn $z(mut self, length: impl Into<Length>) -> Builder<In, X, Y, Set, Time> {
-                self.under_construction.inner.z = length.into().get::<meter>();
+            pub fn $z(
+                mut self,
+                value: impl Into<LengthPossiblyPer<Time>>,
+            ) -> Builder<In, X, Y, Set, Time> {
+                let mut cartesian = LengthBasedComponents::to_cartesian(&self.under_construction);
+                cartesian[2] = value.into();
+                self.under_construction = LengthBasedComponents::from_cartesian(cartesian);
                 Builder {
                     under_construction: self.under_construction,
                     set: (self.set.0, self.set.1, PhantomData::<Set>),
@@ -1228,8 +1253,8 @@ constructor!(EnuLike, [enu_east, enu_north, enu_up]);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::coordinate;
     use crate::systems::EquivalentTo;
-    use crate::{coordinate, system, vector};
     use approx::assert_abs_diff_eq;
     use typenum::{N1, N2, Z0};
     use uom::si::f64::{Acceleration, Angle, Length, Velocity};
@@ -1433,7 +1458,7 @@ mod tests {
 
         #[test]
         fn orientation_at_origin_positive_x_axis() {
-            // Vector pointing along +X should have yaw=0º, pitch=0º
+            // Vector pointing along +X should have yaw=0°, pitch=0°
             let v = vector!(x = m(1.0), y = m(0.0), z = m(0.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1447,7 +1472,7 @@ mod tests {
 
         #[test]
         fn orientation_at_origin_positive_y_axis() {
-            // Vector pointing along +Y should have yaw=90º, pitch=0º
+            // Vector pointing along +Y should have yaw=90°, pitch=0°
             let v = vector!(x = m(0.0), y = m(1.0), z = m(0.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1461,7 +1486,7 @@ mod tests {
 
         #[test]
         fn orientation_at_origin_positive_z_axis() {
-            // Vector pointing along +Z should have yaw=0º (arbitrary), pitch=-90º
+            // Vector pointing along +Z should have yaw=0° (arbitrary), pitch=-90°
             let v = vector!(x = m(0.0), y = m(0.0), z = m(1.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1475,14 +1500,14 @@ mod tests {
 
         #[test]
         fn orientation_at_origin_negative_x_axis() {
-            // Vector pointing along -X should have yaw=180º or -180º, pitch=0º
+            // Vector pointing along -X should have yaw=180° or -180°, pitch=0°
             let v = vector!(x = m(-1.0), y = m(0.0), z = m(0.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
                 .expect("non-zero vector");
             let (yaw, pitch, roll) = orientation.to_tait_bryan_angles();
 
-            // atan2(0, -1) = 180º or -180º depending on convention
+            // atan2(0, -1) = 180° or -180° depending on convention
             assert_abs_diff_eq!(yaw.get::<degree>().abs(), 180.0, epsilon = 1e-10);
             assert_abs_diff_eq!(pitch.get::<degree>(), 0.0, epsilon = 1e-10);
             assert_abs_diff_eq!(roll.get::<degree>(), 0.0, epsilon = 1e-10);
@@ -1490,7 +1515,7 @@ mod tests {
 
         #[test]
         fn orientation_at_origin_45_degree_xy_plane() {
-            // Vector at 45º in XY plane should have yaw=45º, pitch=0º
+            // Vector at 45° in XY plane should have yaw=45°, pitch=0°
             let v = vector!(x = m(1.0), y = m(1.0), z = m(0.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1504,7 +1529,7 @@ mod tests {
 
         #[test]
         fn orientation_at_origin_45_degree_xz_plane() {
-            // Vector at 45º in XZ plane should have yaw=0º, pitch=-45º
+            // Vector at 45° in XZ plane should have yaw=0°, pitch=-45°
             let v = vector!(x = m(1.0), y = m(0.0), z = m(1.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1519,8 +1544,8 @@ mod tests {
         #[test]
         fn orientation_at_origin_general_3d_vector() {
             // Vector at (3, 4, 5) - verify the full computation
-            // Expected yaw = atan2(4, 3) ≈ 53.13º
-            // Expected pitch = atan2(-5, sqrt(3² + 4²)) = atan2(-5, 5) = -45º
+            // Expected yaw = atan2(4, 3) ≈ 53.13°
+            // Expected pitch = atan2(-5, sqrt(3² + 4²)) = atan2(-5, 5) = -45°
             let v = vector!(x = m(3.0), y = m(4.0), z = m(5.0); in TestXyz);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1549,7 +1574,7 @@ mod tests {
             // - positive yaw is from-north-towards-east
             // - positive pitch is towards -Z (as always), so "up"
             //
-            // so a 45º-nose-up east vector should have yaw=90º and pitch=45º
+            // so a 45°-nose-up east vector should have yaw=90° and pitch=45°
             let v = vector!(n = m(0.0), e = m(1.0), d = m(-1.0); in TestNed);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1570,7 +1595,7 @@ mod tests {
             // - positive yaw is from-east-towards-north
             // - positive pitch is towards -Z (as always), so "down"
             //
-            // so a 45º-nose-up north vector should have yaw=90º and pitch=-45º
+            // so a 45°-nose-up north vector should have yaw=90° and pitch=-45°
             let v = vector!(e = m(0.0), n = m(1.0), u = m(1.0); in TestEnu);
             let orientation = v
                 .orientation_at_origin(Angle::ZERO)
@@ -1604,6 +1629,18 @@ mod tests {
             });
             let cartesian = v.to_cartesian();
             assert_eq!(cartesian, [mps(1.0), mps(2.0), mps(3.0)]);
+        }
+
+        #[test]
+        fn builder_pattern_works() {
+            let v = Vector::<TestFrd, N1>::builder()
+                .frd_front(mps(1.0))
+                .frd_right(mps(2.0))
+                .frd_down(mps(3.0))
+                .build();
+            assert_eq!(v.frd_front(), mps(1.0));
+            assert_eq!(v.frd_right(), mps(2.0));
+            assert_eq!(v.frd_down(), mps(3.0));
         }
 
         #[test]
@@ -1692,6 +1729,30 @@ mod tests {
 
             assert_eq!(v_frd2.to_cartesian(), v_frd.to_cartesian());
         }
+
+        #[test]
+        fn ned_accessors_work() {
+            let v = vector!(n = mps(1.0), e = mps(2.0), d = mps(3.0); in TestNed);
+            assert_eq!(v.ned_north(), mps(1.0));
+            assert_eq!(v.ned_east(), mps(2.0));
+            assert_eq!(v.ned_down(), mps(3.0));
+        }
+
+        #[test]
+        fn enu_accessors_work() {
+            let v = vector!(e = mps(1.0), n = mps(2.0), u = mps(3.0); in TestEnu);
+            assert_eq!(v.enu_east(), mps(1.0));
+            assert_eq!(v.enu_north(), mps(2.0));
+            assert_eq!(v.enu_up(), mps(3.0));
+        }
+
+        #[test]
+        fn xyz_accessors_work() {
+            let v = vector!(x = mps(1.0), y = mps(2.0), z = mps(3.0); in TestXyz);
+            assert_eq!(v.x(), mps(1.0));
+            assert_eq!(v.y(), mps(2.0));
+            assert_eq!(v.z(), mps(3.0));
+        }
     }
 
     // Tests for Acceleration vectors (Time = N2)
@@ -1715,6 +1776,18 @@ mod tests {
             });
             let cartesian = v.to_cartesian();
             assert_eq!(cartesian, [mps2(1.0), mps2(2.0), mps2(3.0)]);
+        }
+
+        #[test]
+        fn builder_pattern_works() {
+            let v = Vector::<TestFrd, N2>::builder()
+                .frd_front(mps2(1.0))
+                .frd_right(mps2(2.0))
+                .frd_down(mps2(3.0))
+                .build();
+            assert_eq!(v.frd_front(), mps2(1.0));
+            assert_eq!(v.frd_right(), mps2(2.0));
+            assert_eq!(v.frd_down(), mps2(3.0));
         }
 
         #[test]
@@ -1810,6 +1883,30 @@ mod tests {
             let v_frd2: Vector<TestFrd2, N2> = v_frd.cast();
 
             assert_eq!(v_frd2.to_cartesian(), v_frd.to_cartesian());
+        }
+
+        #[test]
+        fn ned_accessors_work() {
+            let v = vector!(n = mps2(1.0), e = mps2(2.0), d = mps2(3.0); in TestNed);
+            assert_eq!(v.ned_north(), mps2(1.0));
+            assert_eq!(v.ned_east(), mps2(2.0));
+            assert_eq!(v.ned_down(), mps2(3.0));
+        }
+
+        #[test]
+        fn enu_accessors_work() {
+            let v = vector!(e = mps2(1.0), n = mps2(2.0), u = mps2(3.0); in TestEnu);
+            assert_eq!(v.enu_east(), mps2(1.0));
+            assert_eq!(v.enu_north(), mps2(2.0));
+            assert_eq!(v.enu_up(), mps2(3.0));
+        }
+
+        #[test]
+        fn xyz_accessors_work() {
+            let v = vector!(x = mps2(1.0), y = mps2(2.0), z = mps2(3.0); in TestXyz);
+            assert_eq!(v.x(), mps2(1.0));
+            assert_eq!(v.y(), mps2(2.0));
+            assert_eq!(v.z(), mps2(3.0));
         }
     }
 
