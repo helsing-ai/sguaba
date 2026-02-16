@@ -3040,12 +3040,13 @@ mod tests {
     /// rotation given by Tait-Bryan angles.
     fn manual_quaternion_construction(
         #[case] q: (f64, f64, f64, f64),
-        #[case] ypr: (Angle, Angle, Angle)
+        #[case] ypr: (Angle, Angle, Angle),
     ) {
         let q_rotation = unsafe { Rotation::<Ecef, Ecef>::from_quaternion(q.0, q.1, q.2, q.3) };
         // Negate the angles, as the rotation is a rotation _of_ the transformed vector _in_ the
         // rotated system, see the `from_tait_bryan_angles` documentation for details.
-        let ypr_rotation = unsafe { Rotation::<Ecef, Ecef>::from_tait_bryan_angles(-ypr.0, -ypr.1, -ypr.2) };
+        let ypr_rotation =
+            unsafe { Rotation::<Ecef, Ecef>::from_tait_bryan_angles(-ypr.0, -ypr.1, -ypr.2) };
 
         let x = coordinate!(x = m(1.0), y = m(0.0), z = m(0.0); in Ecef);
         let y = coordinate!(x = m(0.0), y = m(1.0), z = m(0.0); in Ecef);
