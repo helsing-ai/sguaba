@@ -28,6 +28,8 @@ uom = { version = "0.37.0", default-features = false, features = ["autoconvert",
 [target.'cfg(any())'.dependencies]
 # nav-types brings in old nalgebra, which has a broken min-dependency
 nalgebra-macros = { version = "0.2.2", optional = true }
+# need uom::num_traits::Euclid
+num-traits = { version = "0.2.18", optional = true }
 
 [dev-dependencies]
 nav-types = "0.5.2"

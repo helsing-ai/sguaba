@@ -638,6 +638,7 @@ dependencies = [
  "nalgebra 0.34.1",
  "nalgebra-macros",
  "nav-types",
+ "num-traits",
  "quickcheck",
  "rstest",
  "serde",
