@@ -103,6 +103,24 @@
 //! [G2296]: https://earth-info.nga.mil/php/download.php?file=WGS%2084(G2296).pdf
 //! [ITRF2020]: https://itrf.ign.fr/en/solutions/ITRF2020
 //!
+//! # Features
+//!
+//! - **`std`** (enabled by default): Enables standard library support. When disabled, you must
+//!   enable the `libm` feature for mathematical operations to work in `no_std` environments.
+//! - **`libm`**: Enables floating point operations through the libm crate. Has no effect if `std`
+//!   is enabled.
+//! - **`serde`** (enabled by default): Enables serialization/deserialization support via serde.
+//!   Works in both `std` and `no_std` environments.
+//! - **`approx`** (enabled by default): Enables approximate equality comparisons for testing.
+//!   Works in both `std` and `no_std` environments.
+//!
+//! For `no_std` usage with all optional features disabled:
+//!
+//! ```toml
+//! [dependencies]
+//! sguaba = { version = "0.9", default-features = false, features = ["libm"] }
+//! ```
+//!
 //! # Examples
 //!
 //! Assume that a pilot of a plane observes something out of their window at a given bearing and
