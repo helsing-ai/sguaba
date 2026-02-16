@@ -153,7 +153,7 @@ impl<In> Orientation<In> {
     /// The components are given as `w` (the scalar/real part) and `[i, j, k]` (the vector /
     /// imaginary part).
     ///
-    /// The quaternion should represent the rotation desired orientation in space.
+    /// The quaternion should represent the desired orientation in space.
     ///
     /// # Examples
     ///
@@ -172,9 +172,10 @@ impl<In> Orientation<In> {
     ///     .build();
     ///
     /// // extract quaternion and reconstruct
-    /// let (w, [i, j, k]) = from_angles.to_quaternion();
+    /// let (w, i, j, k) = from_angles.to_quaternion();
+    /// // SAFETY: We just extracted the quaternion from a valid orientation
     /// let from_quat = unsafe {
-    ///     Orientation::<PlaneNed>::from_quaternion(w, [i, j, k])
+    ///     Orientation::<PlaneNed>::from_quaternion(w, i, j, k)
     /// };
     ///
     /// let (y1, p1, r1) = from_angles.to_tait_bryan_angles();
@@ -186,7 +187,7 @@ impl<In> Orientation<In> {
     ///
     /// # Safety
     ///
-    /// The quaternion must be non-zero (ie, not `(0, [0, 0, 0])`).
+    /// The quaternion must be non-zero (ie, not `(0, 0, 0, 0)`).
     /// A zero quaternion has no meaningful rotation associated with it.
     /// Non-unit quaternions (which don't represent rotations or orientations) are normalized
     /// internally and may change their meaning.
@@ -194,9 +195,9 @@ impl<In> Orientation<In> {
     /// [versor]: https://en.wikipedia.org/wiki/Versor
     #[doc(alias = "from_versor")]
     #[must_use]
-    pub unsafe fn from_quaternion(w: f64, [i, j, k]: [f64; 3]) -> Self {
+    pub unsafe fn from_quaternion(w: f64, i: f64, j: f64, k: f64) -> Self {
         Self {
-            inner: unsafe { Rotation::from_quaternion(w, [i, j, k]) },
+            inner: unsafe { Rotation::from_quaternion(w, i, j, k) },
         }
     }
 
@@ -211,7 +212,7 @@ impl<In> Orientation<In> {
     /// [unit quaternion]: https://en.wikipedia.org/wiki/Versor
     #[doc(alias = "to_versor")]
     #[must_use]
-    pub fn to_quaternion(&self) -> (f64, [f64; 3]) {
+    pub fn to_quaternion(&self) -> (f64, f64, f64, f64) {
         self.inner.to_quaternion()
     }
 
@@ -1316,7 +1317,7 @@ mod tests {
 
     #[test]
     fn orientation_quaternion_identity() {
-        let identity = unsafe { Orientation::<PlaneNed>::from_quaternion(1.0, [0.0, 0.0, 0.0]) };
+        let identity = unsafe { Orientation::<PlaneNed>::from_quaternion(1.0, 0.0, 0.0, 0.0) };
         assert_eq!(identity, Orientation::<PlaneNed>::aligned());
     }
 
@@ -1340,8 +1341,8 @@ mod tests {
             .roll(roll)
             .build();
 
-        let (w, [x, y, z]) = from_angles.to_quaternion();
-        let from_quat = unsafe { Orientation::<PlaneNed>::from_quaternion(w, [x, y, z]) };
+        let (w, i, j, k) = from_angles.to_quaternion();
+        let from_quat = unsafe { Orientation::<PlaneNed>::from_quaternion(w, i, j, k) };
 
         let (y1, p1, r1) = from_angles.to_tait_bryan_angles();
         let (y2, p2, r2) = from_quat.to_tait_bryan_angles();

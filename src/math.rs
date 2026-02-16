@@ -654,9 +654,10 @@ impl<From, To> Rotation<From, To> {
     /// };
     ///
     /// // extract quaternion and reconstruct
-    /// let (w, [i, j, k]) = from_angles.to_quaternion();
+    /// let (w, i, j, k) = from_angles.to_quaternion();
+    /// // SAFETY: We know that this quaternion is valid, as we got it from the rotation above.
     /// let from_quat = unsafe {
-    ///     Rotation::<PlaneNed, PlaneFrd>::from_quaternion(w, [i, j, k])
+    ///     Rotation::<PlaneNed, PlaneFrd>::from_quaternion(w, i, j, k)
     /// };
     ///
     /// assert_relative_eq!(from_angles, from_quat);
@@ -679,7 +680,12 @@ impl<From, To> Rotation<From, To> {
     /// [versor]: https://en.wikipedia.org/wiki/Versor
     #[doc(alias = "from_versor")]
     #[must_use]
-    pub unsafe fn from_quaternion(w: f64, [i, j, k]: [f64; 3]) -> Self {
+    pub unsafe fn from_quaternion(w: f64, i: f64, j: f64, k: f64) -> Self {
+        debug_assert_ne!(
+            [w, i, j, k],
+            [0.0, 0.0, 0.0, 0.0],
+            "Quaternion must be non-zero"
+        );
         let from_to = UnitQuaternion::new_normalize(nalgebra::Quaternion::new(w, i, j, k));
         Self {
             inner: from_to.inverse(),
@@ -692,16 +698,17 @@ impl<From, To> Rotation<From, To> {
     /// `(w, [i, j, k])` where `w` is the scalar/real part and `[i, j, k]` is the vector / imaginary
     /// part.
     ///
-    /// The returned quaternion represents the "forward" direction of this rotation, matching
-    /// the type parameters and the convention of [`Rotation::from_quaternion`].
+    /// The returned quaternion represents the "forward" direction of this rotation, (ie, rotation
+    /// required to go from `From` to `To`), matching the type parameters and the convention of
+    /// [`Rotation::from_quaternion`].
     ///
     /// [unit quaternion]: https://en.wikipedia.org/wiki/Versor
     #[doc(alias = "to_versor")]
     #[must_use]
-    pub fn to_quaternion(&self) -> (f64, [f64; 3]) {
+    pub fn to_quaternion(&self) -> (f64, f64, f64, f64) {
         let from_to = self.inner.inverse();
         let q = from_to.quaternion();
-        (q.w, [q.i, q.j, q.k])
+        (q.w, q.i, q.j, q.k)
     }
 
     /// Returns the [Euler angles] describing this rotation.
@@ -2954,7 +2961,7 @@ mod tests {
     #[test]
     fn rotation_quaternion_identity() {
         let identity =
-            unsafe { Rotation::<PlaneNed, PlaneFrd>::from_quaternion(1.0, [0.0, 0.0, 0.0]) };
+            unsafe { Rotation::<PlaneNed, PlaneFrd>::from_quaternion(1.0, 0.0, 0.0, 0.0) };
         let expected = unsafe { Rotation::<PlaneNed, PlaneFrd>::identity() };
         assert_relative_eq!(identity, expected);
     }
@@ -2962,9 +2969,9 @@ mod tests {
     #[test]
     fn rotation_quaternion_normalization() {
         let from_unit =
-            unsafe { Rotation::<PlaneNed, PlaneFrd>::from_quaternion(1.0, [0.0, 0.0, 0.0]) };
+            unsafe { Rotation::<PlaneNed, PlaneFrd>::from_quaternion(1.0, 0.0, 0.0, 0.0) };
         let from_scaled =
-            unsafe { Rotation::<PlaneNed, PlaneFrd>::from_quaternion(5.0, [0.0, 0.0, 0.0]) };
+            unsafe { Rotation::<PlaneNed, PlaneFrd>::from_quaternion(5.0, 0.0, 0.0, 0.0) };
         assert_relative_eq!(from_unit, from_scaled);
     }
 
@@ -2982,8 +2989,8 @@ mod tests {
                 .build()
         };
 
-        let (w, xyz) = from_angles.to_quaternion();
-        let from_quat = unsafe { Rotation::<PlaneNed, PlaneFrd>::from_quaternion(w, xyz) };
+        let (w, i, j, k) = from_angles.to_quaternion();
+        let from_quat = unsafe { Rotation::<PlaneNed, PlaneFrd>::from_quaternion(w, i, j, k) };
 
         let point = coordinate!(n = m(100.), e = m(50.), d = m(25.); in PlaneNed);
 
@@ -2991,10 +2998,10 @@ mod tests {
     }
 
     #[test]
-    fn manual_quaternion_construction() {
+    fn manual_quaternion_construction_compound_rotate() {
         // Create a rotation from the unit quaternion (1/2, 1/2, 1/2, 1/2), which cyclically maps
         // the (1,0,0), (0,1,0), (0,0,1) vectors to (0,1,0), (0,0,1), and (1,0,0), respectively.
-        let rotation = unsafe { Rotation::<Ecef, Ecef>::from_quaternion(0.5, [0.5, 0.5, 0.5]) };
+        let rotation = unsafe { Rotation::<Ecef, Ecef>::from_quaternion(0.5, 0.5, 0.5, 0.5) };
 
         let a = coordinate!(x = m(1.0), y = m(0.0), z = m(0.0); in Ecef);
         let b = coordinate!(x = m(0.0), y = m(1.0), z = m(0.0); in Ecef);
@@ -3007,5 +3014,45 @@ mod tests {
         assert_relative_eq!(a_rot, b);
         assert_relative_eq!(b_rot, c);
         assert_relative_eq!(c_rot, a);
+    }
+
+    #[rstest]
+    #[case((1.0, 0.0, 0.0, 0.0), (d(0.0), d(0.0), d(0.0)))]
+    #[case((0.0, 1.0, 0.0, 0.0), (d(0.0), d(0.0), d(180.0)))]
+    #[case((0.0, 0.0, 1.0, 0.0), (d(0.0), d(180.0), d(0.0)))]
+    #[case((0.0, 0.0, 0.0, 1.0), (d(180.0), d(0.0), d(0.0)))]
+    #[case((std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2, 0.0, 0.0), (d(0.0), d(0.0), d(90.0)))]
+    #[case((std::f64::consts::FRAC_1_SQRT_2, 0.0, std::f64::consts::FRAC_1_SQRT_2, 0.0), (d(0.0), d(90.0), d(0.0)))]
+    #[case((std::f64::consts::FRAC_1_SQRT_2, 0.0, 0.0, std::f64::consts::FRAC_1_SQRT_2), (d(90.0), d(0.0), d(0.0)))]
+    #[case((-std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2, 0.0, 0.0), (d(0.0), d(0.0), d(-90.0)))]
+    #[case((-std::f64::consts::FRAC_1_SQRT_2, 0.0, std::f64::consts::FRAC_1_SQRT_2, 0.0), (d(0.0), d(-90.0), d(0.0)))]
+    #[case((-std::f64::consts::FRAC_1_SQRT_2, 0.0, 0.0, std::f64::consts::FRAC_1_SQRT_2), (d(-90.0), d(0.0), d(0.0)))]
+    /// Checks that the parameters are handled in the correct order.
+    ///
+    /// We're rotating in a right-handed cartesian coordinate system.
+    /// Tests 2-4 rotate by 180° around the x, y, and z axes.
+    /// Tests 5-7 rotate by 90° around these axes, tests 8-10 by -90° around these axes.
+    ///
+    /// We provide the quaternions and the expected rotations as Tait-Bryan angles (in
+    /// yaw-pitch-roll order).
+    /// To verify that the rotations are indeed correct we map the three basis vectors (1, 0, 0),
+    /// (0, 1, 0), and (0, 0, 1) and having them mapped by the quaternion and the equivalent
+    /// rotation given by Tait-Bryan angles.
+    fn manual_quaternion_construction(
+        #[case] q: (f64, f64, f64, f64),
+        #[case] ypr: (Angle, Angle, Angle)
+    ) {
+        let q_rotation = unsafe { Rotation::<Ecef, Ecef>::from_quaternion(q.0, q.1, q.2, q.3) };
+        // Negate the angles, as the rotation is a rotation _of_ the transformed vector _in_ the
+        // rotated system, see the `from_tait_bryan_angles` documentation for details.
+        let ypr_rotation = unsafe { Rotation::<Ecef, Ecef>::from_tait_bryan_angles(-ypr.0, -ypr.1, -ypr.2) };
+
+        let x = coordinate!(x = m(1.0), y = m(0.0), z = m(0.0); in Ecef);
+        let y = coordinate!(x = m(0.0), y = m(1.0), z = m(0.0); in Ecef);
+        let z = coordinate!(x = m(0.0), y = m(0.0), z = m(1.0); in Ecef);
+
+        assert_relative_eq!(q_rotation.transform(x), ypr_rotation.transform(x));
+        assert_relative_eq!(q_rotation.transform(y), ypr_rotation.transform(y));
+        assert_relative_eq!(q_rotation.transform(z), ypr_rotation.transform(z));
     }
 }
