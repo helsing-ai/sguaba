@@ -14,7 +14,10 @@ use core::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 use core::{fmt, iter::Sum};
 use typenum::{Integer, N1, N2, Z0};
 use uom::si::f64::{Acceleration, Angle, Length, Velocity};
-use uom::si::{acceleration::meter_per_second_squared, angle::radian, length::meter, velocity::meter_per_second};
+use uom::si::{
+    acceleration::meter_per_second_squared, angle::radian, length::meter,
+    velocity::meter_per_second,
+};
 use uom::ConstZero;
 
 #[cfg(any(test, feature = "approx"))]
@@ -571,8 +574,12 @@ where
         let azimuth = azimuth.into();
         let polar = polar.into();
 
-        let x = radius * FloatMath::sin(polar.get::<radian>()) * FloatMath::cos(azimuth.get::<radian>());
-        let y = radius * FloatMath::sin(polar.get::<radian>()) * FloatMath::sin(azimuth.get::<radian>());
+        let x = radius
+            * FloatMath::sin(polar.get::<radian>())
+            * FloatMath::cos(azimuth.get::<radian>());
+        let y = radius
+            * FloatMath::sin(polar.get::<radian>())
+            * FloatMath::sin(azimuth.get::<radian>());
         let z = radius * FloatMath::cos(polar.get::<radian>());
 
         #[allow(deprecated)]
@@ -827,7 +834,9 @@ where
         // rotates from +X toward -Z, so we negate z to get the correct sign.
         let pitch = Angle::new::<radian>(FloatMath::atan2(
             -z.get::<meter>(),
-            FloatMath::sqrt(FloatMath::powi(x.get::<meter>(), 2) + FloatMath::powi(y.get::<meter>(), 2)),
+            FloatMath::sqrt(
+                FloatMath::powi(x.get::<meter>(), 2) + FloatMath::powi(y.get::<meter>(), 2),
+            ),
         ));
         // And the roll is passed in.
         let roll = roll.into();
