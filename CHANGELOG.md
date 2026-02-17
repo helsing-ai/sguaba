@@ -9,13 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support `no_std` environments via new `std` (default) and `libm`
-  feature flags ([#59](https://github.com/helsing-ai/sguaba/pull/59))
-
 ### Changed
-
-- Upgrade `uom` to 0.38.0
-  ([#75](https://github.com/helsing-ai/sguaba/pull/75))
 
 ### Deprecated
 
@@ -24,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Security
+
+## [0.10.0]
+
+### Added
+
+- Support `no_std` environments via new `std` (default) and `libm`
+  feature flags ([#59](https://github.com/helsing-ai/sguaba/pull/59))
+
+### Changed
+
+- Upgrade `uom` to 0.38.0
+  ([#75](https://github.com/helsing-ai/sguaba/pull/75))
 
 ## [0.9.13] - 2026-02-17
 
@@ -168,7 +174,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial public release.
 
-[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.13...HEAD
+[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/helsing-ai/sguaba/compare/v0.9.13...v0.10.0
 [0.9.13]: https://github.com/helsing-ai/sguaba/compare/v0.9.12...v0.9.13
 [0.9.12]: https://github.com/helsing-ai/sguaba/compare/v0.9.11...v0.9.12
 [0.9.11]: https://github.com/helsing-ai/sguaba/compare/v0.9.10...v0.9.11
