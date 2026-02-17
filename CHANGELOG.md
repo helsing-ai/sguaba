@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Upgrade `uom` to 0.38.0
+  ([#75](https://github.com/helsing-ai/sguaba/pull/75))
+
 ### Deprecated
 
 ### Removed
