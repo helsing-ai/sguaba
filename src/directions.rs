@@ -1,7 +1,8 @@
 use crate::util::BoundedAngle;
 use crate::Vector;
-use std::fmt::{Display, Formatter};
-use std::marker::PhantomData;
+use core::f64::consts::FRAC_PI_2;
+use core::fmt::{Display, Formatter};
+use core::marker::PhantomData;
 use uom::si::f64::{Angle, Length};
 use uom::si::{angle::degree, length::meter};
 
@@ -194,7 +195,7 @@ impl<In> Default for Bearing<In> {
 }
 
 impl<In> Display for Bearing<In> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
             "bearing {:?}° at elevation {:?}°",
@@ -316,8 +317,7 @@ impl<In, H1, H2> Builder<In, H1, H2> {
     pub fn elevation(mut self, angle: impl Into<Angle>) -> Option<Builder<In, H1, HasElevation>> {
         let elevation = angle.into();
         let elevation_signed = BoundedAngle::new(elevation).to_signed_range();
-        if !(-std::f64::consts::FRAC_PI_2..=std::f64::consts::FRAC_PI_2).contains(&elevation_signed)
-        {
+        if !(-FRAC_PI_2..=FRAC_PI_2).contains(&elevation_signed) {
             None
         } else {
             self.under_construction.elevation = elevation;
@@ -413,7 +413,7 @@ macro_rules! bearing {
     }};
     (azimuth = rad($az:expr), elevation = rad($el:expr); in $system:ty) => {{
         const _: () = assert!(
-            $el >= -::std::f64::consts::FRAC_PI_2 && $el <= ::std::f64::consts::FRAC_PI_2,
+            $el >= -::core::f64::consts::FRAC_PI_2 && $el <= ::core::f64::consts::FRAC_PI_2,
             "elevation must be in [-π/2, π/2] radians"
         );
         $crate::Bearing::<$system>::builder()
@@ -434,6 +434,8 @@ mod tests {
     use approx::{assert_abs_diff_eq, assert_relative_eq};
     use quickcheck::quickcheck;
     use rstest::rstest;
+    use std::boxed::Box;
+    use std::f64::consts::{FRAC_PI_2, PI, TAU};
     use uom::si::f64::{Angle, Length};
     use uom::si::{
         angle::{degree, radian},
@@ -505,7 +507,6 @@ mod tests {
         assert_eq!(bearing6.elevation(), d(-90.0));
 
         // Test with radians at boundaries
-        use std::f64::consts::FRAC_PI_2;
         let bearing7 = bearing!(azimuth = rad(0.0), elevation = rad(FRAC_PI_2); in Frd);
         assert_relative_eq!(bearing7.elevation().get::<radian>(), FRAC_PI_2);
 
@@ -555,13 +556,9 @@ mod tests {
                 }
             };
             Self {
-                elevation: uom::si::f64::Angle::new::<uom::si::angle::radian>(
-                    elevation.rem_euclid(std::f64::consts::PI) - std::f64::consts::FRAC_PI_2,
-                ),
-                azimuth: uom::si::f64::Angle::new::<uom::si::angle::radian>(
-                    azimuth.rem_euclid(std::f64::consts::TAU),
-                ),
-                system: std::marker::PhantomData,
+                elevation: Angle::new::<radian>(elevation.rem_euclid(PI) - FRAC_PI_2),
+                azimuth: Angle::new::<radian>(azimuth.rem_euclid(TAU)),
+                system: core::marker::PhantomData,
             }
         }
 
@@ -571,28 +568,18 @@ mod tests {
                 elevation,
                 system: phantom_data,
             } = *self;
-            if azimuth.get::<uom::si::angle::radian>() == 0. {
-                Box::new(
-                    elevation
-                        .get::<uom::si::angle::radian>()
-                        .shrink()
-                        .map(move |el| Self {
-                            elevation: uom::si::f64::Angle::new::<uom::si::angle::radian>(el),
-                            azimuth,
-                            system: phantom_data,
-                        }),
-                )
+            if azimuth.get::<radian>() == 0. {
+                Box::new(elevation.get::<radian>().shrink().map(move |el| Self {
+                    elevation: Angle::new::<radian>(el),
+                    azimuth,
+                    system: phantom_data,
+                }))
             } else {
-                Box::new(
-                    azimuth
-                        .get::<uom::si::angle::radian>()
-                        .shrink()
-                        .map(move |az| Self {
-                            elevation,
-                            azimuth: uom::si::f64::Angle::new::<uom::si::angle::radian>(az),
-                            system: phantom_data,
-                        }),
-                )
+                Box::new(azimuth.get::<radian>().shrink().map(move |az| Self {
+                    elevation,
+                    azimuth: Angle::new::<radian>(az),
+                    system: phantom_data,
+                }))
             }
         }
     }
@@ -601,9 +588,9 @@ mod tests {
         fn bearing_vector_roundtrip(bearing: Bearing<Frd>) -> () {
             // azimuth won't be preserved if the bearing is along the Z axis
             let mut bearing = bearing;
-            if approx::relative_eq!(bearing.elevation().get::<radian>(), std::f64::consts::FRAC_PI_2)
-                || approx::relative_eq!(bearing.elevation().get::<radian>(), -std::f64::consts::FRAC_PI_2) {
-                bearing.azimuth = uom::si::f64::Angle::new::<uom::si::angle::radian>(0.);
+            if approx::relative_eq!(bearing.elevation().get::<radian>(), FRAC_PI_2)
+                || approx::relative_eq!(bearing.elevation().get::<radian>(), -FRAC_PI_2) {
+                bearing.azimuth = Angle::new::<radian>(0.);
             }
 
             assert_relative_eq!(

@@ -1,6 +1,6 @@
 [package]
 name = "sguaba"
-version = "0.9.12"
+version = "0.10.0-rc.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
@@ -10,21 +10,26 @@ keywords = ["spatial", "rigid-body", "coordinates", "coordinate-systems"]
 categories = ["aerospace", "mathematics"]
 
 [features]
-default = ["serde", "approx"]
-serde = ["dep:serde", "nalgebra/serde-serialize", "uom/use_serde"]
+default = ["std", "serde", "approx"]
 approx = ["dep:approx"]
+libm = ["dep:libm", "nalgebra/libm"]
+serde = ["dep:serde", "nalgebra/serde-serialize", "uom/use_serde"]
+std = ["nalgebra/std", "uom/std", "serde/std"]
 
 [dependencies]
 approx = { version = "0.5.1", optional = true }
-nalgebra = { version = "0.34.1" }
-serde = { version = "1.0.215", features = ["derive"], optional = true }
+libm = { version = "0.2.8", optional = true }
+nalgebra = { version = "0.34.1", default-features = false }
+serde = { version = "1.0.215", default-features = false, features = ["derive"], optional = true }
 typenum = "1.18.0"
-uom = { version = "0.38.0", default-features = false, features = ["autoconvert", "std", "si", "f64"] }
+uom = { version = "0.38.0", default-features = false, features = ["autoconvert", "si", "f64"] }
 
 # to make -Zminimal-versions work
 [target.'cfg(any())'.dependencies]
 # nav-types brings in old nalgebra, which has a broken min-dependency
 nalgebra-macros = { version = "0.2.2", optional = true }
+# need uom::num_traits::Euclid
+num-traits = { version = "0.2.18", optional = true }
 
 [dev-dependencies]
 nav-types = "0.5.2"

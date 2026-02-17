@@ -2,18 +2,22 @@ use crate::builder::{Set, Unset};
 use crate::coordinate_systems::HasComponents;
 use crate::directions::Bearing;
 use crate::engineering::Orientation;
+use crate::float_math::FloatMath;
 use crate::{
     systems::{EnuLike, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike},
     Coordinate, CoordinateSystem,
 };
 use crate::{LengthPossiblyPer, Vector3};
-use std::fmt::{Display, Formatter};
-use std::marker::PhantomData;
-use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
-use std::{fmt, iter::Sum};
-use typenum::{Integer, N1, N2, P2, Z0};
+use core::fmt::{Display, Formatter};
+use core::marker::PhantomData;
+use core::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
+use core::{fmt, iter::Sum};
+use typenum::{Integer, N1, N2, Z0};
 use uom::si::f64::{Acceleration, Angle, Length, Velocity};
-use uom::si::{acceleration::meter_per_second_squared, length::meter, velocity::meter_per_second};
+use uom::si::{
+    acceleration::meter_per_second_squared, angle::radian, length::meter,
+    velocity::meter_per_second,
+};
 use uom::ConstZero;
 
 #[cfg(any(test, feature = "approx"))]
@@ -241,7 +245,7 @@ impl<In> LengthBasedComponents<In, Z0> for Vector<In, Z0> {
         ]
     }
     fn recast_to_length(v: LengthPossiblyPer<Z0>) -> Length {
-        std::convert::identity(v)
+        core::convert::identity(v)
     }
 }
 
@@ -570,9 +574,13 @@ where
         let azimuth = azimuth.into();
         let polar = polar.into();
 
-        let x = radius * polar.sin().value * azimuth.cos().value;
-        let y = radius * polar.sin().value * azimuth.sin().value;
-        let z = radius * polar.cos().value;
+        let x = radius
+            * FloatMath::sin(polar.get::<radian>())
+            * FloatMath::cos(azimuth.get::<radian>());
+        let y = radius
+            * FloatMath::sin(polar.get::<radian>())
+            * FloatMath::sin(azimuth.get::<radian>());
+        let z = radius * FloatMath::cos(polar.get::<radian>());
 
         #[allow(deprecated)]
         Self::from_cartesian(x, y, z)
@@ -820,11 +828,16 @@ where
         // with no sign flipping.
         //
         // Also note that atan2 guarantees that it returns 0 if both components are 0.
-        let yaw = y.atan2(x);
+        let yaw = Angle::new::<radian>(FloatMath::atan2(y.get::<meter>(), x.get::<meter>()));
         // Pitch is the rotation about the Y axis, with 0° pitch being aligned with the yaw axis
         // (since we're using intrinsic rotations). Per the right-hand rule, positive pitch
         // rotates from +X toward -Z, so we negate z to get the correct sign.
-        let pitch = (-z).atan2((x.powi(P2::new()) + y.powi(P2::new())).sqrt());
+        let pitch = Angle::new::<radian>(FloatMath::atan2(
+            -z.get::<meter>(),
+            FloatMath::sqrt(
+                FloatMath::powi(x.get::<meter>(), 2) + FloatMath::powi(y.get::<meter>(), 2),
+            ),
+        ));
         // And the roll is passed in.
         let roll = roll.into();
 
