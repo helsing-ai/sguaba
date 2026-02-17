@@ -112,7 +112,7 @@ jobs:
       # intentionally no target specifier; see https://github.com/jonhoo/rust-ci-conf/pull/4
       # --feature-powerset runs for every combination of features
       - name: cargo hack
-        run: cargo hack --feature-powerset check
+        run: cargo hack --feature-powerset check --at-least-one-of std,lib
   msrv:
     # check that we can build using the minimal rust version that is specified by this crate
     runs-on: ubuntu-latest

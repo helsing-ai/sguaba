@@ -1,30 +1,29 @@
+use crate::builder::{Set, Unset};
 use crate::coordinate_systems::{
     CoordinateSystem, EnuLike, FrdLike, HasComponents, NedLike, RightHandedXyzLike,
 };
 use crate::directions::Bearing;
+use crate::float_math::FloatMath;
 use crate::math::RigidBodyTransform;
 use crate::systems::EquivalentTo;
 use crate::vectors::Vector;
 use crate::{engineering, Point3};
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use std::marker::PhantomData;
-use std::ops::{Add, AddAssign, Neg, Sub, SubAssign};
+use core::fmt;
+use core::fmt::{Display, Formatter};
+use core::marker::PhantomData;
+use core::ops::{Add, AddAssign, Neg, Sub, SubAssign};
+use uom::si::angle::radian;
 use uom::si::f64::{Angle, Length};
 use uom::si::length::meter;
-use uom::si::quantities::Ratio;
-use uom::typenum::P2;
+use uom::si::ratio::ratio;
 use uom::ConstZero;
 
-#[cfg(any(test, feature = "approx"))]
-use approx::{AbsDiffEq, RelativeEq};
-
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
-use crate::builder::{Set, Unset};
 #[cfg(doc)]
 use crate::{engineering::Pose, systems::BearingDefined};
+#[cfg(any(test, feature = "approx"))]
+use approx::{AbsDiffEq, RelativeEq};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 /// Defines a point (ie, position) in the coordinate system specified by `In`.
 ///
@@ -603,7 +602,7 @@ impl<In> Coordinate<In> {
     #[doc(alias = "norm")]
     #[must_use]
     pub fn distance_from_origin(&self) -> Length {
-        Length::new::<uom::si::length::meter>(self.point.coords.norm())
+        Length::new::<meter>(self.point.coords.norm())
     }
 
     /// Computes the distance between this point and the given point.
@@ -640,16 +639,20 @@ impl<In> Coordinate<In> {
             return None;
         }
 
-        let polar = Ratio::from(Length::new::<meter>(self.point.z) / r).acos();
-        let xy = (Length::new::<meter>(self.point.x).powi(P2::new())
-            + Length::new::<meter>(self.point.y).powi(P2::new()))
-        .sqrt();
+        let polar_value = (Length::new::<meter>(self.point.z) / r).get::<ratio>();
+        let polar = Angle::new::<radian>(FloatMath::acos(polar_value));
+        let xy = Length::new::<meter>(FloatMath::sqrt(
+            FloatMath::powi(self.point.x, 2) + FloatMath::powi(self.point.y, 2),
+        ));
         if xy == Length::ZERO {
             // as promised by bearing_from_origin
             return Some((polar, Angle::ZERO));
         }
-        let mut azimuth = Ratio::from(Length::new::<meter>(self.point.x) / xy).acos();
-        azimuth.value = azimuth.value.copysign(self.point.y);
+        let azimuth_value = (Length::new::<meter>(self.point.x) / xy).get::<ratio>();
+        let azimuth = Angle::new::<radian>(FloatMath::copysign(
+            FloatMath::acos(azimuth_value),
+            self.point.y,
+        ));
 
         Some((polar, azimuth))
     }

@@ -103,6 +103,26 @@
 //! [G2296]: https://earth-info.nga.mil/php/download.php?file=WGS%2084(G2296).pdf
 //! [ITRF2020]: https://itrf.ign.fr/en/solutions/ITRF2020
 //!
+//! # Features
+//!
+//! - **`std`** (enabled by default): Enables standard library support. When disabled, you must
+//!   enable the `libm` feature for mathematical operations to work in `no_std` environments.
+//! - **`libm`**: Enables floating point operations through the libm crate. In `no_std`
+//!   environments, this is required for mathematical operations. When `std` is also enabled,
+//!   sguaba itself will prefer `std` math, but the `libm` feature of dependencies like `nalgebra`
+//!   will still be activated, which may affect their behavior.
+//! - **`serde`** (enabled by default): Enables serialization/deserialization support via serde.
+//!   Works in both `std` and `no_std` environments.
+//! - **`approx`** (enabled by default): Enables approximate equality comparisons for testing.
+//!   Works in both `std` and `no_std` environments.
+//!
+//! For `no_std` usage with all optional features disabled:
+//!
+//! ```toml
+//! [dependencies]
+//! sguaba = { version = "*", default-features = false, features = ["libm"] }
+//! ```
+//!
 //! # Examples
 //!
 //! Assume that a pilot of a plane observes something out of their window at a given bearing and
@@ -257,6 +277,10 @@
 //! println!("{:?}", observation_in_ecef.to_wgs84());
 //! ```
 
+#![no_std]
+#[cfg(feature = "std")]
+extern crate std;
+
 use typenum::{P1, Z0};
 use uom::{
     si::{f64::V, Quantity, ISQ, SI},
@@ -272,6 +296,7 @@ mod coordinate_systems;
 
 mod coordinates;
 mod directions;
+mod float_math;
 mod geodetic;
 mod util;
 mod vectors;

@@ -495,4 +495,5 @@ mod testing {
 
 #[cfg(test)]
 #[allow(clippy::items_after_test_module)]
+#[allow(clippy::useless_attribute)]
 pub(crate) use testing::*;
