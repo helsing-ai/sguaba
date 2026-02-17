@@ -7,16 +7,16 @@ use crate::float_math::FloatMath;
 use crate::math::RigidBodyTransform;
 use crate::systems::EquivalentTo;
 use crate::vectors::Vector;
-use crate::{engineering, Point3};
+use crate::{Point3, engineering};
 use core::fmt;
 use core::fmt::{Display, Formatter};
 use core::marker::PhantomData;
 use core::ops::{Add, AddAssign, Neg, Sub, SubAssign};
+use uom::ConstZero;
 use uom::si::angle::radian;
 use uom::si::f64::{Angle, Length};
 use uom::si::length::meter;
 use uom::si::ratio::ratio;
-use uom::ConstZero;
 
 #[cfg(doc)]
 use crate::{engineering::Pose, systems::BearingDefined};
@@ -851,10 +851,10 @@ constructor!(EnuLike, [enu_east, enu_north, enu_up]);
 #[cfg(test)]
 mod tests {
     use super::Length;
+    use crate::Point3;
     use crate::bearing;
     use crate::coordinate_systems::{Ecef, Enu, Frd, Ned};
     use crate::coordinates::Coordinate;
-    use crate::Point3;
     use approx::assert_relative_eq;
     use rstest::rstest;
 

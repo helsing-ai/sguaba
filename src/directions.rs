@@ -1,5 +1,5 @@
-use crate::util::BoundedAngle;
 use crate::Vector;
+use crate::util::BoundedAngle;
 use core::f64::consts::FRAC_PI_2;
 use core::fmt::{Display, Formatter};
 use core::marker::PhantomData;
@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(doc)]
 use crate::{
-    systems::{BearingDefined, FrdLike, NedLike},
     CoordinateSystem,
+    systems::{BearingDefined, FrdLike, NedLike},
 };
 use uom::ConstZero;
 

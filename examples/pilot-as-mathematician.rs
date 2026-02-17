@@ -1,9 +1,9 @@
 use sguaba::{
+    Bearing, Coordinate,
     engineering::Orientation,
     math::RigidBodyTransform,
     system,
     systems::{Ecef, Wgs84},
-    Bearing, Coordinate,
 };
 use uom::si::f64::{Angle, Length};
 use uom::si::{angle::degree, length::meter};

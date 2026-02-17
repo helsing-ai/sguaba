@@ -4,8 +4,8 @@ use crate::directions::Bearing;
 use crate::engineering::Orientation;
 use crate::float_math::FloatMath;
 use crate::{
-    systems::{EnuLike, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike},
     Coordinate, CoordinateSystem,
+    systems::{EnuLike, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike},
 };
 use crate::{LengthPossiblyPer, Vector3};
 use core::fmt::{Display, Formatter};
@@ -13,12 +13,12 @@ use core::marker::PhantomData;
 use core::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 use core::{fmt, iter::Sum};
 use typenum::{Integer, N1, N2, Z0};
+use uom::ConstZero;
 use uom::si::f64::{Acceleration, Angle, Length, Velocity};
 use uom::si::{
     acceleration::meter_per_second_squared, angle::radian, length::meter,
     velocity::meter_per_second,
 };
-use uom::ConstZero;
 
 #[cfg(any(test, feature = "approx"))]
 use {

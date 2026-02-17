@@ -1,5 +1,5 @@
 use sguaba::{
-    engineering::Orientation, math::RigidBodyTransform, system, systems::Wgs84, Bearing, Coordinate,
+    Bearing, Coordinate, engineering::Orientation, math::RigidBodyTransform, system, systems::Wgs84,
 };
 use uom::si::f64::{Angle, Length};
 use uom::si::{angle::degree, length::meter};

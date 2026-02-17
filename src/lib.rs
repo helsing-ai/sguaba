@@ -283,8 +283,8 @@ extern crate std;
 
 use typenum::{P1, Z0};
 use uom::{
-    si::{f64::V, Quantity, ISQ, SI},
     ConstZero, Kind,
+    si::{ISQ, Quantity, SI, f64::V},
 };
 
 // for easier linking from docs above
