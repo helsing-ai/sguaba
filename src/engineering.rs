@@ -36,16 +36,16 @@ use crate::systems::EquivalentTo;
 use crate::{Point3, Vector};
 use core::marker::PhantomData;
 use core::ops::Mul;
-use uom::si::f64::{Angle, Length};
 use uom::ConstZero;
+use uom::si::f64::{Angle, Length};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 #[cfg(doc)]
 use crate::{
-    systems::{Ecef, FrdLike, NedLike},
     Bearing, CoordinateSystem,
+    systems::{Ecef, FrdLike, NedLike},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -910,9 +910,9 @@ mod tests {
     use crate::math::{RigidBodyTransform, Rotation};
     use crate::util::BoundedAngle;
     use crate::vectors::Vector;
-    use crate::{coordinate, Point3};
+    use crate::{Point3, coordinate};
     use approx::assert_relative_eq;
-    use approx::{assert_abs_diff_eq, AbsDiffEq};
+    use approx::{AbsDiffEq, assert_abs_diff_eq};
     use rstest::rstest;
     use std::println;
     use uom::si::f64::{Angle, Length};

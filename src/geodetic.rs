@@ -1,5 +1,5 @@
 use crate::float_math::FloatMath;
-use crate::{systems::Ecef, util::BoundedAngle, Coordinate, Point3};
+use crate::{Coordinate, Point3, systems::Ecef, util::BoundedAngle};
 use core::fmt;
 use core::fmt::Display;
 use core::marker::PhantomData;
@@ -668,7 +668,7 @@ mod tests {
     use crate::coordinates::Coordinate;
     use crate::geodetic::{Components, ECEF_TO_WGS84_MAX_ALTITUDE_M, ECEF_TO_WGS84_MIN_ALTITUDE_M};
     use crate::util::BoundedAngle;
-    use approx::{assert_relative_eq, AbsDiffEq};
+    use approx::{AbsDiffEq, assert_relative_eq};
     use quickcheck::quickcheck;
     use rstest::rstest;
     use std::boxed::Box;
@@ -885,12 +885,14 @@ mod tests {
             (35.3619, -138.7280, 2294.0),
             (-35.3619, -138.7280, 2294.0),
         ] {
-            insta::assert_snapshot!(Wgs84::build(Components {
-                latitude: d(lat),
-                longitude: d(lon),
-                altitude: m(alt)
-            })
-            .unwrap());
+            insta::assert_snapshot!(
+                Wgs84::build(Components {
+                    latitude: d(lat),
+                    longitude: d(lon),
+                    altitude: m(alt)
+                })
+                .unwrap()
+            );
         }
     }
 

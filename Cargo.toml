@@ -1,7 +1,7 @@
 [package]
 name = "sguaba"
 version = "0.10.0-rc.1"
-edition = "2021"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 
 description = "Hard to misuse rigid body transforms (aka \"spatial math\") for engineers with other things to worry about than linear algebra."

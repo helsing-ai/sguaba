@@ -16,16 +16,16 @@
 //! This module also provides the [`Rotation`] type to represents unit quaternion based transforms
 //! between coordinate systems (ie, they need no translation to convert between them).
 
+use crate::Bearing;
 use crate::coordinate_systems::Ecef;
 use crate::coordinates::Coordinate;
 use crate::float_math::FloatMath;
 use crate::geodetic::Wgs84;
 use crate::systems::EquivalentTo;
 use crate::vectors::Vector;
-use crate::Bearing;
 use crate::{
-    systems::{EnuLike, NedLike},
     CoordinateSystem, Isometry3, UnitQuaternion,
+    systems::{EnuLike, NedLike},
 };
 use core::convert::From;
 use core::fmt;
@@ -807,9 +807,8 @@ impl<From, To> Rotation<From, To> {
     /// The builder's `build()` method is `unsafe` for the same reasons as
     /// [`from_tait_bryan_angles`](Self::from_tait_bryan_angles): you are asserting
     /// a relationship between coordinate systems `From` and `To`.
-    pub fn tait_bryan_builder(
-    ) -> tait_bryan_builder::TaitBryanBuilder<tait_bryan_builder::NeedsYaw, Rotation<From, To>>
-    {
+    pub fn tait_bryan_builder()
+    -> tait_bryan_builder::TaitBryanBuilder<tait_bryan_builder::NeedsYaw, Rotation<From, To>> {
         tait_bryan_builder::TaitBryanBuilder::new()
     }
 }
@@ -1147,7 +1146,7 @@ impl<From, To> RigidBodyTransform<From, To> {
     /// correctly, leading to a defeat of their type safety.
     #[must_use]
     pub unsafe fn identity() -> Self {
-        Self::new(Vector::zero(), Rotation::identity())
+        unsafe { Self::new(Vector::zero(), Rotation::identity()) }
     }
 
     /// Casts the coordinate system type parameter `From` of the transform to the equivalent
@@ -1492,8 +1491,8 @@ pub mod tait_bryan_builder {
     use super::*;
     use crate::engineering::Orientation;
     use core::marker::PhantomData;
-    use uom::si::f64::Angle;
     use uom::ConstZero;
+    use uom::si::f64::Angle;
 
     /// State marker indicating yaw angle is needed next
     pub struct NeedsYaw;
@@ -1649,8 +1648,10 @@ pub mod tait_bryan_builder {
         /// (in that intrinsic order) to the axes of coordinate system `From` will align them
         /// with the axes of coordinate system `To`.
         pub unsafe fn build(self) -> Rotation<From, To> {
-            #[allow(deprecated)]
-            Rotation::from_tait_bryan_angles(self.yaw, self.pitch, self.roll)
+            unsafe {
+                #[allow(deprecated)]
+                Rotation::from_tait_bryan_angles(self.yaw, self.pitch, self.roll)
+            }
         }
     }
 }
@@ -1664,7 +1665,7 @@ mod tests {
     use crate::math::{RigidBodyTransform, Rotation};
     use crate::util::BoundedAngle;
     use crate::vectors::Vector;
-    use crate::{coordinate, vector, Bearing, Point3, Vector3};
+    use crate::{Bearing, Point3, Vector3, coordinate, vector};
     use approx::assert_abs_diff_eq;
     use approx::assert_relative_eq;
     use rstest::rstest;
