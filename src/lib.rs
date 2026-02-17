@@ -107,8 +107,10 @@
 //!
 //! - **`std`** (enabled by default): Enables standard library support. When disabled, you must
 //!   enable the `libm` feature for mathematical operations to work in `no_std` environments.
-//! - **`libm`**: Enables floating point operations through the libm crate. Has no effect if `std`
-//!   is enabled.
+//! - **`libm`**: Enables floating point operations through the libm crate. In `no_std`
+//!   environments, this is required for mathematical operations. When `std` is also enabled,
+//!   sguaba itself will prefer `std` math, but the `libm` feature of dependencies like `nalgebra`
+//!   will still be activated, which may affect their behavior.
 //! - **`serde`** (enabled by default): Enables serialization/deserialization support via serde.
 //!   Works in both `std` and `no_std` environments.
 //! - **`approx`** (enabled by default): Enables approximate equality comparisons for testing.
