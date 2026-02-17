@@ -9,9 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `Orientation::from_quaternion` and `Rotation::from_quaternion`
-  ([#73](https://github.com/helsing-ai/sguaba/pull/73)). 
-
 ### Changed
 
 ### Deprecated
@@ -21,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Security
+
+## [0.9.13] - 2026-02-17
+
+### Added
+
+- Add `Orientation::from_quaternion` and `Rotation::from_quaternion`
+  ([#73](https://github.com/helsing-ai/sguaba/pull/73)).
 
 ## [0.9.12]
 
@@ -158,7 +162,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial public release.
 
-[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.12...HEAD
+[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.9.13...HEAD
+[0.9.13]: https://github.com/helsing-ai/sguaba/compare/v0.9.12...v0.9.13
 [0.9.12]: https://github.com/helsing-ai/sguaba/compare/v0.9.11...v0.9.12
 [0.9.11]: https://github.com/helsing-ai/sguaba/compare/v0.9.10...v0.9.11
 [0.9.10]: https://github.com/helsing-ai/sguaba/compare/v0.9.9...v0.9.10
