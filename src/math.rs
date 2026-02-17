@@ -1146,9 +1146,9 @@ impl<From, To> RigidBodyTransform<From, To> {
     /// moving values between different coordinate system types without adjusting the values
     /// correctly, leading to a defeat of their type safety.
     #[must_use]
-    pub unsafe fn identity() -> Self {
+    pub unsafe fn identity() -> Self { unsafe {
         Self::new(Vector::zero(), Rotation::identity())
-    }
+    }}
 
     /// Casts the coordinate system type parameter `From` of the transform to the equivalent
     /// coordinate system `AlsoFrom`.
@@ -1648,10 +1648,10 @@ pub mod tait_bryan_builder {
         /// Specifically, you are asserting that applying the yaw, pitch, and roll rotations
         /// (in that intrinsic order) to the axes of coordinate system `From` will align them
         /// with the axes of coordinate system `To`.
-        pub unsafe fn build(self) -> Rotation<From, To> {
+        pub unsafe fn build(self) -> Rotation<From, To> { unsafe {
             #[allow(deprecated)]
             Rotation::from_tait_bryan_angles(self.yaw, self.pitch, self.roll)
-        }
+        }}
     }
 }
 
