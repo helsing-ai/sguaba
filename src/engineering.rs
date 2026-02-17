@@ -148,6 +148,74 @@ impl<In> Orientation<In> {
         }
     }
 
+    /// Constructs an orientation from the components of a [versor] / unit quaternion.
+    ///
+    /// The components are given as `w` (the scalar/real part) and `[i, j, k]` (the vector /
+    /// imaginary part).
+    ///
+    /// The quaternion should represent the desired orientation in space.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use approx::assert_abs_diff_eq;
+    /// use sguaba::{system, engineering::Orientation};
+    /// use uom::si::{f64::Angle, angle::degree};
+    ///
+    /// system!(struct PlaneNed using NED);
+    ///
+    /// // construct from Tait-Bryan angles
+    /// let from_angles = Orientation::<PlaneNed>::tait_bryan_builder()
+    ///     .yaw(Angle::new::<degree>(90.0))
+    ///     .pitch(Angle::new::<degree>(45.0))
+    ///     .roll(Angle::new::<degree>(5.0))
+    ///     .build();
+    ///
+    /// // extract quaternion and reconstruct
+    /// let (w, i, j, k) = from_angles.to_quaternion();
+    /// // SAFETY: We just extracted the quaternion from a valid orientation
+    /// let from_quat = unsafe {
+    ///     Orientation::<PlaneNed>::from_quaternion(w, i, j, k)
+    /// };
+    ///
+    /// let (y1, p1, r1) = from_angles.to_tait_bryan_angles();
+    /// let (y2, p2, r2) = from_quat.to_tait_bryan_angles();
+    /// assert_abs_diff_eq!(y1.get::<degree>(), y2.get::<degree>(), epsilon = 1e-10);
+    /// assert_abs_diff_eq!(p1.get::<degree>(), p2.get::<degree>(), epsilon = 1e-10);
+    /// assert_abs_diff_eq!(r1.get::<degree>(), r2.get::<degree>(), epsilon = 1e-10);
+    /// ```
+    ///
+    /// # Safety
+    ///
+    /// The quaternion must be non-zero (ie, not `(0, 0, 0, 0)`).
+    /// A zero quaternion has no meaningful rotation associated with it.
+    /// Non-unit quaternions (which don't represent rotations or orientations) are normalized
+    /// internally and may change their meaning.
+    ///
+    /// [versor]: https://en.wikipedia.org/wiki/Versor
+    #[doc(alias = "from_versor")]
+    #[must_use]
+    pub unsafe fn from_quaternion(w: f64, i: f64, j: f64, k: f64) -> Self {
+        Self {
+            inner: unsafe { Rotation::from_quaternion(w, i, j, k) },
+        }
+    }
+
+    /// Returns the components of the [unit quaternion] that describes this orientation as
+    /// `(w, [i, j, k])` where `w` is the scalar/real part and `[i, j, k]` is the vector / imaginary
+    /// part.
+    ///
+    /// The returned quaternion represents the rotation of the object's body axes relative to
+    /// the coordinate system `In`, matching the convention of
+    /// [`Orientation::from_quaternion`].
+    ///
+    /// [unit quaternion]: https://en.wikipedia.org/wiki/Versor
+    #[doc(alias = "to_versor")]
+    #[must_use]
+    pub fn to_quaternion(&self) -> (f64, f64, f64, f64) {
+        self.inner.to_quaternion()
+    }
+
     /// Constructs an orientation that is aligned with the axes of the [`CoordinateSystem`] `In`.
     ///
     /// That is equivalent to calling [`Orientation::from_tait_bryan_angles`] with all
@@ -1247,5 +1315,41 @@ mod tests {
         assert_relative_eq!(forward_in_frd_2, forward_chained);
         assert_relative_eq!(right_in_frd_2, right_chained);
         assert_relative_eq!(down_in_frd_2, down_chained);
+    }
+
+    #[test]
+    fn orientation_quaternion_identity() {
+        let identity = unsafe { Orientation::<PlaneNed>::from_quaternion(1.0, 0.0, 0.0, 0.0) };
+        assert_eq!(identity, Orientation::<PlaneNed>::aligned());
+    }
+
+    #[rstest]
+    #[case(d(0.), d(0.), d(0.))]
+    #[case(d(90.), d(0.), d(0.))]
+    #[case(d(0.), d(45.), d(0.))]
+    #[case(d(0.), d(0.), d(30.))]
+    #[case(d(90.), d(45.), d(5.))]
+    #[case(d(39.), d(45.), d(55.))]
+    #[case(d(180.), d(0.), d(0.))]
+    #[case(d(-45.), d(20.), d(10.))]
+    fn orientation_quaternion_round_trip(
+        #[case] yaw: Angle,
+        #[case] pitch: Angle,
+        #[case] roll: Angle,
+    ) {
+        let from_angles = Orientation::<PlaneNed>::tait_bryan_builder()
+            .yaw(yaw)
+            .pitch(pitch)
+            .roll(roll)
+            .build();
+
+        let (w, i, j, k) = from_angles.to_quaternion();
+        let from_quat = unsafe { Orientation::<PlaneNed>::from_quaternion(w, i, j, k) };
+
+        let (y1, p1, r1) = from_angles.to_tait_bryan_angles();
+        let (y2, p2, r2) = from_quat.to_tait_bryan_angles();
+        for (a, b) in [(y1, y2), (p1, p2), (r1, r2)] {
+            assert_abs_diff_eq!(&BoundedAngle::new(a), &BoundedAngle::new(b));
+        }
     }
 }

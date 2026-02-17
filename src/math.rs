@@ -95,9 +95,9 @@ use crate::{engineering, systems::FrdLike};
 pub struct Rotation<From, To> {
     /// This is _actually_ the rotation from `To` into `From`, because that's a much more natural
     /// constructor. This means that what we store here is equivalent to a rotation matrix whose
-    /// rows are `From` and columns are `To` (rather than the other way around). If we want convert
-    /// a vector `x` from `From` to `To`, we can't do a straight matrix multiplication of the
-    /// (equivalent) rotation matrix in `inner` with `x`, because that would yield (From x To) *
+    /// rows are `From` and columns are `To` (rather than the other way around). If we want to
+    /// convert a vector `x` from `From` to `To`, we can't do a straight matrix multiplication of
+    /// the (equivalent) rotation matrix in `inner` with `x`, because that would yield (From x To) *
     /// (From x 1), which doesn't math. Instead, we need to matrix multiply the _inverse_ (which is
     /// transpose for a rotation matrix) of `inner` with `x`, which does work:
     ///
@@ -624,6 +624,92 @@ impl<From, To> Rotation<From, To> {
             Angle::new::<radian>(pitch),
             Angle::new::<radian>(roll),
         )
+    }
+
+    /// Constructs a rotation from the components of a [versor] / unit quaternion.
+    ///
+    /// The components are given as `w` (the scalar/real part) and `[i, j, k]` (the
+    /// vector/imaginary part).
+    ///
+    /// The quaternion should represent the rotation that transforms points in `From` into points
+    /// in `To`. This is the intuitive "forward" direction matching the type parameters. The
+    /// quaternion is normalized internally, so the input does not need to be exactly unit length.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use approx::assert_relative_eq;
+    /// use sguaba::{system, math::Rotation};
+    /// use uom::si::{f64::Angle, angle::degree};
+    ///
+    /// system!(struct PlaneNed using NED);
+    /// system!(struct PlaneFrd using FRD);
+    ///
+    /// // construct from Tait-Bryan angles
+    /// let from_angles = unsafe {
+    ///     Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+    ///         .yaw(Angle::new::<degree>(90.0))
+    ///         .pitch(Angle::new::<degree>(45.0))
+    ///         .roll(Angle::new::<degree>(5.0))
+    ///         .build()
+    /// };
+    ///
+    /// // extract quaternion and reconstruct
+    /// let (w, i, j, k) = from_angles.to_quaternion();
+    /// // SAFETY: We know that this quaternion is valid, as we got it from the rotation above.
+    /// let from_quat = unsafe {
+    ///     Rotation::<PlaneNed, PlaneFrd>::from_quaternion(w, i, j, k)
+    /// };
+    ///
+    /// assert_relative_eq!(from_angles, from_quat);
+    /// ```
+    ///
+    /// # Safety
+    ///
+    /// The caller must uphold two invariants:
+    ///
+    /// 1. The provided quaternion correctly rotates from `From` to `To` (and crucially, that no
+    ///    translation is needed). If this is _not_ the correct transform, then this allows moving
+    ///    values between different coordinate system types without adjusting the values correctly,
+    ///    leading to a defeat of their type safety.
+    ///
+    /// 2. The quaternion must be non-zero (ie, not `(0, [0, 0, 0])`).
+    ///    A zero quaternion has no meaningful rotation associated with it.
+    ///    Non-unit quaternions (which don't represent rotations or orientations) are normalized
+    ///    internally and may change their meaning.
+    ///
+    /// [versor]: https://en.wikipedia.org/wiki/Versor
+    #[doc(alias = "from_versor")]
+    #[must_use]
+    pub unsafe fn from_quaternion(w: f64, i: f64, j: f64, k: f64) -> Self {
+        debug_assert_ne!(
+            [w, i, j, k],
+            [0.0, 0.0, 0.0, 0.0],
+            "Quaternion must be non-zero"
+        );
+        let from_to = UnitQuaternion::new_normalize(nalgebra::Quaternion::new(w, i, j, k));
+        Self {
+            inner: from_to.inverse(),
+            from: PhantomData::<From>,
+            to: PhantomData::<To>,
+        }
+    }
+
+    /// Returns the components of the [unit quaternion] that rotates from `From` to `To` as
+    /// `(w, [i, j, k])` where `w` is the scalar/real part and `[i, j, k]` is the vector / imaginary
+    /// part.
+    ///
+    /// The returned quaternion represents the "forward" direction of this rotation, (ie, rotation
+    /// required to go from `From` to `To`), matching the type parameters and the convention of
+    /// [`Rotation::from_quaternion`].
+    ///
+    /// [unit quaternion]: https://en.wikipedia.org/wiki/Versor
+    #[doc(alias = "to_versor")]
+    #[must_use]
+    pub fn to_quaternion(&self) -> (f64, f64, f64, f64) {
+        let from_to = self.inner.inverse();
+        let q = from_to.quaternion();
+        (q.w, q.i, q.j, q.k)
     }
 
     /// Returns the [Euler angles] describing this rotation.
@@ -2872,5 +2958,109 @@ mod tests {
         assert!(debug_str.contains("yaw"));
         assert!(debug_str.contains("pitch"));
         assert!(debug_str.contains("roll"));
+    }
+
+    #[test]
+    fn rotation_quaternion_identity() {
+        let identity =
+            unsafe { Rotation::<PlaneNed, PlaneFrd>::from_quaternion(1.0, 0.0, 0.0, 0.0) };
+        let expected = unsafe { Rotation::<PlaneNed, PlaneFrd>::identity() };
+        assert_relative_eq!(identity, expected);
+    }
+
+    #[test]
+    fn rotation_quaternion_normalization() {
+        let from_unit =
+            unsafe { Rotation::<PlaneNed, PlaneFrd>::from_quaternion(1.0, 0.0, 0.0, 0.0) };
+        let from_scaled =
+            unsafe { Rotation::<PlaneNed, PlaneFrd>::from_quaternion(5.0, 0.0, 0.0, 0.0) };
+        assert_relative_eq!(from_unit, from_scaled);
+    }
+
+    #[test]
+    fn rotation_quaternion_transform_equivalence() {
+        let yaw = d(90.);
+        let pitch = d(45.);
+        let roll = d(5.);
+
+        let from_angles = unsafe {
+            Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+                .yaw(yaw)
+                .pitch(pitch)
+                .roll(roll)
+                .build()
+        };
+
+        let (w, i, j, k) = from_angles.to_quaternion();
+        let from_quat = unsafe { Rotation::<PlaneNed, PlaneFrd>::from_quaternion(w, i, j, k) };
+
+        let point = coordinate!(n = m(100.), e = m(50.), d = m(25.); in PlaneNed);
+
+        assert_relative_eq!(from_angles.transform(point), from_quat.transform(point),);
+    }
+
+    #[test]
+    fn manual_quaternion_construction_compound_rotate() {
+        // Create a rotation from the unit quaternion (1/2, 1/2, 1/2, 1/2), which cyclically maps
+        // the (1,0,0), (0,1,0), (0,0,1) vectors to (0,1,0), (0,0,1), and (1,0,0), respectively.
+        let rotation = unsafe { Rotation::<Ecef, Ecef>::from_quaternion(0.5, 0.5, 0.5, 0.5) };
+
+        let a = coordinate!(x = m(1.0), y = m(0.0), z = m(0.0); in Ecef);
+        let b = coordinate!(x = m(0.0), y = m(1.0), z = m(0.0); in Ecef);
+        let c = coordinate!(x = m(0.0), y = m(0.0), z = m(1.0); in Ecef);
+
+        let a_rot = rotation.transform(a);
+        let b_rot = rotation.transform(b);
+        let c_rot = rotation.transform(c);
+
+        assert_relative_eq!(a_rot, b);
+        assert_relative_eq!(b_rot, c);
+        assert_relative_eq!(c_rot, a);
+    }
+
+    #[rstest]
+    #[case((1.0, 0.0, 0.0, 0.0), (d(0.0), d(0.0), d(0.0)))]
+    #[case((0.0, 1.0, 0.0, 0.0), (d(0.0), d(0.0), d(180.0)))]
+    #[case((0.0, 0.0, 1.0, 0.0), (d(0.0), d(180.0), d(0.0)))]
+    #[case((0.0, 0.0, 0.0, 1.0), (d(180.0), d(0.0), d(0.0)))]
+    #[case((std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2, 0.0, 0.0), (d(0.0), d(0.0), d(90.0)))]
+    #[case((std::f64::consts::FRAC_1_SQRT_2, 0.0, std::f64::consts::FRAC_1_SQRT_2, 0.0), (d(0.0), d(90.0), d(0.0)))]
+    #[case((std::f64::consts::FRAC_1_SQRT_2, 0.0, 0.0, std::f64::consts::FRAC_1_SQRT_2), (d(90.0), d(0.0), d(0.0)))]
+    #[case((-std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2, 0.0, 0.0), (d(0.0), d(0.0), d(-90.0)))]
+    #[case((-std::f64::consts::FRAC_1_SQRT_2, 0.0, std::f64::consts::FRAC_1_SQRT_2, 0.0), (d(0.0), d(-90.0), d(0.0)))]
+    #[case((-std::f64::consts::FRAC_1_SQRT_2, 0.0, 0.0, std::f64::consts::FRAC_1_SQRT_2), (d(-90.0), d(0.0), d(0.0)))]
+    /// Checks that the parameters are handled in the correct order.
+    ///
+    /// We're rotating in a right-handed cartesian coordinate system.
+    /// Tests 2-4 rotate by 180° around the x, y, and z axes.
+    /// Tests 5-7 rotate by 90° around these axes, tests 8-10 by -90° around these axes.
+    ///
+    /// We provide the quaternions and the expected rotations as Tait-Bryan angles (in
+    /// yaw-pitch-roll order).
+    /// To verify that the rotations are indeed correct we map the three basis vectors (1, 0, 0),
+    /// (0, 1, 0), and (0, 0, 1) and having them mapped by the quaternion and the equivalent
+    /// rotation given by Tait-Bryan angles.
+    fn manual_quaternion_construction(
+        #[case] q: (f64, f64, f64, f64),
+        #[case] ypr: (Angle, Angle, Angle),
+    ) {
+        let q_rotation = unsafe { Rotation::<Ecef, Ecef>::from_quaternion(q.0, q.1, q.2, q.3) };
+        // Negate the angles, as the rotation is a rotation _of_ the transformed vector _in_ the
+        // rotated system, see the `from_tait_bryan_angles` documentation for details.
+        let ypr_rotation = unsafe {
+            Rotation::<Ecef, Ecef>::tait_bryan_builder()
+                .yaw(-ypr.0)
+                .pitch(-ypr.1)
+                .roll(-ypr.2)
+                .build()
+        };
+
+        let x = coordinate!(x = m(1.0), y = m(0.0), z = m(0.0); in Ecef);
+        let y = coordinate!(x = m(0.0), y = m(1.0), z = m(0.0); in Ecef);
+        let z = coordinate!(x = m(0.0), y = m(0.0), z = m(1.0); in Ecef);
+
+        assert_relative_eq!(q_rotation.transform(x), ypr_rotation.transform(x));
+        assert_relative_eq!(q_rotation.transform(y), ypr_rotation.transform(y));
+        assert_relative_eq!(q_rotation.transform(z), ypr_rotation.transform(z));
     }
 }
