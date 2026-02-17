@@ -120,7 +120,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! sguaba = { version = "0.9", default-features = false, features = ["libm"] }
+//! sguaba = { version = "*", default-features = false, features = ["libm"] }
 //! ```
 //!
 //! # Examples
