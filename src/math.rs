@@ -3077,4 +3077,78 @@ mod tests {
         assert_relative_eq!(q_rotation.transform(y), ypr_rotation.transform(y));
         assert_relative_eq!(q_rotation.transform(z), ypr_rotation.transform(z));
     }
+
+    #[test]
+    fn velocity_acceleration_vector_multiplication_works() {
+        use crate::vector;
+        use crate::vector::{AccelerationVector, VelocityVector};
+        use uom::si::acceleration::meter_per_second_squared;
+        use uom::si::f64::{Acceleration, Velocity};
+        use uom::si::velocity::meter_per_second;
+
+        let rotation = unsafe {
+            Rotation::<PlaneFrd, SensorFrd>::tait_bryan_builder()
+                .yaw(d(90.))
+                .pitch(d(0.))
+                .roll(d(0.))
+                .build()
+        };
+        let transform = unsafe {
+            RigidBodyTransform::new(
+                vector!(f = m(10.), r = m(0.), d = m(0.); in PlaneFrd),
+                rotation,
+            )
+        };
+
+        // Velocity: 5 m/s forward in PlaneFrd should become 5 m/s right in SensorFrd
+        // after a 90-degree yaw rotation.
+        let vel: VelocityVector<PlaneFrd> = vector!(
+            f = Velocity::new::<meter_per_second>(5.0),
+            r = Velocity::new::<meter_per_second>(0.0),
+            d = Velocity::new::<meter_per_second>(0.0);
+            in PlaneFrd
+        );
+        let acc: AccelerationVector<PlaneFrd> = vector!(
+            f = Acceleration::new::<meter_per_second_squared>(3.0),
+            r = Acceleration::new::<meter_per_second_squared>(0.0),
+            d = Acceleration::new::<meter_per_second_squared>(0.0);
+            in PlaneFrd
+        );
+
+        // Apply rotation and transform to velocity vector
+        let vel_rotated: VelocityVector<SensorFrd> = vel * rotation;
+        let vel_transformed: VelocityVector<SensorFrd> = vel * transform;
+        let expected_vel: VelocityVector<SensorFrd> = vector!(
+            f = Velocity::new::<meter_per_second>(0.0),
+            r = Velocity::new::<meter_per_second>(-5.0),
+            d = Velocity::new::<meter_per_second>(0.0);
+            in SensorFrd
+        );
+        assert_relative_eq!(vel_rotated, expected_vel);
+        assert_relative_eq!(vel_transformed, expected_vel);
+
+        // Multiplying from the left, ie reversing the previous operation
+        let vel_rev_rotated: VelocityVector<PlaneFrd> = rotation * expected_vel;
+        let vel_rev_transformed: VelocityVector<PlaneFrd> = transform * expected_vel;
+        assert_relative_eq!(vel_rev_rotated, vel);
+        assert_relative_eq!(vel_rev_transformed, vel);
+
+        // Apply rotation and transform to acceleration vector
+        let acc_rotated: AccelerationVector<SensorFrd> = acc * rotation;
+        let acc_transformed: AccelerationVector<SensorFrd> = acc * transform;
+        let expected_acc: AccelerationVector<SensorFrd> = vector!(
+            f = Acceleration::new::<meter_per_second_squared>(0.0),
+            r = Acceleration::new::<meter_per_second_squared>(-3.0),
+            d = Acceleration::new::<meter_per_second_squared>(0.0);
+            in SensorFrd
+        );
+        assert_relative_eq!(acc_rotated, expected_acc);
+        assert_relative_eq!(acc_transformed, expected_acc);
+
+        // Multiplying from the left, ie reversing the previous operation
+        let acc_rev_rotated: AccelerationVector<PlaneFrd> = rotation * expected_acc;
+        let acc_rev_transformed: AccelerationVector<PlaneFrd> = transform * expected_acc;
+        assert_relative_eq!(acc_rev_rotated, acc);
+        assert_relative_eq!(acc_rev_transformed, acc);
+    }
 }
