@@ -23,7 +23,6 @@ use crate::float_math::FloatMath;
 use crate::geodetic::Wgs84;
 use crate::systems::EquivalentTo;
 use crate::vectors::{LengthBasedComponents, Vector};
-use typenum::Integer;
 use crate::{
     CoordinateSystem, Isometry3, UnitQuaternion,
     systems::{EnuLike, NedLike},
@@ -34,6 +33,7 @@ use core::fmt::{Display, Formatter};
 use core::marker::PhantomData;
 use core::ops::{Mul, Neg};
 use nalgebra::{Matrix3, Rotation3, Translation3};
+use typenum::Integer;
 use uom::si::angle::radian;
 use uom::si::f64::Angle;
 
