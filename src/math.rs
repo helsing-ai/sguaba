@@ -22,7 +22,8 @@ use crate::coordinates::Coordinate;
 use crate::float_math::FloatMath;
 use crate::geodetic::Wgs84;
 use crate::systems::EquivalentTo;
-use crate::vectors::Vector;
+use crate::vectors::{LengthBasedComponents, Vector};
+use typenum::Integer;
 use crate::{
     CoordinateSystem, Isometry3, UnitQuaternion,
     systems::{EnuLike, NedLike},
@@ -1341,18 +1342,24 @@ impl<From, To> Mul<Coordinate<To>> for Rotation<From, To> {
     }
 }
 
-impl<From, To> Mul<Rotation<From, To>> for Vector<From> {
-    type Output = Vector<To>;
+impl<From, To, Time: Integer> Mul<Rotation<From, To>> for Vector<From, Time>
+where
+    Vector<To, Time>: LengthBasedComponents<To, Time>,
+{
+    type Output = Vector<To, Time>;
 
     fn mul(self, rhs: Rotation<From, To>) -> Self::Output {
         Vector::from_nalgebra_vector(rhs.inner.inverse_transform_vector(&self.inner))
     }
 }
 
-impl<From, To> Mul<Vector<To>> for Rotation<From, To> {
-    type Output = Vector<From>;
+impl<From, To, Time: Integer> Mul<Vector<To, Time>> for Rotation<From, To>
+where
+    Vector<From, Time>: LengthBasedComponents<From, Time>,
+{
+    type Output = Vector<From, Time>;
 
-    fn mul(self, rhs: Vector<To>) -> Self::Output {
+    fn mul(self, rhs: Vector<To, Time>) -> Self::Output {
         Vector::from_nalgebra_vector(self.inner.transform_vector(&rhs.inner))
     }
 }
@@ -1373,18 +1380,24 @@ impl<From, To> Mul<Coordinate<To>> for RigidBodyTransform<From, To> {
     }
 }
 
-impl<From, To> Mul<RigidBodyTransform<From, To>> for Vector<From> {
-    type Output = Vector<To>;
+impl<From, To, Time: Integer> Mul<RigidBodyTransform<From, To>> for Vector<From, Time>
+where
+    Vector<To, Time>: LengthBasedComponents<To, Time>,
+{
+    type Output = Vector<To, Time>;
 
     fn mul(self, rhs: RigidBodyTransform<From, To>) -> Self::Output {
         Vector::from_nalgebra_vector(rhs.inner.inverse_transform_vector(&self.inner))
     }
 }
 
-impl<From, To> Mul<Vector<To>> for RigidBodyTransform<From, To> {
-    type Output = Vector<From>;
+impl<From, To, Time: Integer> Mul<Vector<To, Time>> for RigidBodyTransform<From, To>
+where
+    Vector<From, Time>: LengthBasedComponents<From, Time>,
+{
+    type Output = Vector<From, Time>;
 
-    fn mul(self, rhs: Vector<To>) -> Self::Output {
+    fn mul(self, rhs: Vector<To, Time>) -> Self::Output {
         Vector::from_nalgebra_vector(self.inner.transform_vector(&rhs.inner))
     }
 }
