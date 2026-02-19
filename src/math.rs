@@ -814,6 +814,18 @@ impl<From, To> Rotation<From, To> {
 }
 
 impl<From, To> Rotation<From, To> {
+    /// Chains this rotation with another transform to produce a new combined transform that can
+    /// transform directly from `From` to the final target coordinate system.
+    ///
+    /// This is equivalent to multiplication (`self * rhs`), but can be more readable when
+    /// expressing a sequence of transforms. See also [`RigidBodyTransform::and_then`].
+    pub fn and_then<Transform>(self, rhs: Transform) -> <Self as Mul<Transform>>::Output
+    where
+        Self: Mul<Transform>,
+    {
+        self * rhs
+    }
+
     /// Transforms an element in [`CoordinateSystem`] `From` into `To`.
     #[doc(alias = "apply")]
     pub fn transform<T>(&self, in_from: T) -> <T as Mul<Self>>::Output
@@ -1445,6 +1457,22 @@ impl<From, Over, To> Mul<Rotation<Over, To>> for RigidBodyTransform<From, Over> 
     fn mul(self, rhs: Rotation<Over, To>) -> Self::Output {
         Self::Output {
             inner: self.inner * rhs.inner,
+            from: PhantomData::<From>,
+            to: PhantomData::<To>,
+        }
+    }
+}
+
+// Rotation<From, Over> * RigidBodyTransform<Over, To> -> RigidBodyTransform<From, To>
+//
+// a rotation is an isometry with zero translation, so we can compose them directly
+impl<From, Over, To> Mul<RigidBodyTransform<Over, To>> for Rotation<From, Over> {
+    type Output = RigidBodyTransform<From, To>;
+
+    fn mul(self, rhs: RigidBodyTransform<Over, To>) -> Self::Output {
+        let self_isometry = Isometry3::from_parts(Default::default(), self.inner);
+        Self::Output {
+            inner: self_isometry * rhs.inner,
             from: PhantomData::<From>,
             to: PhantomData::<To>,
         }
@@ -3063,5 +3091,72 @@ mod tests {
         assert_relative_eq!(q_rotation.transform(x), ypr_rotation.transform(x));
         assert_relative_eq!(q_rotation.transform(y), ypr_rotation.transform(y));
         assert_relative_eq!(q_rotation.transform(z), ypr_rotation.transform(z));
+    }
+
+    #[test]
+    fn rotation_and_then_rotation() {
+        let ecef_to_ned = unsafe { Rotation::<Ecef, PlaneNed>::ecef_to_ned_at(d(52.), d(-3.)) };
+        let ned_to_frd = unsafe {
+            Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+                .yaw(d(90.))
+                .pitch(d(45.))
+                .roll(d(0.))
+                .build()
+        };
+
+        let ecef_to_frd_mul = ecef_to_ned * ned_to_frd;
+        let ecef_to_frd_and_then = ecef_to_ned.and_then(ned_to_frd);
+
+        let point = coordinate!(x = m(100.), y = m(200.), z = m(300.); in Ecef);
+        assert_relative_eq!(
+            ecef_to_frd_mul.transform(point),
+            ecef_to_frd_and_then.transform(point),
+        );
+    }
+
+    #[test]
+    fn rotation_and_then_rigid_body_transform() {
+        let ecef_to_ned = unsafe { Rotation::<Ecef, PlaneNed>::ecef_to_ned_at(d(52.), d(-3.)) };
+        let ned_to_frd = unsafe {
+            RigidBodyTransform::<PlaneNed, PlaneFrd>::new(
+                vector!(n = m(10.), e = m(20.), d = m(5.)),
+                Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+                    .yaw(d(90.))
+                    .pitch(d(45.))
+                    .roll(d(0.))
+                    .build(),
+            )
+        };
+
+        let ecef_to_frd = ecef_to_ned.and_then(ned_to_frd);
+
+        // Verify it produces the same result as doing the transforms step by step.
+        let point = coordinate!(x = m(100.), y = m(200.), z = m(300.); in Ecef);
+        let via_chain = ecef_to_frd.transform(point);
+        let via_steps = ned_to_frd.transform(ecef_to_ned.transform(point));
+        assert_relative_eq!(via_chain, via_steps);
+    }
+
+    #[test]
+    fn rotation_mul_rigid_body_transform() {
+        let ecef_to_ned = unsafe { Rotation::<Ecef, PlaneNed>::ecef_to_ned_at(d(52.), d(-3.)) };
+        let ned_to_frd = unsafe {
+            RigidBodyTransform::<PlaneNed, PlaneFrd>::new(
+                vector!(n = m(10.), e = m(20.), d = m(5.)),
+                Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+                    .yaw(d(90.))
+                    .pitch(d(45.))
+                    .roll(d(0.))
+                    .build(),
+            )
+        };
+
+        let ecef_to_frd = ecef_to_ned * ned_to_frd;
+
+        // The inverse should round-trip.
+        let point = coordinate!(x = m(100.), y = m(200.), z = m(300.); in Ecef);
+        let in_frd = ecef_to_frd.transform(point);
+        let back = ecef_to_frd.inverse_transform(in_frd);
+        assert_relative_eq!(point, back);
     }
 }
