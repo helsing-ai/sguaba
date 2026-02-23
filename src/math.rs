@@ -1470,9 +1470,8 @@ impl<From, Over, To> Mul<RigidBodyTransform<Over, To>> for Rotation<From, Over> 
     type Output = RigidBodyTransform<From, To>;
 
     fn mul(self, rhs: RigidBodyTransform<Over, To>) -> Self::Output {
-        let self_isometry = Isometry3::from_parts(Default::default(), self.inner);
         Self::Output {
-            inner: self_isometry * rhs.inner,
+            inner: self.inner * rhs.inner,
             from: PhantomData::<From>,
             to: PhantomData::<To>,
         }
