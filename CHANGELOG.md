@@ -19,6 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.10.1]
+
+### Added
+
+- Add `Rotation::and_then` and `Rotation * RigidBodyTransform`
+  composition, mirroring the existing `RigidBodyTransform::and_then` API
+  ([#80](https://github.com/helsing-ai/sguaba/pull/80))
+- Allow `Rotation` and `RigidBodyTransform` to multiply velocity and
+  acceleration vectors, not just length vectors
+  ([#79](https://github.com/helsing-ai/sguaba/pull/79))
+
 ## [0.10.0]
 
 ### Added
@@ -174,7 +185,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial public release.
 
-[unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/helsing-ai/sguaba/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/helsing-ai/sguaba/compare/v0.9.13...v0.10.0
 [0.9.13]: https://github.com/helsing-ai/sguaba/compare/v0.9.12...v0.9.13
 [0.9.12]: https://github.com/helsing-ai/sguaba/compare/v0.9.11...v0.9.12
