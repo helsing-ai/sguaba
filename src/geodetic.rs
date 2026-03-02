@@ -255,14 +255,7 @@ impl Coordinate<Ecef> {
     pub fn to_wgs84(&self) -> Wgs84 {
         #[cfg(any(debug_assertions, test))]
         {
-            let geo_center_distance_sq = self.point.x * self.point.x
-                + self.point.y * self.point.y
-                + self.point.z * self.point.z;
-
-            if !(ECEF_TO_WGS84_MIN_GEO_CENTER_DISTANCE_M_SQ
-                ..=ECEF_TO_WGS84_MAX_GEO_CENTER_DISTANCE_M_SQ)
-                .contains(&geo_center_distance_sq)
-            {
+            if !self.can_convert_to_wgs84() {
                 panic!(
                     "conversion from ECEF to WGS84 outside altitude range \
             {ECEF_TO_WGS84_MIN_ALTITUDE_M}..{ECEF_TO_WGS84_MAX_ALTITUDE_M} \
@@ -359,6 +352,24 @@ impl Coordinate<Ecef> {
         }
 
         wgs84
+    }
+
+    /// Checks whether this ECEF coordinate is within the altitude range supported by
+    /// [`to_wgs84`][Self::to_wgs84].
+    ///
+    /// The implementation of [`to_wgs84`][Self::to_wgs84] only guarantees correct conversion for
+    /// altitudes between -10km and 50km from the surface of the WGS84 ellipsoid. This method
+    /// returns `true` if the coordinate falls within that range, and `false` otherwise.
+    ///
+    /// In debug builds, [`to_wgs84`][Self::to_wgs84] will panic if this method returns `false`.
+    /// Use this method to check coordinates before conversion if you need to handle out-of-range
+    /// coordinates gracefully.
+    pub fn can_convert_to_wgs84(&self) -> bool {
+        let geo_center_distance_sq =
+            self.point.x * self.point.x + self.point.y * self.point.y + self.point.z * self.point.z;
+
+        (ECEF_TO_WGS84_MIN_GEO_CENTER_DISTANCE_M_SQ..=ECEF_TO_WGS84_MAX_GEO_CENTER_DISTANCE_M_SQ)
+            .contains(&geo_center_distance_sq)
     }
 }
 
