@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [0.10.2] - 2026-03-03
+
+### Added
+
+- Add `Coordinate<Ecef>::can_convert_to_wgs84`
+  ([#83](https://github.com/helsing-ai/sguaba/pull/83))
+
 ## [0.9.14] - 2026-02-25
 
 ### Added
