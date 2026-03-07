@@ -20,6 +20,7 @@ pub(crate) trait FloatMath {
     fn atan(self) -> Self;
     fn atan2(self, other: Self) -> Self;
     fn sqrt(self) -> Self;
+    fn cbrt(self) -> Self;
     fn powi(self, n: i32) -> Self;
     fn abs(self) -> Self;
     fn copysign(self, sign: Self) -> Self;
@@ -65,6 +66,11 @@ impl FloatMath for f64 {
     #[inline]
     fn sqrt(self) -> Self {
         f64::sqrt(self)
+    }
+
+    #[inline]
+    fn cbrt(self) -> Self {
+        f64::cbrt(self)
     }
 
     #[inline]
@@ -123,6 +129,11 @@ impl FloatMath for f64 {
     #[inline]
     fn sqrt(self) -> Self {
         libm::sqrt(self)
+    }
+
+    #[inline]
+    fn cbrt(self) -> Self {
+        libm::cbrt(self)
     }
 
     #[inline]
