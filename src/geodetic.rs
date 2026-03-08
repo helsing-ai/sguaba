@@ -11,7 +11,7 @@ use uom::si::{
 
 #[cfg(any(test, feature = "approx"))]
 use approx::{AbsDiffEq, RelativeEq};
-use core::f64::consts::FRAC_PI_2;
+use core::f64::consts::{FRAC_PI_2, PI};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use uom::ConstZero;
@@ -39,6 +39,15 @@ const SEMI_MINOR_AXIS: f64 = SEMI_MAJOR_AXIS * (1.0 - FLATTENING);
 //     = 1 - 1 + 2 * f - f^2
 //     = 2 * f - f^2
 const ECCENTRICITY_SQ: f64 = 2.0 * FLATTENING - FLATTENING * FLATTENING;
+// l = a^2 * e^4
+#[doc(alias = "l")]
+const L: f64 = (SEMI_MAJOR_AXIS * SEMI_MAJOR_AXIS) * (ECCENTRICITY_SQ * ECCENTRICITY_SQ);
+#[doc(alias = "6*l")]
+const SIX_L: f64 = 6.0 * L;
+#[doc(alias = "1 - e^2")]
+// 1 - e^2 = b^2/a^2
+const SQUARED_AXIS_RATIO: f64 =
+    (SEMI_MINOR_AXIS * SEMI_MINOR_AXIS) / (SEMI_MAJOR_AXIS * SEMI_MAJOR_AXIS);
 
 // Altitude range for which we guarantee From<Ecef> for Wgs84.
 const ECEF_TO_WGS84_MIN_ALTITUDE_M: f64 = -10_000.0;
@@ -354,6 +363,113 @@ impl Coordinate<Ecef> {
         wgs84
     }
 
+    /// Converts an Earth-Centered, Earth-Fixed coordinate into latitude, longitude, and altitude.
+    ///
+    /// Note that this conversion is not trivial and needs to be approximated.
+    ///
+    /// This is a complete closed-form implementation based on the following paper:
+    /// [A complete closed-form method for transformation from Cartesian to geodetic
+    /// coordinates][quan_zhang_2014].
+    ///
+    /// The method is usable over geodetic heights from -6.33×10⁶m to 10¹⁰m. It achieves high
+    /// precision at almost any point including the region near the pole, the equator and the
+    /// center of the reference ellipsoid. This comes at the cost of a roughly 1.5 runtime increase
+    /// over [`to_wgs84`][Self::to_wgs84].
+    ///
+    /// [quan_zhang_2014]: https://link.springer.com/article/10.1007/s00190-024-01821-w
+    #[must_use]
+    pub fn to_wgs84_extended(&self) -> Wgs84 {
+        // Step 1
+        let x = self.point.x;
+        let y = self.point.y;
+        let z = self.point.z;
+
+        let m = FloatMath::powi(x, 2) + FloatMath::powi(y, 2);
+        let n = FloatMath::powi(z, 2);
+        let w = FloatMath::sqrt(m);
+
+        let n_c = SQUARED_AXIS_RATIO * FloatMath::powi(z, 2);
+        let p = m + n_c - L;
+        let q = 27.0 * m * n_c * L;
+
+        // Step 2
+        let p3 = FloatMath::powi(p, 3);
+        let p3q = p3 + q;
+
+        let t = if p3q >= 0.0 {
+            // TODO: Apply optimization if the point is not near the astroid
+            // See: Appendix 1: Step 2
+            //
+            // The difficulty is that the paper doesn't give a threshold for
+            // what is near the astroid.
+            let p3q_root = FloatMath::sqrt(p3q);
+            let q_root = FloatMath::sqrt(q);
+
+            p + FloatMath::cbrt(FloatMath::powi(p3q_root + q_root, 2))
+                + FloatMath::cbrt(FloatMath::powi(p3q_root - q_root, 2))
+        } else {
+            let qp3_root = FloatMath::sqrt(-1.0 * q / p3);
+            -1.0 * p * (qp3_root / FloatMath::cos(FloatMath::acos(qp3_root) / 3.0))
+        };
+
+        // Step 3
+        let u_m = FloatMath::sqrt(36.0 * m * L + FloatMath::powi(t, 2));
+        let u_n_c = FloatMath::sqrt(36.0 * n_c * L + FloatMath::powi(t, 2));
+        let v = u_m + u_n_c;
+        let w_small = 2.0 * t + SIX_L + v;
+
+        let k = (2.0 * (t + u_n_c))
+            / (w_small + FloatMath::sqrt(SIX_L * (w_small + v + 6.0 * (m + n_c))));
+        let i = k * w;
+        let s = FloatMath::sqrt(FloatMath::powi(i, 2) + n);
+
+        // Step 4 & 5
+        let lambda = msign(y) * (PI / 2.0 - 2.0 * FloatMath::atan(x / (w + FloatMath::abs(y))));
+        let (phi, h) = if t == 0.0 && n == 0.0 {
+            let phi = 2.0
+                * FloatMath::atan(
+                    FloatMath::sqrt(L - m)
+                        / (FloatMath::sqrt(L - ECCENTRICITY_SQ * m)
+                            + FloatMath::sqrt(SQUARED_AXIS_RATIO * m)),
+                );
+            let h = -1.0
+                * FloatMath::sqrt(SQUARED_AXIS_RATIO)
+                * FloatMath::sqrt(FloatMath::powi(SEMI_MAJOR_AXIS, 2) - (m / ECCENTRICITY_SQ));
+
+            (phi, h)
+        } else if t > 0.0 || n > 0.0 {
+            let phi = 2.0 * FloatMath::atan(z / (i + s));
+            let h =
+                (w * i + n - SEMI_MAJOR_AXIS * FloatMath::sqrt(FloatMath::powi(i, 2) + n_c)) / s;
+
+            (phi, h)
+        } else {
+            // Check Section 3.1 and 3.2
+            // t is guaranteed to be >=0 and n is z^2 which can only be >=0 by definition
+            unreachable!("Impossible state based on the algorithm in the paper");
+        };
+
+        let lon = lambda;
+        let lat = phi;
+        let altitude = h;
+
+        let wgs84 = Wgs84::builder()
+            .latitude(Angle::new::<radian>(lat))
+            .expect("produces lat in [-pi/2,pi/2]")
+            .longitude(Angle::new::<radian>(lon))
+            .altitude(Length::new::<meter>(altitude))
+            .build();
+
+        #[cfg(all(debug_assertions, any(test, feature = "approx")))]
+        {
+            // double check our math in tests
+            let back_to_ecef = Self::from_wgs84(&wgs84);
+            approx::assert_relative_eq!(self, &back_to_ecef, epsilon = Wgs84::default_epsilon());
+        }
+
+        wgs84
+    }
+
     /// Checks whether this ECEF coordinate is within the altitude range supported by
     /// [`to_wgs84`][Self::to_wgs84].
     ///
@@ -371,6 +487,10 @@ impl Coordinate<Ecef> {
         (ECEF_TO_WGS84_MIN_GEO_CENTER_DISTANCE_M_SQ..=ECEF_TO_WGS84_MAX_GEO_CENTER_DISTANCE_M_SQ)
             .contains(&geo_center_distance_sq)
     }
+}
+
+fn msign(x: f64) -> f64 {
+    if x >= 0.0 { 1.0 } else { -1.0 }
 }
 
 impl From<Coordinate<Ecef>> for Wgs84 {
@@ -1078,6 +1198,58 @@ mod tests {
             drift <= max_drift,
             "drift {drift:?} > max_drift {max_drift:?}"
         );
+    }
+
+    #[rstest]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 5, Length::new::<micrometer>(1.))]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 50, Length::new::<micrometer>(1.))]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 500, Length::new::<micrometer>(1.))]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 5000, Length::new::<micrometer>(1.))]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 50000, Length::new::<micrometer>(1.))]
+    fn wgs84_to_ecef_extended_round_trip_accumulated_drift(
+        #[case] lat: Angle,
+        #[case] long: Angle,
+        #[case] alt: Length,
+        #[case] iterations: usize,
+        #[case] max_drift: Length,
+    ) {
+        let wgs84 = Wgs84::build(Components {
+            latitude: lat,
+            longitude: long,
+            altitude: alt,
+        })
+        .unwrap();
+
+        let original_ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
+        let mut current = original_ecef;
+        for _ in 0..iterations {
+            let current_wgs84 = current.to_wgs84_extended();
+            let ecef = Coordinate::<Ecef>::from_wgs84(&current_wgs84);
+            current = ecef;
+        }
+
+        let drift = Length::new::<meter>((original_ecef.point - current.point).norm());
+
+        assert!(
+            drift <= max_drift,
+            "drift {drift:?} > max_drift {max_drift:?}"
+        );
+    }
+
+    #[test]
+    fn to_wgs84_comp() {
+        let wgs84 = wgs84!(
+            latitude = deg(35.3619),
+            longitude = deg(138.7280),
+            altitude = m(2294.0)
+        );
+
+        let ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
+
+        let wgs84 = ecef.to_wgs84();
+        let wgs84_ext = ecef.to_wgs84_extended();
+
+        assert_relative_eq!(wgs84, wgs84_ext);
     }
 
     #[rstest]
