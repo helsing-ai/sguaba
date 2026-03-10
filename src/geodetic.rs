@@ -11,7 +11,7 @@ use uom::si::{
 
 #[cfg(any(test, feature = "approx"))]
 use approx::{AbsDiffEq, RelativeEq};
-use core::f64::consts::{FRAC_PI_2, PI};
+use core::f64::consts::FRAC_PI_2;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use uom::ConstZero;
@@ -42,8 +42,8 @@ const ECCENTRICITY_SQ: f64 = 2.0 * FLATTENING - FLATTENING * FLATTENING;
 // l = a^2 * e^4
 #[doc(alias = "l")]
 const L: f64 = (SEMI_MAJOR_AXIS * SEMI_MAJOR_AXIS) * (ECCENTRICITY_SQ * ECCENTRICITY_SQ);
-#[doc(alias = "6*l")]
-const SIX_L: f64 = 6.0 * L;
+#[doc(alias = "a^2")]
+const SEMI_MAJOR_AXIS_SQ: f64 = SEMI_MAJOR_AXIS * SEMI_MAJOR_AXIS;
 #[doc(alias = "1 - e^2")]
 // 1 - e^2 = b^2/a^2
 const SQUARED_AXIS_RATIO: f64 =
@@ -369,14 +369,14 @@ impl Coordinate<Ecef> {
     ///
     /// This is a complete closed-form implementation based on the following paper:
     /// [A complete closed-form method for transformation from Cartesian to geodetic
-    /// coordinates][quan_zhang_2014].
+    /// coordinates][quan_zhang_2024].
     ///
     /// The method is usable over geodetic heights from -6.33×10⁶m to 10¹⁰m. It achieves high
     /// precision at almost any point including the region near the pole, the equator and the
     /// center of the reference ellipsoid. This comes at the cost of a roughly 1.5 runtime increase
     /// over [`to_wgs84`][Self::to_wgs84].
     ///
-    /// [quan_zhang_2014]: https://link.springer.com/article/10.1007/s00190-024-01821-w
+    /// [quan_zhang_2024]: https://link.springer.com/article/10.1007/s00190-024-01821-w
     #[must_use]
     pub fn to_wgs84_extended(&self) -> Wgs84 {
         // Step 1
@@ -388,7 +388,7 @@ impl Coordinate<Ecef> {
         let n = FloatMath::powi(z, 2);
         let w = FloatMath::sqrt(m);
 
-        let n_c = SQUARED_AXIS_RATIO * FloatMath::powi(z, 2);
+        let n_c = SQUARED_AXIS_RATIO * n;
         let p = m + n_c - L;
         let q = 27.0 * m * n_c * L;
 
@@ -416,16 +416,17 @@ impl Coordinate<Ecef> {
         let u_m = FloatMath::sqrt(36.0 * m * L + FloatMath::powi(t, 2));
         let u_n_c = FloatMath::sqrt(36.0 * n_c * L + FloatMath::powi(t, 2));
         let v = u_m + u_n_c;
-        let w_small = 2.0 * t + SIX_L + v;
+        let w_small = 2.0 * t + 6.0 * L + v;
 
         let k = (2.0 * (t + u_n_c))
-            / (w_small + FloatMath::sqrt(SIX_L * (w_small + v + 6.0 * (m + n_c))));
+            / (w_small + FloatMath::sqrt(6.0 * L * (w_small + v + 6.0 * (m + n_c))));
         let i = k * w;
         let s = FloatMath::sqrt(FloatMath::powi(i, 2) + n);
 
         // Step 4 & 5
-        let lambda = msign(y) * (PI / 2.0 - 2.0 * FloatMath::atan(x / (w + FloatMath::abs(y))));
+        let lambda = msign(y) * (FRAC_PI_2 - 2.0 * FloatMath::atan(x / (w + FloatMath::abs(y))));
         let (phi, h) = if t == 0.0 && n == 0.0 {
+            // Step 5
             let phi = 2.0
                 * FloatMath::atan(
                     FloatMath::sqrt(L - m)
@@ -433,13 +434,17 @@ impl Coordinate<Ecef> {
                             + FloatMath::sqrt(SQUARED_AXIS_RATIO * m)),
                 );
             let h = -FloatMath::sqrt(SQUARED_AXIS_RATIO)
-                * FloatMath::sqrt(FloatMath::powi(SEMI_MAJOR_AXIS, 2) - (m / ECCENTRICITY_SQ));
+                * FloatMath::sqrt(SEMI_MAJOR_AXIS_SQ - (m / ECCENTRICITY_SQ));
 
             (phi, h)
         } else if t > 0.0 || n > 0.0 {
+            // Step 4
             let phi = 2.0 * FloatMath::atan(z / (i + s));
-            let h =
-                (w * i + n - SEMI_MAJOR_AXIS * FloatMath::sqrt(FloatMath::powi(i, 2) + n_c)) / s;
+            // We use the optimized calculation for h, as we know that Earth is not a
+            // perfect sphere.
+            let h = ((k + ECCENTRICITY_SQ - 1.0) / (ECCENTRICITY_SQ * k)) * s;
+            // let h =
+            //     (w * i + n - SEMI_MAJOR_AXIS * FloatMath::sqrt(FloatMath::powi(i, 2) + n_c)) / s;
 
             (phi, h)
         } else {
@@ -1100,6 +1105,31 @@ mod tests {
         .unwrap();
         let ecef: Coordinate<Ecef> = wgs84.into();
         let _should_panic = ecef.to_wgs84();
+    }
+
+    // Check a few points analogous to `to_wgs84` that should succeed with the extended algorithm.
+    // wgs_ecef_roundtrip verifies that the conversion succeeds within the documented range.
+    #[rstest]
+    #[case(d(0.), d(0.), m(-50_000.))]
+    #[case(d(90.), d(180.), m(-50_000.))]
+    #[case(d(-90.), d(90.), m(-50_000.))]
+    #[case(d(0.), d(0.), m(80_000.))]
+    #[case(d(90.), d(180.), m(80_000.))]
+    #[case(d(-90.), d(90.), m(80_000.))]
+    fn wgs_ecef_extended_conversion_succeeds_for_low_or_high_altitudes(
+        #[case] lat: Angle,
+        #[case] long: Angle,
+        #[case] alt: Length,
+    ) -> () {
+        let wgs84 = Wgs84::build(Components {
+            latitude: lat,
+            longitude: long,
+            altitude: alt,
+        })
+        .unwrap();
+        let ecef: Coordinate<Ecef> = wgs84.into();
+        let should_succeed = ecef.to_wgs84_extended();
+        assert_relative_eq!(wgs84, should_succeed);
     }
 
     #[test]

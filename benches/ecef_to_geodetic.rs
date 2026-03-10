@@ -33,11 +33,11 @@ fn benchmark_conversions(c: &mut Criterion) {
     let mut group = c.benchmark_group("ecef_to_geodetic");
 
     group.bench_function("to_wgs84", |b| {
-        b.iter(|| black_box(ecef.to_wgs84()));
+        b.iter(|| black_box(ecef).to_wgs84());
     });
 
     group.bench_function("to_wgs84_extended", |b| {
-        b.iter(|| black_box(ecef.to_wgs84_extended()));
+        b.iter(|| black_box(ecef).to_wgs84_extended());
     });
 
     group.finish();
