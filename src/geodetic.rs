@@ -46,8 +46,7 @@ const L: f64 = (SEMI_MAJOR_AXIS * SEMI_MAJOR_AXIS) * (ECCENTRICITY_SQ * ECCENTRI
 const SEMI_MAJOR_AXIS_SQ: f64 = SEMI_MAJOR_AXIS * SEMI_MAJOR_AXIS;
 #[doc(alias = "1 - e^2")]
 // 1 - e^2 = b^2/a^2
-const SQUARED_AXIS_RATIO: f64 =
-    (SEMI_MINOR_AXIS * SEMI_MINOR_AXIS) / (SEMI_MAJOR_AXIS * SEMI_MAJOR_AXIS);
+const SQUARED_AXIS_RATIO: f64 = 1. - ECCENTRICITY_SQ;
 
 // Altitude range for which we guarantee From<Ecef> for Wgs84.
 const ECEF_TO_WGS84_MIN_ALTITUDE_M: f64 = -10_000.0;
@@ -418,15 +417,31 @@ impl Coordinate<Ecef> {
         let v = u_m + u_n_c;
         let w_small = 2.0 * t + 6.0 * L + v;
 
+        // There seems to be an error in the paper. Appendix 1 Step 3 describes:
+        // I = k * W = (2.0 * (t + u_n_c)) / (w_small + FloatMath::sqrt(6.0 * L * (w_small + v + 6.0 * (m + n_c))))
+        // But this formula results in incorrect results. Looking at Section 3.3 (45) and (46), it
+        // seems that the given formula describes k only (46). Looking at (45) W still needs to be
+        // multiplied to k to reach I.
+        // I have emailed the author to hopefully receive confirmation of the above assumption.
+        // Currently multiplying with W produces correct results in comparison to `to_wgs84`.
         let k = (2.0 * (t + u_n_c))
             / (w_small + FloatMath::sqrt(6.0 * L * (w_small + v + 6.0 * (m + n_c))));
         let i = k * w;
         let s = FloatMath::sqrt(FloatMath::powi(i, 2) + n);
 
         // Step 4 & 5
-        let lambda = msign(y) * (FRAC_PI_2 - 2.0 * FloatMath::atan(x / (w + FloatMath::abs(y))));
+        let lambda =
+            f64::signum(y) * (FRAC_PI_2 - 2.0 * FloatMath::atan(x / (w + FloatMath::abs(y))));
         let (phi, h) = if t == 0.0 && n == 0.0 {
             // Step 5
+            // The paper states that φ = ±2 arctan(...), so there are two solutions for φ. Reading
+            // the paper and doing some research, it looks like the solution is ambiguous from a
+            // mathematical standpoint. Both solutions are correct, but in practice we need one. In
+            // theory it would be nice to take the sign of the Z coordinate to select the correct
+            // sign for φ, but this case only appears if n == 0 and n = Z², so we have no sign.
+            // Looking at other libraries there is apparently no correct way to choose + or -.
+            // GeographicLib also selects the positive result in the ambiguous case, so we do the
+            // same.
             let phi = 2.0
                 * FloatMath::atan(
                     FloatMath::sqrt(L - m)
@@ -491,10 +506,6 @@ impl Coordinate<Ecef> {
         (ECEF_TO_WGS84_MIN_GEO_CENTER_DISTANCE_M_SQ..=ECEF_TO_WGS84_MAX_GEO_CENTER_DISTANCE_M_SQ)
             .contains(&geo_center_distance_sq)
     }
-}
-
-fn msign(x: f64) -> f64 {
-    if x >= 0.0 { 1.0 } else { -1.0 }
 }
 
 impl From<Coordinate<Ecef>> for Wgs84 {
@@ -1031,7 +1042,7 @@ mod tests {
         }
     }
 
-    fn try_wgs_ecef_roundtrip(wgs84: Wgs84) {
+    fn try_wgs_ecef_roundtrip(wgs84: Wgs84, extended: bool) {
         let ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
 
         let lat = wgs84.latitude;
@@ -1051,7 +1062,11 @@ mod tests {
         // precision when going from ECEF to lat/lon.
         assert_relative_eq!(ecef, expected_ecef, epsilon = Wgs84::default_epsilon());
 
-        let wgs_84_result = Wgs84::from(ecef);
+        let wgs_84_result = if extended {
+            ecef.to_wgs84_extended()
+        } else {
+            Wgs84::from(ecef)
+        };
         assert_relative_eq!(wgs_84_result, wgs84);
 
         // also double-check that rotations of 360° are fine
@@ -1077,8 +1092,8 @@ mod tests {
     }
 
     quickcheck! {
-        fn wgs_ecef_roundtrip(wgs84: Wgs84) -> () {
-            try_wgs_ecef_roundtrip(wgs84);
+        fn wgs_ecef_roundtrip(wgs84: Wgs84, extended: bool) -> () {
+            try_wgs_ecef_roundtrip(wgs84, extended);
         }
     }
 
@@ -1163,6 +1178,7 @@ mod tests {
                 altitude: alt,
             })
             .expect("lat in [-90,90]"),
+            false,
         );
     }
 
