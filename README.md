@@ -6,7 +6,7 @@ algebra.
 
 See also [Helsing's announcement blog post][blog].
 
-[blog]: https://blog.helsing.ai/sguaba-hard-to-misuse-rigid-body-transforms-for-engineers-with-other-things-to-worry-about-than-aeaa45af9e0d
+[blog]: https://blog.helsing.ai/posts/sguaba-hard-to-misuse-rigid-body-transforms-for-engineers-with-other-things-to-worry-about-than-line/
 
 ## Naming
 
