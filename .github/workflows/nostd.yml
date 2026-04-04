@@ -23,7 +23,7 @@ jobs:
         with:
           submodules: true
       - name: Install stable
-        uses: dtolnay/rust-toolchain@6d653acede28d24f02e3cd41383119e8b1b35921 # branch=master
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # branch=master
         with:
           toolchain: stable
       - name: rustup target add ${{ matrix.target }}
