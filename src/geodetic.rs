@@ -309,7 +309,7 @@ impl Coordinate<Ecef> {
         self.to_wgs84_fast_inner()
     }
 
-    fn to_wgs84_fast_inner(&self) -> Wgs84 {
+    fn to_wgs84_fast_inner(self) -> Wgs84 {
         let lon = FloatMath::atan2(self.point.y, self.point.x);
 
         // interestingly, there is no single way to convert from ECEF to WGS84.
@@ -429,7 +429,7 @@ impl Coordinate<Ecef> {
         self.to_wgs84_extended_inner()
     }
 
-    fn to_wgs84_extended_inner(&self) -> Wgs84 {
+    fn to_wgs84_extended_inner(self) -> Wgs84 {
         // Step 1
         let x = self.point.x;
         let y = self.point.y;
