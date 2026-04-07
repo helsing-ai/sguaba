@@ -253,8 +253,8 @@ impl Coordinate<Ecef> {
     /// The implementation currently only guarantees conversion to WGS84 datums with altitude
     /// between -10km and 50km from the surface of the WGS84 ellipsoid, roughly corresponding
     /// to the bottom of the Mariana Trench to the top of the stratosphere. Outside this range,
-    /// the implementation may panic. If a wider altitude range is required
-    /// prefer [`to_wgs84_extended`].
+    /// the implementation may panic. If a wider altitude range is required, prefer
+    /// [`to_wgs84_extended`].
     ///
     /// This implementation currently uses [Ferrari's solution][ferrari], but this may change
     /// in the future.
