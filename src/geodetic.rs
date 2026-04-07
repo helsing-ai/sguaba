@@ -47,9 +47,20 @@ const SEMI_MAJOR_AXIS_SQ: f64 = SEMI_MAJOR_AXIS * SEMI_MAJOR_AXIS;
 #[doc(alias = "1 - e^2")]
 const SQUARED_AXIS_RATIO: f64 = 1. - ECCENTRICITY_SQ;
 
+// Altitude range for which we guarantee Coordinate<Ecef>::to_wgs84_fast will work.
+const ECEF_TO_WGS84_FAST_MIN_ALTITUDE_M: f64 = -10_000.0;
+const ECEF_TO_WGS84_FAST_MAX_ALTITUDE_M: f64 = 50_000.0;
+
+const ECEF_TO_WGS84_FAST_MIN_GEO_CENTER_DISTANCE_M_SQ: f64 = (SEMI_MINOR_AXIS
+    + ECEF_TO_WGS84_FAST_MIN_ALTITUDE_M)
+    * (SEMI_MINOR_AXIS + ECEF_TO_WGS84_FAST_MIN_ALTITUDE_M);
+const ECEF_TO_WGS84_FAST_MAX_GEO_CENTER_DISTANCE_M_SQ: f64 = (SEMI_MAJOR_AXIS
+    + ECEF_TO_WGS84_FAST_MAX_ALTITUDE_M)
+    * (SEMI_MAJOR_AXIS + ECEF_TO_WGS84_FAST_MAX_ALTITUDE_M);
+
 // Altitude range for which we guarantee From<Ecef> for Wgs84.
-const ECEF_TO_WGS84_MIN_ALTITUDE_M: f64 = -10_000.0;
-const ECEF_TO_WGS84_MAX_ALTITUDE_M: f64 = 50_000.0;
+const ECEF_TO_WGS84_MIN_ALTITUDE_M: f64 = -6.3e6;
+const ECEF_TO_WGS84_MAX_ALTITUDE_M: f64 = 10e10;
 
 const ECEF_TO_WGS84_MIN_GEO_CENTER_DISTANCE_M_SQ: f64 = (SEMI_MINOR_AXIS
     + ECEF_TO_WGS84_MIN_ALTITUDE_M)
@@ -249,29 +260,56 @@ impl Coordinate<Ecef> {
     ///
     /// Note that this conversion is not trivial and needs to be approximated.
     ///
+    /// The method is usable over geodetic heights from -6.33×10⁶m to 10¹⁰m.
+    ///
+    /// This implementation currently uses different solutions depending on the geodetic height of
+    /// the chosen point. It uses [`to_wgs84_fast`][Self::to_wgs84_fast] for points near the
+    /// surface of the Earth and the slower [`to_wgs84_extended`][Self::to_wgs84_extended] for all
+    /// other points, but this may change in the future.
+    ///
+    /// Since this implementation branches depending on the geodetic height of `self`, you may want
+    /// to call [`to_wgs84_fast`][Self::to_wgs84_fast] directly for maximal performance if you know
+    /// you will never exceed its supported range.
+    #[must_use]
+    pub fn to_wgs84(&self) -> Wgs84 {
+        if self.is_in_fast_wgs84_range() {
+            self.to_wgs84_fast_inner()
+        } else {
+            self.to_wgs84_extended()
+        }
+    }
+
+    /// Converts an Earth-Centered, Earth-Fixed coordinate into latitude, longitude, and altitude.
+    ///
+    /// Note that this conversion is not trivial and needs to be approximated.
+    ///
     /// The implementation currently only guarantees conversion to WGS84 datums with altitude
     /// between -10km and 50km from the surface of the WGS84 ellipsoid, roughly corresponding
-    /// to the bottom of the Mariana Trench to the top of the stratosphere. Outside this range,
-    /// the implementation may panic. If a wider altitude range is required, prefer
-    /// [`to_wgs84_extended`].
+    /// to the bottom of the Mariana Trench to the top of the stratosphere. However, it is also a
+    /// decent amount faster than [`to_wgs84`][Self::to_wgs84]. Outside this range, the
+    /// implementation may panic. If a wider altitude range is required, prefer
+    /// [`to_wgs84`][Self::to_wgs84].
     ///
     /// This implementation currently uses [Ferrari's solution][ferrari], but this may change
     /// in the future.
     ///
     /// [ferrari]: https://en.wikipedia.org/wiki/Geographic_coordinate_conversion#The_application_of_Ferrari's_solution
     #[must_use]
-    pub fn to_wgs84(&self) -> Wgs84 {
+    pub fn to_wgs84_fast(&self) -> Wgs84 {
         #[cfg(any(debug_assertions, test))]
         {
-            if !self.can_convert_to_wgs84() {
+            if !self.is_in_fast_wgs84_range() {
                 panic!(
-                    "conversion from ECEF to WGS84 outside altitude range \
-            {ECEF_TO_WGS84_MIN_ALTITUDE_M}..{ECEF_TO_WGS84_MAX_ALTITUDE_M} \
+                    "fast conversion from ECEF to WGS84 outside altitude range \
+            {ECEF_TO_WGS84_FAST_MIN_ALTITUDE_M}..{ECEF_TO_WGS84_FAST_MAX_ALTITUDE_M} \
             is not supported: {self}"
                 )
             }
         }
+        self.to_wgs84_fast_inner()
+    }
 
+    fn to_wgs84_fast_inner(&self) -> Wgs84 {
         let lon = FloatMath::atan2(self.point.y, self.point.x);
 
         // interestingly, there is no single way to convert from ECEF to WGS84.
@@ -373,11 +411,25 @@ impl Coordinate<Ecef> {
     /// The method is usable over geodetic heights from -6.33×10⁶m to 10¹⁰m. It achieves high
     /// precision at almost any point including the region near the pole, the equator and the
     /// center of the reference ellipsoid. This comes at the cost of a roughly 1.5 runtime increase
-    /// over [`to_wgs84`][Self::to_wgs84].
+    /// over [`to_wgs84`][Self::to_wgs84]. Outside this range, the implementation may panic.
     ///
     /// [quan_zhang_2024]: https://link.springer.com/article/10.1007/s00190-024-01821-w
     #[must_use]
     pub fn to_wgs84_extended(&self) -> Wgs84 {
+        #[cfg(any(debug_assertions, test))]
+        {
+            if !self.can_convert_to_wgs84() {
+                panic!(
+                    "conversion from ECEF to WGS84 outside altitude range \
+            {ECEF_TO_WGS84_MIN_ALTITUDE_M}..{ECEF_TO_WGS84_MAX_ALTITUDE_M} \
+            is not supported: {self}"
+                )
+            }
+        }
+        self.to_wgs84_extended_inner()
+    }
+
+    fn to_wgs84_extended_inner(&self) -> Wgs84 {
         // Step 1
         let x = self.point.x;
         let y = self.point.y;
@@ -490,11 +542,31 @@ impl Coordinate<Ecef> {
     }
 
     /// Checks whether this ECEF coordinate is within the altitude range supported by
+    /// [`to_wgs84_fast`][Self::to_wgs84_fast].
+    ///
+    /// The implementation of [`to_wgs84_fast`][Self::to_wgs84_fast] only guarantees correct
+    /// conversion for geodetic heights between -10km and 50km from the surface of the WGS84
+    /// ellipsoid. This method returns `true` if the coordinate falls within that range, and
+    /// `false` otherwise.
+    ///
+    /// In debug builds, [`to_wgs84_fast`][Self::to_wgs84_fast] will panic if this method returns
+    /// `false`. Use this method to check coordinates before conversion if you need to handle
+    /// out-of-range coordinates gracefully.
+    pub fn is_in_fast_wgs84_range(&self) -> bool {
+        let geo_center_distance_sq =
+            self.point.x * self.point.x + self.point.y * self.point.y + self.point.z * self.point.z;
+
+        (ECEF_TO_WGS84_FAST_MIN_GEO_CENTER_DISTANCE_M_SQ
+            ..=ECEF_TO_WGS84_FAST_MAX_GEO_CENTER_DISTANCE_M_SQ)
+            .contains(&geo_center_distance_sq)
+    }
+
+    /// Checks whether this ECEF coordinate is within the altitude range supported by
     /// [`to_wgs84`][Self::to_wgs84].
     ///
     /// The implementation of [`to_wgs84`][Self::to_wgs84] only guarantees correct conversion for
-    /// altitudes between -10km and 50km from the surface of the WGS84 ellipsoid. This method
-    /// returns `true` if the coordinate falls within that range, and `false` otherwise.
+    /// geodetic heights from -6.33×10⁶m to 10¹⁰m from the surface of the WGS84 ellipsoid. This
+    /// method returns `true` if the coordinate falls within that range, and `false` otherwise.
     ///
     /// In debug builds, [`to_wgs84`][Self::to_wgs84] will panic if this method returns `false`.
     /// Use this method to check coordinates before conversion if you need to handle out-of-range
@@ -1106,8 +1178,8 @@ mod tests {
     #[case(d(0.), d(0.), m(80_000.))]
     #[case(d(90.), d(180.), m(80_000.))]
     #[case(d(-90.), d(90.), m(80_000.))]
-    #[should_panic(expected = "conversion from ECEF to WGS84 outside altitude range")]
-    fn wgs_ecef_conversion_fails_for_low_or_high_altitudes(
+    #[should_panic(expected = "fast conversion from ECEF to WGS84 outside altitude range")]
+    fn wgs_ecef_fast_conversion_fails_for_low_or_high_altitudes(
         #[case] lat: Angle,
         #[case] long: Angle,
         #[case] alt: Length,
@@ -1119,7 +1191,8 @@ mod tests {
         })
         .unwrap();
         let ecef: Coordinate<Ecef> = wgs84.into();
-        let _should_panic = ecef.to_wgs84();
+        let _should_not_panic = ecef.to_wgs84();
+        let _should_panic = ecef.to_wgs84_fast();
     }
 
     // Check a few points analogous to `to_wgs84` that should succeed with the extended algorithm.
