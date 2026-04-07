@@ -37,3 +37,9 @@ rstest = "0.26.1"
 serde_yaml = "0.9.34"
 insta = "1.41.1"
 quickcheck = "1.0.3"
+criterion = { version = "0.8.2", features = ["html_reports"] }
+
+
+[[bench]]
+name = "ecef_to_geodetic"
+harness = false

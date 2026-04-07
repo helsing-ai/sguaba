@@ -39,10 +39,28 @@ const SEMI_MINOR_AXIS: f64 = SEMI_MAJOR_AXIS * (1.0 - FLATTENING);
 //     = 1 - 1 + 2 * f - f^2
 //     = 2 * f - f^2
 const ECCENTRICITY_SQ: f64 = 2.0 * FLATTENING - FLATTENING * FLATTENING;
+// l = a^2 * e^4
+#[doc(alias = "l")]
+const L: f64 = (SEMI_MAJOR_AXIS * SEMI_MAJOR_AXIS) * (ECCENTRICITY_SQ * ECCENTRICITY_SQ);
+#[doc(alias = "a^2")]
+const SEMI_MAJOR_AXIS_SQ: f64 = SEMI_MAJOR_AXIS * SEMI_MAJOR_AXIS;
+#[doc(alias = "1 - e^2")]
+const SQUARED_AXIS_RATIO: f64 = 1. - ECCENTRICITY_SQ;
+
+// Altitude range for which we guarantee Coordinate<Ecef>::to_wgs84_fast will work.
+const ECEF_TO_WGS84_FAST_MIN_ALTITUDE_M: f64 = -10_000.0;
+const ECEF_TO_WGS84_FAST_MAX_ALTITUDE_M: f64 = 50_000.0;
+
+const ECEF_TO_WGS84_FAST_MIN_GEO_CENTER_DISTANCE_M_SQ: f64 = (SEMI_MINOR_AXIS
+    + ECEF_TO_WGS84_FAST_MIN_ALTITUDE_M)
+    * (SEMI_MINOR_AXIS + ECEF_TO_WGS84_FAST_MIN_ALTITUDE_M);
+const ECEF_TO_WGS84_FAST_MAX_GEO_CENTER_DISTANCE_M_SQ: f64 = (SEMI_MAJOR_AXIS
+    + ECEF_TO_WGS84_FAST_MAX_ALTITUDE_M)
+    * (SEMI_MAJOR_AXIS + ECEF_TO_WGS84_FAST_MAX_ALTITUDE_M);
 
 // Altitude range for which we guarantee From<Ecef> for Wgs84.
-const ECEF_TO_WGS84_MIN_ALTITUDE_M: f64 = -10_000.0;
-const ECEF_TO_WGS84_MAX_ALTITUDE_M: f64 = 50_000.0;
+const ECEF_TO_WGS84_MIN_ALTITUDE_M: f64 = -6.3e6;
+const ECEF_TO_WGS84_MAX_ALTITUDE_M: f64 = 10e10;
 
 const ECEF_TO_WGS84_MIN_GEO_CENTER_DISTANCE_M_SQ: f64 = (SEMI_MINOR_AXIS
     + ECEF_TO_WGS84_MIN_ALTITUDE_M)
@@ -242,28 +260,56 @@ impl Coordinate<Ecef> {
     ///
     /// Note that this conversion is not trivial and needs to be approximated.
     ///
+    /// The method is usable over geodetic heights from -6.33×10⁶m to 10¹⁰m.
+    ///
+    /// This implementation currently uses different solutions depending on the geodetic height of
+    /// the chosen point. It uses [`to_wgs84_fast`][Self::to_wgs84_fast] for points near the
+    /// surface of the Earth and the slower [`to_wgs84_extended`][Self::to_wgs84_extended] for all
+    /// other points, but this may change in the future.
+    ///
+    /// Since this implementation branches depending on the geodetic height of `self`, you may want
+    /// to call [`to_wgs84_fast`][Self::to_wgs84_fast] directly for maximal performance if you know
+    /// you will never exceed its supported range.
+    #[must_use]
+    pub fn to_wgs84(&self) -> Wgs84 {
+        if self.is_in_fast_wgs84_range() {
+            self.to_wgs84_fast_inner()
+        } else {
+            self.to_wgs84_extended()
+        }
+    }
+
+    /// Converts an Earth-Centered, Earth-Fixed coordinate into latitude, longitude, and altitude.
+    ///
+    /// Note that this conversion is not trivial and needs to be approximated.
+    ///
     /// The implementation currently only guarantees conversion to WGS84 datums with altitude
     /// between -10km and 50km from the surface of the WGS84 ellipsoid, roughly corresponding
-    /// to the bottom of the Mariana Trench to the top of the stratosphere. Outside this range,
-    /// the implementation may panic.
+    /// to the bottom of the Mariana Trench to the top of the stratosphere. However, it is also a
+    /// decent amount faster than [`to_wgs84`][Self::to_wgs84]. Outside this range, the
+    /// implementation may panic. If a wider altitude range is required, prefer
+    /// [`to_wgs84`][Self::to_wgs84].
     ///
     /// This implementation currently uses [Ferrari's solution][ferrari], but this may change
     /// in the future.
     ///
     /// [ferrari]: https://en.wikipedia.org/wiki/Geographic_coordinate_conversion#The_application_of_Ferrari's_solution
     #[must_use]
-    pub fn to_wgs84(&self) -> Wgs84 {
+    pub fn to_wgs84_fast(&self) -> Wgs84 {
         #[cfg(any(debug_assertions, test))]
         {
-            if !self.can_convert_to_wgs84() {
+            if !self.is_in_fast_wgs84_range() {
                 panic!(
-                    "conversion from ECEF to WGS84 outside altitude range \
-            {ECEF_TO_WGS84_MIN_ALTITUDE_M}..{ECEF_TO_WGS84_MAX_ALTITUDE_M} \
+                    "fast conversion from ECEF to WGS84 outside altitude range \
+            {ECEF_TO_WGS84_FAST_MIN_ALTITUDE_M}..{ECEF_TO_WGS84_FAST_MAX_ALTITUDE_M} \
             is not supported: {self}"
                 )
             }
         }
+        self.to_wgs84_fast_inner()
+    }
 
+    fn to_wgs84_fast_inner(self) -> Wgs84 {
         let lon = FloatMath::atan2(self.point.y, self.point.x);
 
         // interestingly, there is no single way to convert from ECEF to WGS84.
@@ -354,12 +400,173 @@ impl Coordinate<Ecef> {
         wgs84
     }
 
+    /// Converts an Earth-Centered, Earth-Fixed coordinate into latitude, longitude, and altitude.
+    ///
+    /// Note that this conversion is not trivial and needs to be approximated.
+    ///
+    /// This is a complete closed-form implementation based on the following paper:
+    /// [A complete closed-form method for transformation from Cartesian to geodetic
+    /// coordinates][quan_zhang_2024].
+    ///
+    /// The method is usable over geodetic heights from -6.33×10⁶m to 10¹⁰m. It achieves high
+    /// precision at almost any point including the region near the pole, the equator and the
+    /// center of the reference ellipsoid. This comes at the cost of a roughly 1.5 runtime increase
+    /// over [`to_wgs84`][Self::to_wgs84]. Outside this range, the implementation may panic.
+    ///
+    /// [quan_zhang_2024]: https://link.springer.com/article/10.1007/s00190-024-01821-w
+    #[must_use]
+    pub fn to_wgs84_extended(&self) -> Wgs84 {
+        #[cfg(any(debug_assertions, test))]
+        {
+            if !self.can_convert_to_wgs84() {
+                panic!(
+                    "conversion from ECEF to WGS84 outside altitude range \
+            {ECEF_TO_WGS84_MIN_ALTITUDE_M}..{ECEF_TO_WGS84_MAX_ALTITUDE_M} \
+            is not supported: {self}"
+                )
+            }
+        }
+        self.to_wgs84_extended_inner()
+    }
+
+    fn to_wgs84_extended_inner(self) -> Wgs84 {
+        // Step 1
+        let x = self.point.x;
+        let y = self.point.y;
+        let z = self.point.z;
+
+        let m = FloatMath::powi(x, 2) + FloatMath::powi(y, 2);
+        let n = FloatMath::powi(z, 2);
+        let w = FloatMath::sqrt(m);
+
+        let n_c = SQUARED_AXIS_RATIO * n;
+        let p = m + n_c - L;
+        let q = 27.0 * m * n_c * L;
+
+        // Step 2
+        let p3 = FloatMath::powi(p, 3);
+        let p3q = p3 + q;
+
+        let t = if p3q >= 0.0 {
+            // TODO: Apply optimization if the point is not near the astroid
+            // See: Appendix 1: Step 2
+            //
+            // The difficulty is that the paper doesn't give a threshold for
+            // what is near the astroid.
+            let p3q_root = FloatMath::sqrt(p3q);
+            let q_root = FloatMath::sqrt(q);
+
+            p + FloatMath::cbrt(FloatMath::powi(p3q_root + q_root, 2))
+                + FloatMath::cbrt(FloatMath::powi(p3q_root - q_root, 2))
+        } else {
+            let qp3_root = FloatMath::sqrt(-q / p3);
+            -p * (qp3_root / FloatMath::cos(FloatMath::acos(qp3_root) / 3.0))
+        };
+
+        // Step 3
+        let u_m = FloatMath::sqrt(36.0 * m * L + FloatMath::powi(t, 2));
+        let u_n_c = FloatMath::sqrt(36.0 * n_c * L + FloatMath::powi(t, 2));
+        let v = u_m + u_n_c;
+        let w_small = 2.0 * t + 6.0 * L + v;
+
+        // There seems to be an error in the paper. Appendix 1 Step 3 describes:
+        // I = k * W = (2.0 * (t + u_n_c)) / (w_small + FloatMath::sqrt(6.0 * L * (w_small + v + 6.0 * (m + n_c))))
+        // But this formula results in incorrect results. Looking at Section 3.3 (45) and (46), it
+        // seems that the given formula describes k only (46). Looking at (45) W still needs to be
+        // multiplied to k to reach I.
+        // I have emailed the author to hopefully receive confirmation of the above assumption.
+        // Currently multiplying with W produces correct results in comparison to `to_wgs84`.
+        let k = (2.0 * (t + u_n_c))
+            / (w_small + FloatMath::sqrt(6.0 * L * (w_small + v + 6.0 * (m + n_c))));
+        let i = k * w;
+        let s = FloatMath::sqrt(FloatMath::powi(i, 2) + n);
+
+        // Step 4 & 5
+        let lambda =
+            f64::signum(y) * (FRAC_PI_2 - 2.0 * FloatMath::atan(x / (w + FloatMath::abs(y))));
+        let (phi, h) = if t == 0.0 && n == 0.0 {
+            // Step 5
+            // The paper states that φ = ±2 arctan(...), so there are two solutions for φ. Reading
+            // the paper and doing some research, it looks like the solution is ambiguous from a
+            // mathematical standpoint. Both solutions are correct, but in practice we need one. In
+            // theory it would be nice to take the sign of the Z coordinate to select the correct
+            // sign for φ, but this case only appears if n == 0 and n = Z², so we have no sign.
+            // Looking at other libraries there is apparently no correct way to choose + or -.
+            // GeographicLib also selects the positive result in the ambiguous case, so we do the
+            // same.
+            let phi = 2.0
+                * FloatMath::atan(
+                    FloatMath::sqrt(L - m)
+                        / (FloatMath::sqrt(L - ECCENTRICITY_SQ * m)
+                            + FloatMath::sqrt(SQUARED_AXIS_RATIO * m)),
+                );
+            let h = -FloatMath::sqrt(SQUARED_AXIS_RATIO)
+                * FloatMath::sqrt(SEMI_MAJOR_AXIS_SQ - (m / ECCENTRICITY_SQ));
+
+            (phi, h)
+        } else if t > 0.0 || n > 0.0 {
+            // Step 4
+            let phi = 2.0 * FloatMath::atan(z / (i + s));
+            // We use the optimized calculation for h, as we know that Earth is not a
+            // perfect sphere.
+            let h = ((k + ECCENTRICITY_SQ - 1.0) / (ECCENTRICITY_SQ * k)) * s;
+            // let h =
+            //     (w * i + n - SEMI_MAJOR_AXIS * FloatMath::sqrt(FloatMath::powi(i, 2) + n_c)) / s;
+
+            (phi, h)
+        } else {
+            // Check Section 3.1 and 3.2
+            // t is guaranteed to be >=0 and n is z^2 which can only be >=0 by definition
+            unreachable!("Impossible state based on the algorithm in the paper");
+        };
+
+        let lon = lambda;
+        let lat = phi;
+        let altitude = h;
+
+        let wgs84 = Wgs84::builder()
+            .latitude(Angle::new::<radian>(lat))
+            .expect("produces lat in [-pi/2,pi/2]")
+            .longitude(Angle::new::<radian>(lon))
+            .altitude(Length::new::<meter>(altitude))
+            .build();
+
+        #[cfg(all(debug_assertions, any(test, feature = "approx")))]
+        {
+            // double check our math in tests
+            let back_to_ecef = Self::from_wgs84(&wgs84);
+            approx::assert_relative_eq!(self, &back_to_ecef, epsilon = Wgs84::default_epsilon());
+        }
+
+        wgs84
+    }
+
+    /// Checks whether this ECEF coordinate is within the altitude range supported by
+    /// [`to_wgs84_fast`][Self::to_wgs84_fast].
+    ///
+    /// The implementation of [`to_wgs84_fast`][Self::to_wgs84_fast] only guarantees correct
+    /// conversion for geodetic heights between -10km and 50km from the surface of the WGS84
+    /// ellipsoid. This method returns `true` if the coordinate falls within that range, and
+    /// `false` otherwise.
+    ///
+    /// In debug builds, [`to_wgs84_fast`][Self::to_wgs84_fast] will panic if this method returns
+    /// `false`. Use this method to check coordinates before conversion if you need to handle
+    /// out-of-range coordinates gracefully.
+    pub fn is_in_fast_wgs84_range(&self) -> bool {
+        let geo_center_distance_sq =
+            self.point.x * self.point.x + self.point.y * self.point.y + self.point.z * self.point.z;
+
+        (ECEF_TO_WGS84_FAST_MIN_GEO_CENTER_DISTANCE_M_SQ
+            ..=ECEF_TO_WGS84_FAST_MAX_GEO_CENTER_DISTANCE_M_SQ)
+            .contains(&geo_center_distance_sq)
+    }
+
     /// Checks whether this ECEF coordinate is within the altitude range supported by
     /// [`to_wgs84`][Self::to_wgs84].
     ///
     /// The implementation of [`to_wgs84`][Self::to_wgs84] only guarantees correct conversion for
-    /// altitudes between -10km and 50km from the surface of the WGS84 ellipsoid. This method
-    /// returns `true` if the coordinate falls within that range, and `false` otherwise.
+    /// geodetic heights from -6.33×10⁶m to 10¹⁰m from the surface of the WGS84 ellipsoid. This
+    /// method returns `true` if the coordinate falls within that range, and `false` otherwise.
     ///
     /// In debug builds, [`to_wgs84`][Self::to_wgs84] will panic if this method returns `false`.
     /// Use this method to check coordinates before conversion if you need to handle out-of-range
@@ -907,7 +1114,7 @@ mod tests {
         }
     }
 
-    fn try_wgs_ecef_roundtrip(wgs84: Wgs84) {
+    fn try_wgs_ecef_roundtrip(wgs84: Wgs84, extended: bool) {
         let ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
 
         let lat = wgs84.latitude;
@@ -927,7 +1134,11 @@ mod tests {
         // precision when going from ECEF to lat/lon.
         assert_relative_eq!(ecef, expected_ecef, epsilon = Wgs84::default_epsilon());
 
-        let wgs_84_result = Wgs84::from(ecef);
+        let wgs_84_result = if extended {
+            ecef.to_wgs84_extended()
+        } else {
+            Wgs84::from(ecef)
+        };
         assert_relative_eq!(wgs_84_result, wgs84);
 
         // also double-check that rotations of 360° are fine
@@ -953,8 +1164,8 @@ mod tests {
     }
 
     quickcheck! {
-        fn wgs_ecef_roundtrip(wgs84: Wgs84) -> () {
-            try_wgs_ecef_roundtrip(wgs84);
+        fn wgs_ecef_roundtrip(wgs84: Wgs84, extended: bool) -> () {
+            try_wgs_ecef_roundtrip(wgs84, extended);
         }
     }
 
@@ -967,8 +1178,8 @@ mod tests {
     #[case(d(0.), d(0.), m(80_000.))]
     #[case(d(90.), d(180.), m(80_000.))]
     #[case(d(-90.), d(90.), m(80_000.))]
-    #[should_panic(expected = "conversion from ECEF to WGS84 outside altitude range")]
-    fn wgs_ecef_conversion_fails_for_low_or_high_altitudes(
+    #[should_panic(expected = "fast conversion from ECEF to WGS84 outside altitude range")]
+    fn wgs_ecef_fast_conversion_fails_for_low_or_high_altitudes(
         #[case] lat: Angle,
         #[case] long: Angle,
         #[case] alt: Length,
@@ -980,7 +1191,33 @@ mod tests {
         })
         .unwrap();
         let ecef: Coordinate<Ecef> = wgs84.into();
-        let _should_panic = ecef.to_wgs84();
+        let _should_not_panic = ecef.to_wgs84();
+        let _should_panic = ecef.to_wgs84_fast();
+    }
+
+    // Check a few points analogous to `to_wgs84` that should succeed with the extended algorithm.
+    // wgs_ecef_roundtrip verifies that the conversion succeeds within the documented range.
+    #[rstest]
+    #[case(d(0.), d(0.), m(-50_000.))]
+    #[case(d(90.), d(180.), m(-50_000.))]
+    #[case(d(-90.), d(90.), m(-50_000.))]
+    #[case(d(0.), d(0.), m(80_000.))]
+    #[case(d(90.), d(180.), m(80_000.))]
+    #[case(d(-90.), d(90.), m(80_000.))]
+    fn wgs_ecef_extended_conversion_succeeds_for_low_or_high_altitudes(
+        #[case] lat: Angle,
+        #[case] long: Angle,
+        #[case] alt: Length,
+    ) -> () {
+        let wgs84 = Wgs84::build(Components {
+            latitude: lat,
+            longitude: long,
+            altitude: alt,
+        })
+        .unwrap();
+        let ecef: Coordinate<Ecef> = wgs84.into();
+        let should_succeed = ecef.to_wgs84_extended();
+        assert_relative_eq!(wgs84, should_succeed);
     }
 
     #[test]
@@ -1014,6 +1251,7 @@ mod tests {
                 altitude: alt,
             })
             .expect("lat in [-90,90]"),
+            false,
         );
     }
 
@@ -1078,6 +1316,58 @@ mod tests {
             drift <= max_drift,
             "drift {drift:?} > max_drift {max_drift:?}"
         );
+    }
+
+    #[rstest]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 5, Length::new::<micrometer>(1.))]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 50, Length::new::<micrometer>(1.))]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 500, Length::new::<micrometer>(1.))]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 5000, Length::new::<micrometer>(1.))]
+    #[case(d(35.3619), d(138.7280), m(2294.0), 50000, Length::new::<micrometer>(1.))]
+    fn wgs84_to_ecef_extended_round_trip_accumulated_drift(
+        #[case] lat: Angle,
+        #[case] long: Angle,
+        #[case] alt: Length,
+        #[case] iterations: usize,
+        #[case] max_drift: Length,
+    ) {
+        let wgs84 = Wgs84::build(Components {
+            latitude: lat,
+            longitude: long,
+            altitude: alt,
+        })
+        .unwrap();
+
+        let original_ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
+        let mut current = original_ecef;
+        for _ in 0..iterations {
+            let current_wgs84 = current.to_wgs84_extended();
+            let ecef = Coordinate::<Ecef>::from_wgs84(&current_wgs84);
+            current = ecef;
+        }
+
+        let drift = Length::new::<meter>((original_ecef.point - current.point).norm());
+
+        assert!(
+            drift <= max_drift,
+            "drift {drift:?} > max_drift {max_drift:?}"
+        );
+    }
+
+    #[test]
+    fn to_wgs84_comp() {
+        let wgs84 = wgs84!(
+            latitude = deg(35.3619),
+            longitude = deg(138.7280),
+            altitude = m(2294.0)
+        );
+
+        let ecef = Coordinate::<Ecef>::from_wgs84(&wgs84);
+
+        let wgs84 = ecef.to_wgs84();
+        let wgs84_ext = ecef.to_wgs84_extended();
+
+        assert_relative_eq!(wgs84, wgs84_ext);
     }
 
     #[rstest]
