@@ -45,7 +45,6 @@ const L: f64 = (SEMI_MAJOR_AXIS * SEMI_MAJOR_AXIS) * (ECCENTRICITY_SQ * ECCENTRI
 #[doc(alias = "a^2")]
 const SEMI_MAJOR_AXIS_SQ: f64 = SEMI_MAJOR_AXIS * SEMI_MAJOR_AXIS;
 #[doc(alias = "1 - e^2")]
-// 1 - e^2 = b^2/a^2
 const SQUARED_AXIS_RATIO: f64 = 1. - ECCENTRICITY_SQ;
 
 // Altitude range for which we guarantee From<Ecef> for Wgs84.
