@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.10.3] - 2026-04-07
+
+### Added
+
 - Add `Coordinate<Ecef>::to_wgs84_extended`
   and `Coordinate<Ecef>::to_wgs84_fast` (formerly `to_wgs84`)
   ([#85](https://github.com/helsing-ai/sguaba/pull/85)).
@@ -20,14 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Coordinate<Ecef>::to_wgs84` now delegates to `_extended` or `_fast`
   depending on geodetic height, and thus now has a much wider useful
   range ([#85](https://github.com/helsing-ai/sguaba/pull/85)).
-
-### Deprecated
-
-### Removed
-
-### Fixed
-
-### Security
 
 ## [0.10.2] - 2026-03-03
 
