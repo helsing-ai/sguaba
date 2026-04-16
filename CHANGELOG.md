@@ -214,7 +214,9 @@ Backports both changes from 0.10.1 by user request.
 
 Initial public release.
 
-[Unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.10.3...HEAD
+[0.10.3]: https://github.com/helsing-ai/sguaba/compare/v0.10.2...v0.10.3
+[0.10.2]: https://github.com/helsing-ai/sguaba/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/helsing-ai/sguaba/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/helsing-ai/sguaba/compare/v0.9.13...v0.10.0
 [0.9.14]: https://github.com/helsing-ai/sguaba/compare/v0.9.13...v0.9.14
