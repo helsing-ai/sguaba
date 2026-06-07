@@ -1084,6 +1084,22 @@ impl<In> Mul<uom::si::f64::Time> for Vector<In, N1> {
         LengthBasedComponents::from_cartesian(self.to_cartesian().map(|v| v * duration))
     }
 }
+// dividing a length vector by time gives you a velocity vector
+impl<In> Div<uom::si::f64::Time> for Vector<In, Z0> {
+    type Output = Vector<In, N1>;
+
+    fn div(self, duration: uom::si::f64::Time) -> Self::Output {
+        LengthBasedComponents::from_cartesian(self.to_cartesian().map(|v| v / duration))
+    }
+}
+// dividing a velocity vector by time gives you an acceleration vector
+impl<In> Div<uom::si::f64::Time> for Vector<In, N1> {
+    type Output = Vector<In, N2>;
+
+    fn div(self, duration: uom::si::f64::Time) -> Self::Output {
+        LengthBasedComponents::from_cartesian(self.to_cartesian().map(|v| v / duration))
+    }
+}
 
 impl<In, Time: Integer> Mul<f64> for Vector<In, Time> {
     type Output = Self;
@@ -1969,6 +1985,22 @@ mod tests {
             let len: Vector<TestFrd, Z0> =
                 vel * uom::si::f64::Time::new::<uom::si::time::second>(2.0);
             assert_eq!(len.to_cartesian(), [m(2.0), m(4.0), m(6.0)]);
+        }
+
+        #[test]
+        fn divide_length_by_time_gives_velocity() {
+            let len = vector!(f = m(2.0), r = m(4.0), d = m(6.0); in TestFrd);
+            let vel: Vector<TestFrd, N1> =
+                len / uom::si::f64::Time::new::<uom::si::time::second>(2.0);
+            assert_eq!(vel.to_cartesian(), [mps(1.0), mps(2.0), mps(3.0)]);
+        }
+
+        #[test]
+        fn divide_velocity_by_time_gives_acceleration() {
+            let vel = vector!(f = mps(3.0), r = mps(6.0), d = mps(9.0); in TestFrd);
+            let acc: Vector<TestFrd, N2> =
+                vel / uom::si::f64::Time::new::<uom::si::time::second>(3.0);
+            assert_eq!(acc.to_cartesian(), [mps2(1.0), mps2(2.0), mps2(3.0)]);
         }
     }
 }
