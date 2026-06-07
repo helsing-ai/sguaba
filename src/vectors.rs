@@ -751,6 +751,17 @@ where
         Self::from_nalgebra_vector(self.inner.normalize())
     }
 
+    /// Returns a unit vector with the same direction as this vector.
+    ///
+    /// Returns `None` if this is the zero vector.
+    /// Avoids producing non-finite components when normalizing a zero vector.
+    #[must_use]
+    pub fn try_normalized(&self) -> Option<Self> {
+        self.inner
+            .try_normalize(0.0)
+            .map(Self::from_nalgebra_vector)
+    }
+
     /// Computes the dot (scalar) product between this vector and another.
     ///
     /// Note that this method's return value is unitless since the unit of the dot product is not
@@ -1390,6 +1401,22 @@ mod tests {
         fn zero_vector_works() {
             let v = Vector::<TestFrd>::zero();
             assert_eq!(v.to_cartesian(), [m(0.0), m(0.0), m(0.0)]);
+        }
+
+        #[test]
+        fn try_normalized_zero_vector_returns_none() {
+            let v = Vector::<TestFrd>::zero();
+
+            assert_eq!(v.try_normalized(), None);
+        }
+
+        #[test]
+        fn try_normalized_nonzero_vector_returns_unit_vector() {
+            let v = vector!(f = m(3.0), r = m(0.0), d = m(4.0); in TestFrd);
+
+            let normalized = v.try_normalized().expect("non-zero vector");
+
+            assert_abs_diff_eq!(normalized.magnitude().get::<meter>(), 1.0);
         }
 
         #[test]
