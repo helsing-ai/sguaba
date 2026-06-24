@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `Vector::try_normalized` ([#99](https://github.com/helsing-ai/sguaba/pull/99)).
 ### Changed
 
 ### Deprecated

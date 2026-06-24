@@ -753,12 +753,11 @@ where
 
     /// Returns a unit vector with the same direction as this vector.
     ///
-    /// Returns `None` if this is the zero vector.
-    /// Avoids producing non-finite components when normalizing a zero vector.
+    /// Returns `None` if this vector's magnitude is less than or equal to `min_norm`.
     #[must_use]
-    pub fn try_normalized(&self) -> Option<Self> {
+    pub fn try_normalized(&self, min_norm: f64) -> Option<Self> {
         self.inner
-            .try_normalize(0.0)
+            .try_normalize(min_norm)
             .map(Self::from_nalgebra_vector)
     }
 
@@ -1407,16 +1406,23 @@ mod tests {
         fn try_normalized_zero_vector_returns_none() {
             let v = Vector::<TestFrd>::zero();
 
-            assert_eq!(v.try_normalized(), None);
+            assert_eq!(v.try_normalized(0.0), None);
         }
 
         #[test]
         fn try_normalized_nonzero_vector_returns_unit_vector() {
             let v = vector!(f = m(3.0), r = m(0.0), d = m(4.0); in TestFrd);
 
-            let normalized = v.try_normalized().expect("non-zero vector");
+            let normalized = v.try_normalized(0.0).expect("non-zero vector");
 
             assert_abs_diff_eq!(normalized.magnitude().get::<meter>(), 1.0);
+        }
+
+        #[test]
+        fn try_normalized_returns_none_below_min_norm() {
+            let v = vector!(f = m(3.0), r = m(0.0), d = m(4.0); in TestFrd); // magnitude is 5, but we set min_norm to 6
+
+            assert_eq!(v.try_normalized(6.0), None);
         }
 
         #[test]
