@@ -130,7 +130,7 @@ jobs:
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # branch=master
         with:
           toolchain: ${{ matrix.msrv }}
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # tag=v5.0.4
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # tag=v6.1.0
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-cargo
