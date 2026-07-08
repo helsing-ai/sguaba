@@ -19,7 +19,7 @@ std = ["nalgebra/std", "uom/std", "serde/std"]
 [dependencies]
 approx = { version = "0.5.1", optional = true }
 libm = { version = "0.2.8", optional = true }
-nalgebra = { version = "0.34.1", default-features = false }
+nalgebra = { version = "0.35.0", default-features = false }
 serde = { version = "1.0.215", default-features = false, features = ["derive"], optional = true }
 typenum = "1.18.0"
 uom = { version = "0.38.0", default-features = false, features = ["autoconvert", "si", "f64"] }
