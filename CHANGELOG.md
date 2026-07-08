@@ -9,9 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `Vector::try_normalized` ([#99](https://github.com/helsing-ai/sguaba/pull/99)).
-- Allow dividing length and velocity vectors by time ([#98](https://github.com/helsing-ai/sguaba/pull/98)).
-
 ### Changed
 
 ### Deprecated
@@ -21,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Security
+
+## [0.10.4] - 2026-07-08
+
+### Added
+
+- Add `Vector::try_normalized` ([#99](https://github.com/helsing-ai/sguaba/pull/99)).
+- Allow dividing length and velocity vectors by time ([#98](https://github.com/helsing-ai/sguaba/pull/98)).
 
 ## [0.10.3] - 2026-04-07
 
@@ -217,7 +221,8 @@ Backports both changes from 0.10.1 by user request.
 
 Initial public release.
 
-[Unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.10.3...HEAD
+[Unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.10.4...HEAD
+[0.10.4]: https://github.com/helsing-ai/sguaba/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/helsing-ai/sguaba/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/helsing-ai/sguaba/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/helsing-ai/sguaba/compare/v0.10.0...v0.10.1
