@@ -120,7 +120,7 @@ jobs:
     # https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
     strategy:
       matrix:
-        msrv: ["1.87.0"] # nalgebra
+        msrv: ["1.89.0"] # nalgebra
     name: ubuntu / ${{ matrix.msrv }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # tag=v7.0.0
