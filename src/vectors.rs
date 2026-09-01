@@ -791,6 +791,21 @@ where
         }
     }
 
+    /// Rotates this vector around the rotation axis based on [Rodrigues' rotation formula][rrf].
+    ///
+    /// ```text
+    /// v' = v * cos(θ) + (k x v) * sin(θ) + k(k * v)(1 - cos(θ))
+    /// ```
+    ///
+    /// [rrf]: https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
+    pub fn rotate(&self, rotation_axis: &Self, rotation: Angle) -> Self {
+        let rotation_axis = rotation_axis.normalized();
+        let rotation = rotation.get::<radian>();
+        self.scale(rotation.cos())
+            + rotation_axis.cross(self).scale(rotation.sin())
+            + rotation_axis * (rotation_axis.dot(self)) * (1.0 - rotation.cos())
+    }
+
     /// Multiply each component of the vector by the given `real`.
     ///
     /// Equivalent to `self * real`, notably useful for method chaining.
@@ -1690,6 +1705,24 @@ mod tests {
             // u =  4.0 *  1.0 - -3.0 * -1.0 =   1.0
             let v4 = vector!(e = m(-11.0), n = m(-14.0), u = m(1.0); in TestEnu);
             assert_abs_diff_eq!(v3, v4);
+        }
+
+        #[test]
+        fn rotate() {
+            let v1 = vector!(e = m(4.0), n = m(-3.0), u = m(2.0); in TestEnu);
+            let rotation_axis = vector!(e = m(-1.0), n = m(1.0), u = m(3.0); in TestEnu);
+            let rotation_angle = Angle::new::<degree>(50.0);
+            let v2 = v1.rotate(&rotation_axis, rotation_angle);
+
+            // Limiting to 5 significant digits here, the values are specific enough that
+            // if we make a mistake in the implementation, we'll see it quickly
+            //
+            // Expected result verified via:
+            // 1. manual computation of the formula
+            // 2. <https://www.vcalc.com/wiki/vector-rotation>
+            assert_abs_diff_eq!(v2.enu_east().get::<meter>(), 5.14431, epsilon = 1e-5);
+            assert_abs_diff_eq!(v2.enu_north().get::<meter>(), 1.27276, epsilon = 1e-5);
+            assert_abs_diff_eq!(v2.enu_up().get::<meter>(), 0.95718, epsilon = 1e-5);
         }
     }
 
