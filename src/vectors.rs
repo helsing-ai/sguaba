@@ -785,6 +785,14 @@ where
         }
     }
 
+    /// Multiply each component of the vector by the given `real`.
+    ///
+    /// Equivalent to `self * real`, notably useful for method chaining.
+    #[must_use]
+    pub fn scale(&self, real: f64) -> Self {
+        *self * real
+    }
+
     /// Computes the bearing of the vector as if the vector starts at the origin of `In`.
     ///
     /// Returns `None` if the vector has zero length, as the azimuth is then ill-defined.
@@ -1654,6 +1662,15 @@ mod tests {
             assert_abs_diff_eq!(yaw.get::<degree>(), 90.0, epsilon = 1e-10);
             assert_abs_diff_eq!(pitch.get::<degree>(), -45.0, epsilon = 1e-10);
             assert_abs_diff_eq!(roll.get::<degree>(), 0.0, epsilon = 1e-10);
+        }
+
+        #[test]
+        fn scale() {
+            let v = vector!(e = m(4.0), n = m(-3.0), u = m(2.0); in TestEnu);
+            let v2 = v.scale(2.5);
+            assert_abs_diff_eq!(v2.enu_east().get::<meter>(), 10.0, epsilon = 1e-10);
+            assert_abs_diff_eq!(v2.enu_north().get::<meter>(), -7.5, epsilon = 1e-10);
+            assert_abs_diff_eq!(v2.enu_up().get::<meter>(), 5.0, epsilon = 1e-10);
         }
     }
 
