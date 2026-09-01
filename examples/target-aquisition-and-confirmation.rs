@@ -74,7 +74,7 @@ fn main() {
 
     println!(
         "[GROUNDC] Radar confirmed aircraft at {}",
-        &plane_ecef.to_wgs84()
+        plane_ecef.to_wgs84()
     );
 
     let transform_ecef_to_plane_ned =
@@ -98,7 +98,7 @@ fn main() {
 
     println!(
         "[GROUNDC] Standby for visual inspection of target at {}",
-        &plane_target_ecef.to_wgs84()
+        plane_target_ecef.to_wgs84()
     );
 
     let target_ground_enu = transform_ecef_to_ground_enu.transform(plane_target_ecef);
@@ -131,7 +131,7 @@ fn main() {
 
     println!(
         "[GROUNDC] Confirmed target locked at {}, cleared to engage",
-        &ground_control_target_ecef.to_wgs84()
+        ground_control_target_ecef.to_wgs84()
     );
 
     println!("[FRANK01] Copy, target confirmed and locked, weapons hot");
