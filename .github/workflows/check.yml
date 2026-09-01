@@ -120,6 +120,7 @@ jobs:
     # https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
     strategy:
       matrix:
+        # If you increase this, update it in `../../Cargo.toml` too
         msrv: ["1.89.0"] # nalgebra
     name: ubuntu / ${{ matrix.msrv }}
     steps:
