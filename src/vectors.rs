@@ -761,6 +761,12 @@ where
             .map(Self::from_nalgebra_vector)
     }
 
+    /// Computes the cross product between this vector and another.
+    #[must_use]
+    pub fn cross(&self, rhs: &Self) -> Self {
+        Self::from_nalgebra_vector(self.inner.cross(&rhs.inner))
+    }
+
     /// Computes the dot (scalar) product between this vector and another.
     ///
     /// Note that this method's return value is unitless since the unit of the dot product is not
@@ -783,6 +789,14 @@ where
             system: self.system,
             unit: self.unit,
         }
+    }
+
+    /// Multiply each component of the vector by the given `real`.
+    ///
+    /// Equivalent to `self * real`, notably useful for method chaining.
+    #[must_use]
+    pub fn scale(&self, real: f64) -> Self {
+        *self * real
     }
 
     /// Computes the bearing of the vector as if the vector starts at the origin of `In`.
@@ -1654,6 +1668,28 @@ mod tests {
             assert_abs_diff_eq!(yaw.get::<degree>(), 90.0, epsilon = 1e-10);
             assert_abs_diff_eq!(pitch.get::<degree>(), -45.0, epsilon = 1e-10);
             assert_abs_diff_eq!(roll.get::<degree>(), 0.0, epsilon = 1e-10);
+        }
+
+        #[test]
+        fn scale() {
+            let v = vector!(e = m(4.0), n = m(-3.0), u = m(2.0); in TestEnu);
+            let v2 = v.scale(2.5);
+            assert_abs_diff_eq!(v2.enu_east().get::<meter>(), 10.0, epsilon = 1e-10);
+            assert_abs_diff_eq!(v2.enu_north().get::<meter>(), -7.5, epsilon = 1e-10);
+            assert_abs_diff_eq!(v2.enu_up().get::<meter>(), 5.0, epsilon = 1e-10);
+        }
+
+        #[test]
+        fn cross() {
+            let v1 = vector!(e = m(4.0), n = m(-3.0), u = m(2.0); in TestEnu);
+            let v2 = vector!(e = m(-1.0), n = m(1.0), u = m(3.0); in TestEnu);
+
+            let v3 = v1.cross(&v2);
+            // e = -3.0 *  3.0 -  2.0 *  1.0 = -11.0
+            // n =  2.0 * -1.0 -  4.0 *  3.0 = -14.0
+            // u =  4.0 *  1.0 - -3.0 * -1.0 =   1.0
+            let v4 = vector!(e = m(-11.0), n = m(-14.0), u = m(1.0); in TestEnu);
+            assert_abs_diff_eq!(v3, v4);
         }
     }
 
