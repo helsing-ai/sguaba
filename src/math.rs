@@ -183,7 +183,8 @@ where
             0.,
             -sin_phi,
         );
-        let rot = Rotation3::from_matrix(&matrix);
+        // Orthonormal with determinant +1, precondition for from_matrix_unchecked
+        let rot = Rotation3::from_matrix_unchecked(matrix);
 
         Self {
             inner: UnitQuaternion::from_rotation_matrix(&rot),
@@ -238,7 +239,8 @@ where
             cos_phi,
             sin_phi,
         );
-        let rot = Rotation3::from_matrix(&matrix);
+        // Orthonormal with determinant +1, precondition for from_matrix_unchecked
+        let rot = Rotation3::from_matrix_unchecked(matrix);
 
         Self {
             inner: UnitQuaternion::from_rotation_matrix(&rot),
@@ -1705,12 +1707,13 @@ mod tests {
     use crate::util::BoundedAngle;
     use crate::vectors::Vector;
     use crate::{Bearing, Point3, Vector3, coordinate, vector};
+    use approx::abs_diff_eq;
     use approx::assert_abs_diff_eq;
     use approx::assert_relative_eq;
     use rstest::rstest;
     use std::format;
     use uom::si::f64::{Angle, Length};
-    use uom::si::{angle::degree, length::meter};
+    use uom::si::{angle::degree, angle::radian, length::meter};
 
     fn m(meters: f64) -> Length {
         Length::new::<meter>(meters)
@@ -2149,6 +2152,105 @@ mod tests {
 
         let result_ned_down_in_ecef = pose.inverse_transform(point_on_down);
         assert_relative_eq!(result_ned_down_in_ecef, ned_down_in_ecef);
+    }
+
+    /// Regression test: `ecef_to_ned_at` and `ecef_to_enu_at` used to return (nearly) the identity
+    /// at the positions annotated below. This was caused by nalgebra upstream issue:
+    /// https://github.com/dimforge/nalgebra/issues/1512
+    ///
+    /// The rotation is a half turn where `(1 - sin phi)(1 + cos lambda) == 0` for NED, so at the
+    /// north pole and on the antimeridian, and where `(1 + sin phi)(1 - sin lambda) == 0` for ENU,
+    /// so at the south pole and on the +90 degree meridian.
+    #[test]
+    fn local_tangent_plane_axes_match_closed_form() {
+        let positions = [
+            // half turns where `Rotation3::from_matrix` stalled and returned the identity matrix
+            (d(90.), d(0.)),      // NED
+            (d(47.4), d(180.)),   // NED
+            (d(-13.5), d(180.)),  // NED
+            (d(-13.5), d(-180.)), // NED
+            (d(-90.), d(30.7)),   // ENU
+            (d(23.5), d(90.)),    // ENU
+            (d(-47.4), d(90.)),   // ENU
+            // half turns that come out right, by luck of floating point rounding
+            (d(90.), d(45.7)),
+            (d(-90.), d(0.)),
+            (d(0.), d(180.)),
+            (d(0.), d(-180.)),
+            (d(45.), d(90.)),
+            // ordinary positions
+            (d(0.), d(0.)),
+            (d(52.), d(-3.)),
+            (d(47.9948211), d(7.8211606)),
+            (d(-27.270950), d(143.722880)),
+            (d(84.883074), d(-29.160550)),
+            (d(-64.5), d(-179.9)),
+        ];
+
+        for (lat, long) in positions {
+            let (phi, lambda) = (lat.get::<radian>(), long.get::<radian>());
+            let (sin_phi, cos_phi) = (phi.sin(), phi.cos());
+            let (sin_lambda, cos_lambda) = (lambda.sin(), lambda.cos());
+
+            let up = vector!(
+                x = m(cos_phi * cos_lambda),
+                y = m(cos_phi * sin_lambda),
+                z = m(sin_phi);
+                in Ecef
+            );
+            let east = vector!(x = m(-sin_lambda), y = m(cos_lambda), z = m(0.); in Ecef);
+            let north = vector!(
+                x = m(-sin_phi * cos_lambda),
+                y = m(-sin_phi * sin_lambda),
+                z = m(cos_phi);
+                in Ecef
+            );
+
+            let ecef_to_ned = unsafe { Rotation::<Ecef, PlaneNed>::ecef_to_ned_at(lat, long) };
+            let ecef_to_enu = unsafe { Rotation::<Ecef, PlaneEnu>::ecef_to_enu_at(lat, long) };
+
+            let axes = [
+                (
+                    "N",
+                    ecef_to_ned.inverse_transform(Vector::<PlaneNed>::ned_north_axis()),
+                    north,
+                ),
+                (
+                    "E",
+                    ecef_to_ned.inverse_transform(Vector::<PlaneNed>::ned_east_axis()),
+                    east,
+                ),
+                (
+                    "D",
+                    ecef_to_ned.inverse_transform(Vector::<PlaneNed>::ned_down_axis()),
+                    -up,
+                ),
+                (
+                    "E (of ENU)",
+                    ecef_to_enu.inverse_transform(Vector::<PlaneEnu>::enu_east_axis()),
+                    east,
+                ),
+                (
+                    "N (of ENU)",
+                    ecef_to_enu.inverse_transform(Vector::<PlaneEnu>::enu_north_axis()),
+                    north,
+                ),
+                (
+                    "U",
+                    ecef_to_enu.inverse_transform(Vector::<PlaneEnu>::enu_up_axis()),
+                    up,
+                ),
+            ];
+
+            for (axis, got, want) in axes {
+                assert!(
+                    abs_diff_eq!(got, want, epsilon = 1e-12),
+                    "{axis} axis at {}/{} degrees: got {got}, want {want}",
+                    lat.get::<degree>(),
+                    long.get::<degree>()
+                );
+            }
+        }
     }
 
     #[test]

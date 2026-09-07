@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `RigidBodyTransform::ecef_to_ned_at` and `ecef_to_enu_at` returned something close to the
+  identity matrix for inputs at the poles and on the antimeridian, where the rotation from ECEF
+  is a half turn. The fixed implementation is ~50x faster.
+
 ### Security
 
 ## [0.10.5] - 2026-09-07
