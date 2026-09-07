@@ -9,9 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `Vector::scale()` and `Vector::cross()` ([#108](https://github.com/helsing-ai/sguaba/pull/108))
-- Add `Vector::rotate()` ([#109](https://github.com/helsing-ai/sguaba/pull/109))
-
 ### Changed
 
 ### Deprecated
@@ -21,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Security
+
+## [0.10.5] - 2026-09-07
+
+### Added
+
+- Add `Vector::scale()` and `Vector::cross()` ([#108](https://github.com/helsing-ai/sguaba/pull/108))
+- Add `Vector::rotate()` ([#109](https://github.com/helsing-ai/sguaba/pull/109))
 
 ## [0.10.4] - 2026-07-08
 
