@@ -250,16 +250,19 @@ where
     }
 }
 
+/// Rotation between an [`EnuLike`] frame and [`NedLike`] frame at the same origin.
+/// It is a half turn, so the same value converts either way.
+// Inline because the function's body is optimized away to just fill out a constant return value.
+#[inline]
 fn swap_x_y_negate_z_quaternion() -> UnitQuaternion {
-    use nalgebra::{Matrix3, Rotation3, UnitQuaternion};
-
     const SWAP_X_Y_NEGATE_Z: [f64; 9] = [
         0.0, 1.0, 0.0, // swap x and y
         1.0, 0.0, 0.0, // swap x and y
         0.0, 0.0, -1.0, // negate z
     ];
     let m = Matrix3::from_row_slice(&SWAP_X_Y_NEGATE_Z);
-    UnitQuaternion::from_rotation_matrix(&Rotation3::from_matrix(&m))
+    // `from_matrix` spends a few us iterating and returns the same quaternion to 2e-16, so skip it
+    UnitQuaternion::from_rotation_matrix(&Rotation3::from_matrix_unchecked(m))
 }
 
 impl<From, To> Rotation<From, To>

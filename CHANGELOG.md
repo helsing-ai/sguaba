@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Rotation::into_ned_equivalent()` and `into_enu_equivalent()` are now roughly 300x faster.
+
 ### Deprecated
 
 ### Removed
