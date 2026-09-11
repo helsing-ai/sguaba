@@ -762,8 +762,12 @@ where
     }
 
     /// Computes the cross product between this vector and another.
+    // NOTE: this is private at the moment because it returns a wrongly typed vector
+    //       (`[m]` when it should be `[m^2]`).
+    //       Since this is only used for `rotate()`, where one of the vector is the unit-less
+    //       unit vector it's fine there but most likely not anywhere else
     #[must_use]
-    pub fn cross(&self, rhs: &Self) -> Self {
+    fn cross(&self, rhs: &Self) -> Self {
         Self::from_nalgebra_vector(self.inner.cross(&rhs.inner))
     }
 
@@ -802,6 +806,8 @@ where
         let rotation_axis = rotation_axis.normalized();
         let rotation = rotation.get::<radian>();
         self.scale(rotation.cos())
+            // NOTE: `rotation_axis`, while being of type `Self`, is actually a unit-less unit
+            //       vector so the cross product does not introduce unit issues
             + rotation_axis.cross(self).scale(rotation.sin())
             + rotation_axis * (rotation_axis.dot(self)) * (1.0 - rotation.cos())
     }

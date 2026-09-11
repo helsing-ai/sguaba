@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed `Vector::cross()` ([#115](https://github.com/helsing-ai/sguaba/pull/115))
+
 ### Fixed
 
 ### Security
