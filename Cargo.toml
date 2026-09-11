@@ -43,5 +43,5 @@ criterion = { version = "0.8.2", features = ["html_reports"] }
 
 
 [[bench]]
-name = "ecef_to_geodetic"
+name = "ecef"
 harness = false
