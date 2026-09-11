@@ -15,11 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Removed `Vector::cross()` ([#115](https://github.com/helsing-ai/sguaba/pull/115))
-
 ### Fixed
 
 ### Security
+
+## [0.10.6] - 2026-09-11
+
+This release yanks 0.10.5 due to the issue identified in
+<https://github.com/helsing-ai/sguaba/issues/114>.
+
+### Removed
+
+- Removed `Vector::cross()` ([#115](https://github.com/helsing-ai/sguaba/pull/115))
 
 ## [0.10.5] - 2026-09-07
 
@@ -230,7 +237,9 @@ Backports both changes from 0.10.1 by user request.
 
 Initial public release.
 
-[Unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.10.4...HEAD
+[Unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.10.6...HEAD
+[0.10.6]: https://github.com/helsing-ai/sguaba/compare/v0.10.5...v0.10.6
+[0.10.5]: https://github.com/helsing-ai/sguaba/compare/v0.10.4...v0.10.5
 [0.10.4]: https://github.com/helsing-ai/sguaba/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/helsing-ai/sguaba/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/helsing-ai/sguaba/compare/v0.10.1...v0.10.2
