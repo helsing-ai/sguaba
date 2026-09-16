@@ -11,19 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `Rotation::into_ned_equivalent()` and `into_enu_equivalent()` are now roughly 300x faster.
-
 ### Deprecated
 
 ### Removed
 
 ### Fixed
 
+### Security
+
+## [0.10.7] - 2026-09-16
+
+### Changed
+
+- `Rotation::into_ned_equivalent()` and `into_enu_equivalent()` are now roughly 300x faster.
+
+### Fixed
+
 - `RigidBodyTransform::ecef_to_ned_at` and `ecef_to_enu_at` returned something close to the
   identity matrix for inputs at the poles and on the antimeridian, where the rotation from ECEF
   is a half turn. The fixed implementation is ~50x faster.
-
-### Security
 
 ## [0.10.6] - 2026-09-11
 
@@ -243,7 +249,8 @@ Backports both changes from 0.10.1 by user request.
 
 Initial public release.
 
-[Unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.10.6...HEAD
+[Unreleased]: https://github.com/helsing-ai/sguaba/compare/v0.10.7...HEAD
+[0.10.7]: https://github.com/helsing-ai/sguaba/compare/v0.10.6...v0.10.7
 [0.10.6]: https://github.com/helsing-ai/sguaba/compare/v0.10.5...v0.10.6
 [0.10.5]: https://github.com/helsing-ai/sguaba/compare/v0.10.4...v0.10.5
 [0.10.4]: https://github.com/helsing-ai/sguaba/compare/v0.10.3...v0.10.4
