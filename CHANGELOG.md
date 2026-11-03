@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `Rotation::to_tait_bryan_angles` and `Orientation::to_tait_bryan_angles` now return angles that
+  rebuild the original rotation when pitch is at or within rounding error of +/-90 degrees.
+  Previously yaw and roll could be off by several degrees there
+  ([#120](https://github.com/helsing-ai/sguaba/issues/120)).
+
 ### Security
 
 ## [0.10.7] - 2026-09-16
