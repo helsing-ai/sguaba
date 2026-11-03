@@ -620,10 +620,40 @@ impl<From, To> Rotation<From, To> {
     /// [`Rotation::from_tait_bryan_angles`], the rotations that must be performed to go from `To`
     /// _into_ `From`.
     ///
+    /// When pitch is +/-90 degrees (gimbal lock), yaw and roll rotate about the same axis and only
+    /// their combination is defined. In that case yaw is returned as 0 and the whole rotation
+    /// about that axis is returned as roll. Either way, passing the returned angles back to
+    /// [`Rotation::from_tait_bryan_angles`] gives back this rotation.
+    ///
     /// [tb]: https://en.wikipedia.org/wiki/Euler_angles#Tait%E2%80%93Bryan_angles
     #[must_use]
     pub fn to_tait_bryan_angles(&self) -> (Angle, Angle, Angle) {
-        let (roll, pitch, yaw) = self.inner.euler_angles();
+        // We don't use nalgebra's `euler_angles` here. It takes pitch as `-asin(m[(2, 0)])` and
+        // then divides other entries by `cos(pitch)`, and only treats the rotation as gimbal
+        // locked when `|m[(2, 0)]|` is exactly 1. When pitch is within rounding error of +/-90
+        // degrees, `cos(pitch)` is tiny and the rounding error in the other entries ends up in
+        // yaw and roll, so the returned angles no longer describe this rotation (see
+        // <https://github.com/helsing-ai/sguaba/issues/120>).
+        //
+        // Instead, take pitch from an `atan2` and solve for roll given whatever yaw we picked,
+        // so the three angles always rebuild the rotation. `m` is `Rz(yaw) * Ry(pitch) *
+        // Rx(roll)`, the same decomposition `from_tait_bryan_angles` builds.
+        let rot = self.inner.to_rotation_matrix();
+        let m = rot.matrix();
+        // the entries are in [-1, 1], so this can't overflow and doesn't need `hypot`
+        let cos_pitch = FloatMath::sqrt(m[(0, 0)] * m[(0, 0)] + m[(1, 0)] * m[(1, 0)]);
+        let pitch = FloatMath::atan2(-m[(2, 0)], cos_pitch);
+        // At gimbal lock only yaw - roll (or yaw + roll) is defined, so put all of it in roll.
+        let yaw = if cos_pitch < 1e-12 {
+            0.
+        } else {
+            FloatMath::atan2(m[(1, 0)], m[(0, 0)])
+        };
+        let (sin_yaw, cos_yaw) = (FloatMath::sin(yaw), FloatMath::cos(yaw));
+        let roll = FloatMath::atan2(
+            sin_yaw * m[(0, 2)] - cos_yaw * m[(1, 2)],
+            cos_yaw * m[(1, 1)] - sin_yaw * m[(0, 1)],
+        );
         (
             Angle::new::<radian>(yaw),
             Angle::new::<radian>(pitch),
@@ -3071,6 +3101,116 @@ mod tests {
         let _rotation = unsafe { builder.build() };
 
         // There are compile_fail tests that check that other orders will not work
+    }
+
+    /// Builds a rotation from yaw, pitch and roll through the builder.
+    fn rotation_from_ypr(yaw: Angle, pitch: Angle, roll: Angle) -> Rotation<PlaneNed, PlaneFrd> {
+        unsafe {
+            Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+                .yaw(yaw)
+                .pitch(pitch)
+                .roll(roll)
+                .build()
+        }
+    }
+
+    /// Rebuilding a rotation from the angles returned by `to_tait_bryan_angles` must give back
+    /// the same rotation, also when pitch is within rounding error of +/-90 degrees.
+    #[rstest]
+    #[case(d(0.), d(0.), d(0.))]
+    #[case(d(30.), d(45.), d(10.))]
+    #[case(d(-120.), d(-60.), d(170.))]
+    #[case(d(30.), d(90.), d(10.))]
+    #[case(d(30.), d(-90.), d(10.))]
+    #[case(d(30.), Angle::new::<radian>(core::f64::consts::FRAC_PI_2 - 1e-8), d(10.))]
+    #[case(d(-75.), Angle::new::<radian>(-core::f64::consts::FRAC_PI_2 + 1e-9), d(40.))]
+    #[case(d(5.), Angle::new::<radian>(core::f64::consts::FRAC_PI_2 - 1e-12), d(-20.))]
+    fn tait_bryan_angles_rebuild_the_rotation(
+        #[case] yaw: Angle,
+        #[case] pitch: Angle,
+        #[case] roll: Angle,
+    ) {
+        let rotation = rotation_from_ypr(yaw, pitch, roll);
+        let (yaw, pitch, roll) = rotation.to_tait_bryan_angles();
+        let rebuilt = rotation_from_ypr(yaw, pitch, roll);
+        assert!(
+            rotation.inner.angle_to(&rebuilt.inner) < 1e-9,
+            "rebuilt rotation is off by {} rad",
+            rotation.inner.angle_to(&rebuilt.inner)
+        );
+    }
+
+    quickcheck::quickcheck! {
+        fn tait_bryan_angles_rebuild_arbitrary_rotations(
+            w: i16,
+            i: i16,
+            j: i16,
+            k: i16
+        ) -> quickcheck::TestResult {
+            let c = |x: i16| f64::from(x) / f64::from(i16::MAX);
+            let q = nalgebra::Quaternion::new(c(w), c(i), c(j), c(k));
+            if q.norm() < 1e-3 {
+                return quickcheck::TestResult::discard();
+            }
+            let rotation = Rotation::<PlaneNed, PlaneFrd> {
+                inner: nalgebra::UnitQuaternion::from_quaternion(q),
+                from: core::marker::PhantomData,
+                to: core::marker::PhantomData,
+            };
+            let (yaw, pitch, roll) = rotation.to_tait_bryan_angles();
+            let rebuilt = rotation_from_ypr(yaw, pitch, roll);
+            if rotation.inner.angle_to(&rebuilt.inner) > 1e-9 {
+                return quickcheck::TestResult::failed();
+            }
+            // away from gimbal lock, the angles match what nalgebra's `euler_angles` returns
+            if pitch.get::<radian>().abs() < 1.5 {
+                let (nroll, npitch, nyaw) = rotation.inner.euler_angles();
+                let tau = core::f64::consts::TAU;
+                let close = |a: f64, b: f64| ((a - b).rem_euclid(tau) + 1e-9).rem_euclid(tau) < 2e-9;
+                if !(close(yaw.get::<radian>(), nyaw)
+                    && close(pitch.get::<radian>(), npitch)
+                    && close(roll.get::<radian>(), nroll))
+                {
+                    return quickcheck::TestResult::failed();
+                }
+            }
+            quickcheck::TestResult::passed()
+        }
+    }
+
+    /// From <https://github.com/helsing-ai/sguaba/issues/120>: a level aircraft facing north on
+    /// the equator has its nose along ECEF +Z, so its orientation in ECEF sits right at gimbal
+    /// lock. Going to ECEF angles and back must preserve its roll.
+    #[rstest]
+    #[case(0.)]
+    #[case(5.)]
+    #[case(20.)]
+    fn tait_bryan_angles_near_gimbal_lock_round_trip_through_ecef(#[case] roll: f64) {
+        let position = Wgs84::builder()
+            .latitude(d(0.))
+            .expect("latitude is in range")
+            .longitude(d(0.))
+            .altitude(m(0.))
+            .build();
+        let ecef_to_ned =
+            unsafe { RigidBodyTransform::<Ecef, PlaneNed>::ecef_to_ned_at(&position) };
+        let in_ned = crate::engineering::Orientation::<PlaneNed>::tait_bryan_builder()
+            .yaw(d(0.))
+            .pitch(d(0.))
+            .roll(d(roll))
+            .build();
+        let in_ecef = (ecef_to_ned * in_ned).orientation();
+        let (yaw, pitch, roll_ecef) = in_ecef.to_tait_bryan_angles();
+        let rebuilt = crate::engineering::Orientation::<Ecef>::tait_bryan_builder()
+            .yaw(yaw)
+            .pitch(pitch)
+            .roll(roll_ecef)
+            .build();
+        let (yaw_back, pitch_back, roll_back) =
+            (rebuilt * ecef_to_ned).orientation().to_tait_bryan_angles();
+        assert_abs_diff_eq!(yaw_back.get::<degree>(), 0., epsilon = 1e-6);
+        assert_abs_diff_eq!(pitch_back.get::<degree>(), 0., epsilon = 1e-6);
+        assert_abs_diff_eq!(roll_back.get::<degree>(), roll, epsilon = 1e-6);
     }
 
     #[test]
