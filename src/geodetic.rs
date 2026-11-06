@@ -614,8 +614,10 @@ pub(crate) fn central_angle_by_inverse_haversine(
     let delta_lat = lat_b - lat_a;
     let delta_lon = lon_b - lon_a;
 
-    let inner = 1. - FloatMath::cos(delta_lat)
-        + FloatMath::cos(lat_a) * FloatMath::cos(lat_b) * (1. - FloatMath::cos(delta_lon));
+    let inner = 2. * FloatMath::powi(FloatMath::sin(delta_lat / 2.), 2)
+        + FloatMath::cos(lat_a)
+            * FloatMath::cos(lat_b)
+            * (2. * FloatMath::powi(FloatMath::sin(delta_lon / 2.), 2));
     Angle::new::<radian>(2. * FloatMath::asin(FloatMath::sqrt(inner / 2.)))
 }
 
@@ -884,7 +886,10 @@ mod tests {
     use crate::coordinate;
     use crate::coordinate_systems::Ecef;
     use crate::coordinates::Coordinate;
-    use crate::geodetic::{Components, ECEF_TO_WGS84_MAX_ALTITUDE_M, ECEF_TO_WGS84_MIN_ALTITUDE_M};
+    use crate::geodetic::{
+        Components, ECEF_TO_WGS84_MAX_ALTITUDE_M, ECEF_TO_WGS84_MIN_ALTITUDE_M,
+        central_angle_by_inverse_haversine,
+    };
     use crate::util::BoundedAngle;
     use approx::{AbsDiffEq, assert_relative_eq};
     use quickcheck::quickcheck;
@@ -1381,5 +1386,30 @@ mod tests {
             z = Length::new::<meter>(z),
         };
         let _ = coord.to_wgs84();
+    }
+
+    #[rstest]
+    #[case::small_latitude_difference(0.0, 1e-8, 0.0, 0.0, 1e-8)]
+    #[case::small_longitude_difference(0.0, 0.0, 0.0, 1e-8, 1e-8)]
+    #[case::identical_points(0.5, 0.5, 1.0, 1.0, 0.0)]
+    #[case::quarter_equator(0.0, 0.0, 0.0, FRAC_PI_2, FRAC_PI_2)]
+    #[case::half_equator(0.0, 0.0, 0.0, PI, PI)]
+    #[case::opposite_longitudes_at_45_degrees(
+        FRAC_PI_2 / 2.0, FRAC_PI_2 / 2.0, 0.0, PI, FRAC_PI_2
+    )]
+    fn haversine_known_central_angles(
+        #[case] lat_a: f64,
+        #[case] lat_b: f64,
+        #[case] lon_a: f64,
+        #[case] lon_b: f64,
+        #[case] expected: f64,
+    ) {
+        let result = central_angle_by_inverse_haversine(
+            Angle::new::<radian>(lat_a),
+            Angle::new::<radian>(lat_b),
+            Angle::new::<radian>(lon_a),
+            Angle::new::<radian>(lon_b),
+        );
+        assert_relative_eq!(result.get::<radian>(), expected, epsilon = 1e-15);
     }
 }
