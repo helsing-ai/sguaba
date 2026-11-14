@@ -611,6 +611,21 @@ impl<From, To> Rotation<From, To> {
         }
     }
 
+    /// Spherically linearly interpolate between this rotation and another one.
+    ///
+    /// Unlike [`Self::nlerp`], spherical linear interpolation ensures a constant rate of angular
+    /// rotation across the interpolation path.
+    ///
+    /// The value for `t` is not restricted to the range [0, 1].
+    #[must_use]
+    pub fn slerp(&self, rhs: &Self, t: f64) -> Self {
+        Self {
+            inner: self.inner.slerp(&rhs.inner, t),
+            from: self.from,
+            to: self.to,
+        }
+    }
+
     /// Returns the yaw-pitch-roll [Tait-Bryan angles][tb] that describe this rotation.
     ///
     /// See [`Rotation::from_tait_bryan_angles`] for documentation about the exact meaning of yaw,
@@ -1234,6 +1249,22 @@ impl<From, To> RigidBodyTransform<From, To> {
             Self::new(
                 self.translation().lerp(&rhs.translation(), t),
                 self.rotation().nlerp(&rhs.rotation(), t),
+            )
+        }
+    }
+
+    /// Linearly interpolates the translation and spherically linearly interpolates (`slerp`) the
+    /// rotation between `self` and `rhs` at parameter `t` (see [`Rotation::slerp`]).
+    ///
+    /// The value for `t` is not restricted to the range [0, 1].
+    #[must_use]
+    pub fn slerp(&self, rhs: &Self, t: f64) -> Self {
+        // SAFETY: if `self` and `rhs` are both correct transforms from `From` to `To`, slerping
+        // between them should also be a valid transform.
+        unsafe {
+            Self::new(
+                self.translation().lerp(&rhs.translation(), t),
+                self.rotation().slerp(&rhs.rotation(), t),
             )
         }
     }
@@ -3348,5 +3379,103 @@ mod tests {
         let acc_rev_transformed: AccelerationVector<PlaneFrd> = transform * expected_acc;
         assert_relative_eq!(acc_rev_rotated, acc);
         assert_relative_eq!(acc_rev_transformed, acc);
+    }
+
+    #[test]
+    fn rotation_slerp() {
+        let rot_start = unsafe {
+            Rotation::<PlaneFrd, SensorFrd>::tait_bryan_builder()
+                .yaw(d(0.))
+                .pitch(d(0.))
+                .roll(d(0.))
+                .build()
+        };
+        let rot_end = unsafe {
+            Rotation::<PlaneFrd, SensorFrd>::tait_bryan_builder()
+                .yaw(d(90.))
+                .pitch(d(0.))
+                .roll(d(0.))
+                .build()
+        };
+
+        // t = 0 should give start
+        assert_relative_eq!(rot_start.slerp(&rot_end, 0.0), rot_start);
+        // t = 1 should give end
+        assert_relative_eq!(rot_start.slerp(&rot_end, 1.0), rot_end);
+
+        // t = 0.5 should be exactly halfway (45 degrees yaw)
+        let halfway = rot_start.slerp(&rot_end, 0.5);
+        let expected_halfway = unsafe {
+            Rotation::<PlaneFrd, SensorFrd>::tait_bryan_builder()
+                .yaw(d(45.))
+                .pitch(d(0.))
+                .roll(d(0.))
+                .build()
+        };
+        assert_relative_eq!(halfway, expected_halfway);
+
+        // Constant rate check: quarter and three-quarter points
+        let quarter = rot_start.slerp(&rot_end, 0.25);
+        let expected_quarter = unsafe {
+            Rotation::<PlaneFrd, SensorFrd>::tait_bryan_builder()
+                .yaw(d(22.5))
+                .pitch(d(0.))
+                .roll(d(0.))
+                .build()
+        };
+        assert_relative_eq!(quarter, expected_quarter);
+
+        let three_quarter = rot_start.slerp(&rot_end, 0.75);
+        let expected_three_quarter = unsafe {
+            Rotation::<PlaneFrd, SensorFrd>::tait_bryan_builder()
+                .yaw(d(67.5))
+                .pitch(d(0.))
+                .roll(d(0.))
+                .build()
+        };
+        assert_relative_eq!(three_quarter, expected_three_quarter);
+    }
+
+    #[test]
+    fn rigid_body_transform_slerp() {
+        let t1 = unsafe {
+            RigidBodyTransform::<PlaneFrd, SensorFrd>::new(
+                Vector::<PlaneFrd>::zero(),
+                Rotation::<PlaneFrd, SensorFrd>::tait_bryan_builder()
+                    .yaw(d(0.))
+                    .pitch(d(0.))
+                    .roll(d(0.))
+                    .build(),
+            )
+        };
+        let t2 = unsafe {
+            RigidBodyTransform::<PlaneFrd, SensorFrd>::new(
+                vector!(f = m(10.), r = m(20.), d = m(30.); in PlaneFrd),
+                Rotation::<PlaneFrd, SensorFrd>::tait_bryan_builder()
+                    .yaw(d(90.))
+                    .pitch(d(0.))
+                    .roll(d(0.))
+                    .build(),
+            )
+        };
+
+        let interp_start = t1.slerp(&t2, 0.0);
+        assert_relative_eq!(interp_start, t1);
+
+        let interp_end = t1.slerp(&t2, 1.0);
+        assert_relative_eq!(interp_end, t2);
+
+        let interp_mid = t1.slerp(&t2, 0.5);
+        let expected_mid = unsafe {
+            RigidBodyTransform::<PlaneFrd, SensorFrd>::new(
+                vector!(f = m(5.), r = m(10.), d = m(15.); in PlaneFrd),
+                Rotation::<PlaneFrd, SensorFrd>::tait_bryan_builder()
+                    .yaw(d(45.))
+                    .pitch(d(0.))
+                    .roll(d(0.))
+                    .build(),
+            )
+        };
+        assert_relative_eq!(interp_mid, expected_mid);
     }
 }
