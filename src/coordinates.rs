@@ -1,6 +1,6 @@
 use crate::builder::{Set, Unset};
 use crate::coordinate_systems::{
-    CoordinateSystem, EnuLike, FrdLike, HasComponents, NedLike, RightHandedXyzLike,
+    CoordinateSystem, EnuLike, FluLike, FrdLike, HasComponents, NedLike, RightHandedXyzLike,
 };
 use crate::directions::Bearing;
 use crate::float_math::FloatMath;
@@ -103,6 +103,22 @@ impl<In> Copy for Coordinate<In> {}
 /// # ;
 /// ```
 ///
+/// For [`FluLike`], use:
+///
+/// ```rust
+/// # use sguaba::{coordinate, system, Coordinate};
+/// # use uom::si::f64::Length;
+/// # use uom::si::length::meter;
+/// # system!(struct RobotFlu using FLU);
+/// # let _: Coordinate<RobotFlu> =
+/// coordinate! {
+///     f = Length::new::<meter>(1.),
+///     l = Length::new::<meter>(2.),
+///     u = Length::new::<meter>(3.),
+/// }
+/// # ;
+/// ```
+///
 /// For [`RightHandedXyzLike`], use:
 ///
 /// ```rust
@@ -159,6 +175,13 @@ macro_rules! coordinate {
             front: $f.into(),
             right: $r.into(),
             down: $d.into(),
+        })
+    };
+    (f = $f:expr, l = $l:expr, u = $u:expr; in $in:ty) => {
+        $crate::Coordinate::<$in>::build($crate::systems::FluComponents {
+            forward: $f.into(),
+            left: $l.into(),
+            up: $u.into(),
         })
     };
     (x = $x:expr, y = $y:expr, z = $z:expr; in $in:ty) => {
@@ -564,6 +587,7 @@ accessors!(RightHandedXyzLike using x, y, z + x_axis, y_axis, z_axis);
 // today (see https://github.com/rust-lang/rfcs/pull/1672).
 accessors!(NedLike using ned_north, ned_east, ned_down + ned_north_axis, ned_east_axis, ned_down_axis);
 accessors!(FrdLike using frd_front, frd_right, frd_down + frd_front_axis, frd_right_axis, frd_down_axis);
+accessors!(FluLike using flu_forward, flu_left, flu_up + flu_forward_axis, flu_left_axis, flu_up_axis);
 accessors!(EnuLike using enu_east, enu_north, enu_up + enu_east_axis, enu_north_axis, enu_up_axis);
 
 impl<In> Coordinate<In> {
@@ -846,6 +870,7 @@ macro_rules! constructor {
 constructor!(RightHandedXyzLike, [x, y, z]);
 constructor!(NedLike, [ned_north, ned_east, ned_down]);
 constructor!(FrdLike, [frd_front, frd_right, frd_down]);
+constructor!(FluLike, [flu_forward, flu_left, flu_up]);
 constructor!(EnuLike, [enu_east, enu_north, enu_up]);
 
 #[cfg(test)]
@@ -853,8 +878,9 @@ mod tests {
     use super::Length;
     use crate::Point3;
     use crate::bearing;
-    use crate::coordinate_systems::{Ecef, Enu, Frd, Ned};
+    use crate::coordinate_systems::{Ecef, Enu, Flu, Frd, Ned};
     use crate::coordinates::Coordinate;
+    use crate::vectors::Vector;
     use approx::assert_relative_eq;
     use rstest::rstest;
 
@@ -879,12 +905,15 @@ mod tests {
         let frd = coordinate!(f = m(10.), r = m(-5.), d = m(3.5); in Frd);
         let ned = coordinate!(n = m(10.), e = m(-5.), d = m(3.5); in Ned);
         let ecef = coordinate!(x = m(10.), y = m(-5.), z = m(3.5); in Ecef);
+        let flu = coordinate!(f = m(10.), l = m(-5.), u = m(3.5); in Flu);
 
         assert_relative_eq!(-frd, coordinate!(f = m(-10.), r = m(5.), d = m(-3.5)));
 
         assert_relative_eq!(-ned, coordinate!(n = m(-10.), e = m(5.), d = m(-3.5)));
 
         assert_relative_eq!(-ecef, coordinate!(x = m(-10.), y = m(5.), z = m(-3.5)));
+
+        assert_relative_eq!(-flu, coordinate!(f = m(-10.), l = m(5.), u = m(-3.5)));
     }
 
     // Test promise made by `bearing_from_origin` that when elevation is 90,
@@ -902,6 +931,76 @@ mod tests {
         assert_relative_eq!(
             down.bearing_from_origin().expect("down is not at origin"),
             bearing!(azimuth = deg(0.), elevation = deg(-90.); in Enu)
+        );
+    }
+
+    #[test]
+    fn flu_accessors_and_builder() {
+        let coord = Coordinate::<Flu>::builder()
+            .flu_forward(m(10.))
+            .flu_left(m(20.))
+            .flu_up(m(30.))
+            .build();
+        assert_eq!(coord.flu_forward(), m(10.));
+        assert_eq!(coord.flu_left(), m(20.));
+        assert_eq!(coord.flu_up(), m(30.));
+        assert_eq!(coord.to_cartesian(), [m(10.), m(20.), m(30.)]);
+
+        assert_eq!(
+            Coordinate::<Flu>::flu_forward_axis(),
+            Vector::<Flu>::flu_forward_axis()
+        );
+        assert_eq!(
+            Coordinate::<Flu>::flu_left_axis(),
+            Vector::<Flu>::flu_left_axis()
+        );
+        assert_eq!(
+            Coordinate::<Flu>::flu_up_axis(),
+            Vector::<Flu>::flu_up_axis()
+        );
+    }
+
+    #[test]
+    fn flu_bearing_from_origin() {
+        let up = coordinate!(f = m(0.), l = m(0.), u = m(10.0); in Flu);
+        let down = coordinate!(f = m(0.), l = m(0.), u = m(-10.0); in Flu);
+        let forward = coordinate!(f = m(10.0), l = m(0.), u = m(0.); in Flu);
+        let right = coordinate!(f = m(0.), l = m(-10.0), u = m(0.); in Flu);
+        let backward = coordinate!(f = m(-10.0), l = m(0.), u = m(0.); in Flu);
+        let left = coordinate!(f = m(0.), l = m(10.0), u = m(0.); in Flu);
+
+        assert_relative_eq!(
+            up.bearing_from_origin().expect("up is not at origin"),
+            bearing!(azimuth = deg(0.), elevation = deg(90.); in Flu)
+        );
+
+        assert_relative_eq!(
+            down.bearing_from_origin().expect("down is not at origin"),
+            bearing!(azimuth = deg(0.), elevation = deg(-90.); in Flu)
+        );
+
+        assert_relative_eq!(
+            forward
+                .bearing_from_origin()
+                .expect("forward is not at origin"),
+            bearing!(azimuth = deg(0.), elevation = deg(0.); in Flu)
+        );
+
+        assert_relative_eq!(
+            right.bearing_from_origin().expect("right is not at origin"),
+            bearing!(azimuth = deg(90.), elevation = deg(0.); in Flu)
+        );
+
+        assert_relative_eq!(
+            backward
+                .bearing_from_origin()
+                .expect("backward is not at origin"),
+            bearing!(azimuth = deg(180.), elevation = deg(0.); in Flu)
+        );
+
+        assert_relative_eq!(
+            left.bearing_from_origin().expect("left is not at origin"),
+            bearing!(azimuth = deg(270.), elevation = deg(0.); in Flu)
         );
     }
 }

@@ -426,7 +426,7 @@ macro_rules! bearing {
 
 #[cfg(test)]
 mod tests {
-    use crate::coordinate_systems::Frd;
+    use crate::coordinate_systems::{Flu, Frd};
     use crate::coordinates::Coordinate;
     use crate::directions::{Bearing, Components};
     use crate::util::BoundedAngle;
@@ -472,6 +472,36 @@ mod tests {
             .unwrap()
             .to_unit_vector(),
             vector!(f = m(expected[0]), r = m(expected[1]), d = m(expected[2]))
+        );
+    }
+
+    // in Flu, positive Z is up, positive Y is left, and positive X is forward
+    #[rstest]
+    #[case(0.0, 90.0, [0.0, 0.0, 1.0])]
+    #[case(90.0, 90.0, [0.0, 0.0, 1.0])]
+    #[case(180.0, 90.0, [0.0, 0.0, 1.0])]
+    #[case(270.0, 90.0, [0.0, 0.0, 1.0])]
+    #[case(0.0, 0.0, [1.0, 0.0, 0.0])]
+    #[case(90.0, 0.0, [0.0, -1.0, 0.0])]
+    #[case(180.0, 0.0, [-1.0, 0.0, 0.0])]
+    #[case(270.0, 0.0, [0.0, 1.0, 0.0])]
+    #[case(0.0, -90.0, [0.0, 0.0, -1.0])]
+    #[case(90.0, -90.0, [0.0, 0.0, -1.0])]
+    #[case(180.0, -90.0, [0.0, 0.0, -1.0])]
+    #[case(270.0, -90.0, [0.0, 0.0, -1.0])]
+    fn flu_to_unit_vector(
+        #[case] azimuth: f64,
+        #[case] elevation: f64,
+        #[case] expected: [f64; 3],
+    ) {
+        assert_relative_eq!(
+            Bearing::<Flu>::build(Components {
+                azimuth: d(azimuth),
+                elevation: d(elevation)
+            })
+            .unwrap()
+            .to_unit_vector(),
+            vector!(f = m(expected[0]), l = m(expected[1]), u = m(expected[2]))
         );
     }
 

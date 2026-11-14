@@ -84,6 +84,11 @@ unsafe impl<System> EquivalentTo<System> for System {}
 ///
 /// - azimuth is the angle clockwise about positive Z along the XY plane from positive Y; and
 /// - elevation is the angle towards positive Z from the XY plane.
+///
+/// And for the [`FluLike`] coordinate system:
+///
+/// - azimuth is the angle clockwise as seen from above along the horizontal plane from positive X (Forward); and
+/// - elevation is the angle towards positive Z from the XY plane.
 pub trait BearingDefined: Sized {
     /// Returns the spherical-coordinate polar and azimuthal angles equivalent to a bearing.
     fn bearing_to_spherical(bearing: Bearing<Self>) -> (Angle, Angle);
@@ -255,6 +260,53 @@ impl<Time: typenum::Integer> HasComponents<Time> for EnuLike {
     type Components = EnuComponents<Time>;
 }
 
+/// Marks an FLU-like coordinate system where the axes are Forward (or "Front"), Left, and Up.
+///
+/// FLUs are right-handed coordinate systems, and have observer bounded axes (common in robotics and ROS):
+///
+/// - Positive X is in the direction of travel or facing of the observer/robot ("Forward").
+/// - Positive Y is to the left of the observer ("Left").
+/// - Positive Z is upwards, away from the ground/center of the earth ("Up").
+///
+/// Note that two FLU-like coordinate systems may have different "absolute" Earth-bound coordinates
+/// for their origin. For example, two different robots may both define their observations in
+/// FLU-like coordinate systems, but for each robot, (0, 0, 0) corresponds to the center of mass
+/// or reference frame of that robot. Thus, an object observed at, say, (10, 20, 30) in one robot's
+/// local FLU-like coordinate system will have completely different coordinates in the other robot's
+/// local FLU-like coordinate system.
+///
+/// [Bearing](BearingDefined) in FLU-like coordinate systems are defined as:
+///
+/// - azimuth is the angle clockwise as seen from above along the horizontal plane from forward; and
+/// - elevation is the angle upwards from the horizontal plane.
+///
+/// <https://www.ros.org/reps/rep-0103.html>
+pub struct FluLike;
+
+/// Components for Cartesian points in an [`FluLike`] coordinate system.
+///
+/// Usually provided to methods like [`Coordinate::build`] or [`Vector::build`].
+#[derive(Debug, Clone, Copy)]
+#[must_use]
+pub struct FluComponents<Time = Z0>
+where
+    Time: typenum::Integer,
+{
+    pub forward: LengthPossiblyPer<Time>,
+    pub left: LengthPossiblyPer<Time>,
+    pub up: LengthPossiblyPer<Time>,
+}
+
+impl<Time: typenum::Integer> From<FluComponents<Time>> for [LengthPossiblyPer<Time>; 3] {
+    fn from(c: FluComponents<Time>) -> [LengthPossiblyPer<Time>; 3] {
+        [c.forward, c.left, c.up]
+    }
+}
+
+impl<Time: typenum::Integer> HasComponents<Time> for FluLike {
+    type Components = FluComponents<Time>;
+}
+
 /// Marks a coordinate system whose axes are simply named X, Y, and Z.
 ///
 /// Unlike [`NedLike`] and [`FrdLike`], there is no intrinsic relationship between XYZ-like
@@ -309,6 +361,13 @@ impl<Time: typenum::Integer> HasComponents<Time> for RightHandedXyzLike {
 /// system!(pub struct SensorEnu using ENU);
 /// ```
 ///
+/// [`FluLike`]
+///
+/// ```rust
+/// # use sguaba::system;
+/// system!(pub struct RobotFlu using FLU);
+/// ```
+///
 /// [`FrdLike`]
 ///
 /// ```rust
@@ -348,6 +407,10 @@ macro_rules! system {
     ($(#[$attr:meta])* $vis:vis struct $name:ident using ENU) => {
         $crate::system!($(#[$attr])* $vis struct $name as EnuLike);
         $crate::system!(_clockwise_from_y_and_positive_z_bearing, $name);
+    };
+    ($(#[$attr:meta])* $vis:vis struct $name:ident using FLU) => {
+        $crate::system!($(#[$attr])* $vis struct $name as FluLike);
+        $crate::system!(_clockwise_from_x_and_positive_z_bearing, $name);
     };
     (_clockwise_from_x_and_negative_z_bearing, $name:ident) => {
         /// For this coordinate system:
@@ -430,6 +493,47 @@ macro_rules! system {
             }
         }
     };
+    (_clockwise_from_x_and_positive_z_bearing, $name:ident) => {
+        /// For this coordinate system:
+        ///
+        /// - azimuth is the angle clockwise as seen from above along the horizontal plane from the
+        ///   positive X axis; and
+        /// - elevation is the angle towards _positive_ Z from the XY plane.
+        impl $crate::systems::BearingDefined for $name {
+            fn bearing_to_spherical(bearing: $crate::Bearing<Self>)
+            -> (
+                $crate::AngleForBearingTrait,
+                $crate::AngleForBearingTrait
+            ) {
+                // elevation is flipped and shifted by 90°; the polar angle is with respect to
+                // positive Z, not XY plane, meaning an elevation of 0° is a polar angle of 90°,
+                // and an elevation of 90° (which is towards positive Z) is a polar angle of 0°.
+                let polar = $crate::AngleForBearingTrait::HALF_TURN/2. - bearing.elevation();
+
+                // azimuth is negated; in spherical coordinates azimuth increases counterclockwise
+                // about positive Z along the XY plane from the positive X axis.
+                let azimuth = -$crate::AngleForBearingTrait::from(bearing.azimuth());
+
+                (polar, azimuth)
+            }
+            fn spherical_to_bearing(
+                polar: impl Into<$crate::AngleForBearingTrait>,
+                azimuth: impl Into<$crate::AngleForBearingTrait>
+            ) -> Option<$crate::Bearing<Self>> {
+                // just the inverse of the above
+                let elevation = $crate::AngleForBearingTrait::HALF_TURN/2. - polar.into();
+                let mut azimuth = -$crate::AngleForBearingTrait::from(azimuth.into());
+
+                // azimuth should be 0° when elevation is +/- 90° as promised by
+                // bearing_from_origin; the 90° shift is removed to uphold this promise.
+                if elevation.abs() == $crate::AngleForBearingTrait::HALF_TURN/2. {
+                    azimuth = $crate::ZERO_FOR_BEARING;
+                }
+
+                Some($crate::Bearing::builder().azimuth(azimuth).elevation(elevation)?.build())
+            }
+        }
+    };
     {
         $(#[$attr:meta])*
         $vis:vis struct $name:ident
@@ -490,6 +594,12 @@ mod testing {
         // ditto for "using ENU"
         #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
         pub(crate) struct Enu using ENU
+    }
+
+    system! {
+        // ditto for "using FLU"
+        #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+        pub(crate) struct Flu using FLU
     }
 }
 

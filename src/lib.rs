@@ -327,10 +327,10 @@ type LengthPossiblyPer<Time> = Quantity<ISQ<P1, Z0, Time, Z0, Z0, Z0, Z0, dyn Ki
 /// Well-known coordinate systems and conventions.
 pub mod systems {
     pub use super::coordinate_systems::{
-        BearingDefined, Ecef, EnuLike, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike,
+        BearingDefined, Ecef, EnuLike, EquivalentTo, FluLike, FrdLike, NedLike, RightHandedXyzLike,
     };
     pub use super::coordinate_systems::{
-        EnuComponents, FrdComponents, HasComponents, NedComponents, XyzComponents,
+        EnuComponents, FluComponents, FrdComponents, HasComponents, NedComponents, XyzComponents,
     };
     pub use super::geodetic::Wgs84;
 }
