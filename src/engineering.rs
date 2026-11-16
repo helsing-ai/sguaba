@@ -435,6 +435,19 @@ impl<In> Orientation<In> {
             inner: self.inner.nlerp(&rhs.inner, t),
         }
     }
+
+    /// Spherically linearly interpolate between this orientation and another one.
+    ///
+    /// Unlike [`Self::nlerp`], spherical linear interpolation ensures a constant rate of angular
+    /// rotation across the interpolation path (see [`Rotation::slerp`]).
+    ///
+    /// The value for `t` is not restricted to the range [0, 1].
+    #[must_use]
+    pub fn slerp(&self, rhs: &Self, t: f64) -> Self {
+        Self {
+            inner: self.inner.slerp(&rhs.inner, t),
+        }
+    }
 }
 
 impl<From, To> Mul<Rotation<From, To>> for Orientation<From> {
@@ -803,6 +816,19 @@ impl<In> Pose<In> {
     pub fn lerp(&self, rhs: &Self, t: f64) -> Self {
         Self {
             inner: self.inner.lerp(&rhs.inner, t),
+        }
+    }
+
+    /// Spherically linearly interpolate between this pose and another one.
+    ///
+    /// Internally, this linearly interpolates the position and spherically linearly interpolates
+    /// the orientation (see [`RigidBodyTransform::slerp`]).
+    ///
+    /// The value for `t` is not restricted to the range [0, 1].
+    #[must_use]
+    pub fn slerp(&self, rhs: &Self, t: f64) -> Self {
+        Self {
+            inner: self.inner.slerp(&rhs.inner, t),
         }
     }
 }
@@ -1351,5 +1377,68 @@ mod tests {
         for (a, b) in [(y1, y2), (p1, p2), (r1, r2)] {
             assert_abs_diff_eq!(&BoundedAngle::new(a), &BoundedAngle::new(b));
         }
+    }
+
+    #[test]
+    fn orientation_slerp() {
+        let ori_start = Orientation::<PlaneNed>::tait_bryan_builder()
+            .yaw(d(0.))
+            .pitch(d(0.))
+            .roll(d(0.))
+            .build();
+        let ori_end = Orientation::<PlaneNed>::tait_bryan_builder()
+            .yaw(d(90.))
+            .pitch(d(0.))
+            .roll(d(0.))
+            .build();
+
+        assert_relative_eq!(ori_start.slerp(&ori_end, 0.0).inner, ori_start.inner);
+        assert_relative_eq!(ori_start.slerp(&ori_end, 1.0).inner, ori_end.inner);
+
+        let halfway = ori_start.slerp(&ori_end, 0.5);
+        let expected_halfway = Orientation::<PlaneNed>::tait_bryan_builder()
+            .yaw(d(45.))
+            .pitch(d(0.))
+            .roll(d(0.))
+            .build();
+        let (y, p, r) = halfway.to_tait_bryan_angles();
+        let (ey, ep, er) = expected_halfway.to_tait_bryan_angles();
+        assert_abs_diff_eq!(&BoundedAngle::new(y), &BoundedAngle::new(ey));
+        assert_abs_diff_eq!(&BoundedAngle::new(p), &BoundedAngle::new(ep));
+        assert_abs_diff_eq!(&BoundedAngle::new(r), &BoundedAngle::new(er));
+    }
+
+    #[test]
+    fn pose_slerp() {
+        let p1 = Pose::<PlaneNed>::new(
+            Coordinate::<PlaneNed>::origin(),
+            Orientation::<PlaneNed>::tait_bryan_builder()
+                .yaw(d(0.))
+                .pitch(d(0.))
+                .roll(d(0.))
+                .build(),
+        );
+        let p2 = Pose::<PlaneNed>::new(
+            coordinate!(n = m(10.), e = m(20.), d = m(30.); in PlaneNed),
+            Orientation::<PlaneNed>::tait_bryan_builder()
+                .yaw(d(90.))
+                .pitch(d(0.))
+                .roll(d(0.))
+                .build(),
+        );
+
+        assert_relative_eq!(p1.slerp(&p2, 0.0).inner, p1.inner);
+        assert_relative_eq!(p1.slerp(&p2, 1.0).inner, p2.inner);
+
+        let mid = p1.slerp(&p2, 0.5);
+        let expected_mid = Pose::<PlaneNed>::new(
+            coordinate!(n = m(5.), e = m(10.), d = m(15.); in PlaneNed),
+            Orientation::<PlaneNed>::tait_bryan_builder()
+                .yaw(d(45.))
+                .pitch(d(0.))
+                .roll(d(0.))
+                .build(),
+        );
+        assert_relative_eq!(mid.inner, expected_mid.inner);
     }
 }
