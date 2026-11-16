@@ -1352,4 +1352,39 @@ mod tests {
             assert_abs_diff_eq!(&BoundedAngle::new(a), &BoundedAngle::new(b));
         }
     }
+
+    #[test]
+    fn issue_120_gimbal_lock_near_90_pitch() {
+        use crate::math::RigidBodyTransform;
+        use crate::systems::Wgs84;
+
+        let position = Wgs84::builder()
+            .latitude(Angle::new::<degree>(0.0))
+            .expect("latitude is in range")
+            .longitude(Angle::new::<degree>(0.0))
+            .altitude(Length::new::<meter>(0.0))
+            .build();
+        let ecef_to_ned =
+            unsafe { RigidBodyTransform::<Ecef, PlaneNed>::ecef_to_ned_at(&position) };
+
+        for roll in [0.0, 5.0, 20.0, 45.0, -30.0] {
+            let in_ned = Orientation::<PlaneNed>::tait_bryan_builder()
+                .yaw(Angle::new::<degree>(0.0))
+                .pitch(Angle::new::<degree>(0.0))
+                .roll(Angle::new::<degree>(roll))
+                .build();
+            let in_ecef = (ecef_to_ned * in_ned).orientation();
+            let (yaw, pitch, roll_ecef) = in_ecef.to_tait_bryan_angles();
+
+            // Rebuild from the returned angles and map back into NED.
+            let rebuilt = Orientation::<Ecef>::tait_bryan_builder()
+                .yaw(yaw)
+                .pitch(pitch)
+                .roll(roll_ecef)
+                .build();
+            let (_, _, roll_back) = (rebuilt * ecef_to_ned).orientation().to_tait_bryan_angles();
+
+            assert_abs_diff_eq!(roll_back.get::<degree>(), roll, epsilon = 1e-4);
+        }
+    }
 }

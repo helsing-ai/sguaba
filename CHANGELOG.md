@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `FloatMath::hypot` across `std` and `no_std` (`libm`).
+
 ### Changed
 
 ### Deprecated
@@ -16,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 ### Fixed
+
+- Fixed numerical instability and orientation corruption in `Rotation::to_tait_bryan_angles` and `Orientation::to_tait_bryan_angles` near gimbal lock (pitch $\approx \pm 90^\circ$) by using numerically stable `atan2` projections rather than dividing by near-zero $\cos(\text{pitch})$ ([#120](https://github.com/helsing-ai/sguaba/issues/120)).
 
 ### Security
 

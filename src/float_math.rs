@@ -19,6 +19,7 @@ pub(crate) trait FloatMath {
     fn acos(self) -> Self;
     fn atan(self) -> Self;
     fn atan2(self, other: Self) -> Self;
+    fn hypot(self, other: Self) -> Self;
     fn sqrt(self) -> Self;
     fn cbrt(self) -> Self;
     fn powi(self, n: i32) -> Self;
@@ -61,6 +62,11 @@ impl FloatMath for f64 {
     #[inline]
     fn atan2(self, other: Self) -> Self {
         f64::atan2(self, other)
+    }
+
+    #[inline]
+    fn hypot(self, other: Self) -> Self {
+        f64::hypot(self, other)
     }
 
     #[inline]
@@ -124,6 +130,11 @@ impl FloatMath for f64 {
     #[inline]
     fn atan2(self, other: Self) -> Self {
         libm::atan2(self, other)
+    }
+
+    #[inline]
+    fn hypot(self, other: Self) -> Self {
+        libm::hypot(self, other)
     }
 
     #[inline]

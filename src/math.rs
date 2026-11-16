@@ -623,7 +623,25 @@ impl<From, To> Rotation<From, To> {
     /// [tb]: https://en.wikipedia.org/wiki/Euler_angles#Tait%E2%80%93Bryan_angles
     #[must_use]
     pub fn to_tait_bryan_angles(&self) -> (Angle, Angle, Angle) {
-        let (roll, pitch, yaw) = self.inner.euler_angles();
+        let rot = self.inner.to_rotation_matrix();
+        let m = rot.matrix();
+
+        let cos_pitch = FloatMath::hypot(m[(0, 0)], m[(1, 0)]);
+        let (yaw, sy, cy) = if cos_pitch < 1e-12 {
+            // Gimbal lock (pitch near +/-90°): yaw and roll share an axis of rotation.
+            // By convention, set yaw = 0 and resolve the full turn in roll.
+            (0.0, 0.0, 1.0)
+        } else {
+            let y = FloatMath::atan2(m[(1, 0)], m[(0, 0)]);
+            (y, FloatMath::sin(y), FloatMath::cos(y))
+        };
+
+        let pitch = FloatMath::atan2(-m[(2, 0)], cos_pitch);
+        let roll = FloatMath::atan2(
+            sy * m[(0, 2)] - cy * m[(1, 2)],
+            cy * m[(1, 1)] - sy * m[(0, 1)],
+        );
+
         (
             Angle::new::<radian>(yaw),
             Angle::new::<radian>(pitch),
@@ -730,12 +748,7 @@ impl<From, To> Rotation<From, To> {
     /// [in aerospace]: https://en.wikipedia.org/wiki/Aircraft_principal_axes
     #[must_use]
     pub fn euler_angles(&self) -> (Angle, Angle, Angle) {
-        let (roll, pitch, yaw) = self.inner.euler_angles();
-        (
-            Angle::new::<radian>(yaw),
-            Angle::new::<radian>(pitch),
-            Angle::new::<radian>(roll),
-        )
+        self.to_tait_bryan_angles()
     }
 
     /// Provides a type-safe builder for constructing a rotation from Tait-Bryan angles.
@@ -3348,5 +3361,42 @@ mod tests {
         let acc_rev_transformed: AccelerationVector<PlaneFrd> = transform * expected_acc;
         assert_relative_eq!(acc_rev_rotated, acc);
         assert_relative_eq!(acc_rev_transformed, acc);
+    }
+
+    #[rstest]
+    #[case(d(0.), d(90.), d(0.))]
+    #[case(d(0.), d(-90.), d(0.))]
+    #[case(d(0.), d(89.9999999), d(25.))]
+    #[case(d(0.), d(-89.9999999), d(25.))]
+    #[case(d(15.), d(89.999999), d(-45.))]
+    #[case(d(-30.), d(-89.999999), d(60.))]
+    #[case(d(45.), d(30.), d(15.))]
+    #[case(d(-120.), d(-45.), d(-70.))]
+    fn to_tait_bryan_angles_near_gimbal_lock_round_trip(
+        #[case] yaw: Angle,
+        #[case] pitch: Angle,
+        #[case] roll: Angle,
+    ) {
+        let rotation = unsafe {
+            Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+                .yaw(yaw)
+                .pitch(pitch)
+                .roll(roll)
+                .build()
+        };
+
+        let (extracted_yaw, extracted_pitch, extracted_roll) = rotation.to_tait_bryan_angles();
+
+        let rebuilt = unsafe {
+            Rotation::<PlaneNed, PlaneFrd>::tait_bryan_builder()
+                .yaw(extracted_yaw)
+                .pitch(extracted_pitch)
+                .roll(extracted_roll)
+                .build()
+        };
+
+        // Regardless of gimbal lock ambiguity, the rebuilt 3D rotation must identically match
+        // the original rotation.
+        assert_relative_eq!(rotation, rebuilt, epsilon = 1e-10);
     }
 }
