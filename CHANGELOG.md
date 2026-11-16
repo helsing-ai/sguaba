@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add FLU (Forward-Left-Up) coordinate system convention for robotics and ROS (REP-103) interoperability, including `FluLike`, `FluComponents`, and `flu_forward`, `flu_left`, and `flu_up` accessors on `Coordinate` and `Vector`.
+
 ### Changed
 
 ### Deprecated

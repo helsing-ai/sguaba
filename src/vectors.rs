@@ -5,7 +5,7 @@ use crate::engineering::Orientation;
 use crate::float_math::FloatMath;
 use crate::{
     Coordinate, CoordinateSystem,
-    systems::{EnuLike, EquivalentTo, FrdLike, NedLike, RightHandedXyzLike},
+    systems::{EnuLike, EquivalentTo, FluLike, FrdLike, NedLike, RightHandedXyzLike},
 };
 use crate::{LengthPossiblyPer, Vector3};
 use core::fmt::{Display, Formatter};
@@ -343,6 +343,22 @@ impl<In, Time: Integer> Copy for Vector<In, Time> {}
 /// # ;
 /// ```
 ///
+/// For [`FluLike`], use:
+///
+/// ```rust
+/// # use sguaba::{vector, system, Vector};
+/// # use uom::si::f64::Length;
+/// # use uom::si::length::meter;
+/// # system!(struct RobotFlu using FLU);
+/// # let _: Vector<RobotFlu> =
+/// vector! {
+///     f = Length::new::<meter>(1.),
+///     l = Length::new::<meter>(2.),
+///     u = Length::new::<meter>(3.),
+/// }
+/// # ;
+/// ```
+///
 /// For [`RightHandedXyzLike`], use:
 ///
 /// ```rust
@@ -433,6 +449,13 @@ macro_rules! vector {
             front: $f.into(),
             right: $r.into(),
             down: $d.into(),
+        })
+    };
+    (f = $f:expr, l = $l:expr, u = $u:expr; in $in:ty) => {
+        $crate::Vector::<$in, _>::build($crate::systems::FluComponents {
+            forward: $f.into(),
+            left: $l.into(),
+            up: $u.into(),
         })
     };
     (x = $x:expr, y = $y:expr, z = $z:expr; in $in:ty) => {
@@ -983,6 +1006,7 @@ macro_rules! accessors {
 accessors!(RightHandedXyzLike using x, y, z + x_axis, y_axis, z_axis);
 accessors!(NedLike using ned_north, ned_east, ned_down + ned_north_axis, ned_east_axis, ned_down_axis);
 accessors!(FrdLike using frd_front, frd_right, frd_down + frd_front_axis, frd_right_axis, frd_down_axis);
+accessors!(FluLike using flu_forward, flu_left, flu_up + flu_forward_axis, flu_left_axis, flu_up_axis);
 accessors!(EnuLike using enu_east, enu_north, enu_up + enu_east_axis, enu_north_axis, enu_up_axis);
 
 impl<In> Vector<In, Z0> {
@@ -1309,6 +1333,7 @@ macro_rules! constructor {
 constructor!(RightHandedXyzLike, [x, y, z]);
 constructor!(NedLike, [ned_north, ned_east, ned_down]);
 constructor!(FrdLike, [frd_front, frd_right, frd_down]);
+constructor!(FluLike, [flu_forward, flu_left, flu_up]);
 constructor!(EnuLike, [enu_east, enu_north, enu_up]);
 
 #[cfg(test)]
@@ -1328,6 +1353,7 @@ mod tests {
     system!(struct TestFrd using FRD);
     system!(struct TestNed using NED);
     system!(struct TestEnu using ENU);
+    system!(struct TestFlu using FLU);
     system!(struct TestXyz using right-handed XYZ);
 
     // Define equivalent coordinate systems for testing
@@ -1730,6 +1756,37 @@ mod tests {
             assert_abs_diff_eq!(v2.enu_north().get::<meter>(), 1.27276, epsilon = 1e-5);
             assert_abs_diff_eq!(v2.enu_up().get::<meter>(), 0.95718, epsilon = 1e-5);
         }
+
+        #[test]
+        fn flu_vector_works() {
+            let v = vector!(f = m(1.0), l = m(2.0), u = m(3.0); in TestFlu);
+            assert_eq!(v.flu_forward(), m(1.0));
+            assert_eq!(v.flu_left(), m(2.0));
+            assert_eq!(v.flu_up(), m(3.0));
+            assert_eq!(v.to_cartesian(), [m(1.0), m(2.0), m(3.0)]);
+
+            let builder_v = Vector::<TestFlu>::builder()
+                .flu_forward(m(1.0))
+                .flu_left(m(2.0))
+                .flu_up(m(3.0))
+                .build();
+            assert_eq!(builder_v, v);
+
+            use crate::systems::FluComponents;
+            let build_v = Vector::<TestFlu>::build(FluComponents {
+                forward: m(1.0),
+                left: m(2.0),
+                up: m(3.0),
+            });
+            assert_eq!(build_v, v);
+
+            let f_axis = Vector::<TestFlu>::flu_forward_axis();
+            let l_axis = Vector::<TestFlu>::flu_left_axis();
+            let u_axis = Vector::<TestFlu>::flu_up_axis();
+            assert_eq!(f_axis.to_cartesian(), [m(1.0), m(0.0), m(0.0)]);
+            assert_eq!(l_axis.to_cartesian(), [m(0.0), m(1.0), m(0.0)]);
+            assert_eq!(u_axis.to_cartesian(), [m(0.0), m(0.0), m(1.0)]);
+        }
     }
 
     // Tests for Velocity vectors (Time = N1)
@@ -1876,6 +1933,21 @@ mod tests {
             assert_eq!(v.x(), mps(1.0));
             assert_eq!(v.y(), mps(2.0));
             assert_eq!(v.z(), mps(3.0));
+        }
+
+        #[test]
+        fn flu_velocity_vector_works() {
+            let v = vector!(f = mps(1.0), l = mps(2.0), u = mps(3.0); in TestFlu);
+            assert_eq!(v.flu_forward(), mps(1.0));
+            assert_eq!(v.flu_left(), mps(2.0));
+            assert_eq!(v.flu_up(), mps(3.0));
+
+            let builder_v = Vector::<TestFlu, N1>::builder()
+                .flu_forward(mps(1.0))
+                .flu_left(mps(2.0))
+                .flu_up(mps(3.0))
+                .build();
+            assert_eq!(builder_v, v);
         }
     }
 
@@ -2031,6 +2103,21 @@ mod tests {
             assert_eq!(v.x(), mps2(1.0));
             assert_eq!(v.y(), mps2(2.0));
             assert_eq!(v.z(), mps2(3.0));
+        }
+
+        #[test]
+        fn flu_acceleration_vector_works() {
+            let v = vector!(f = mps2(1.0), l = mps2(2.0), u = mps2(3.0); in TestFlu);
+            assert_eq!(v.flu_forward(), mps2(1.0));
+            assert_eq!(v.flu_left(), mps2(2.0));
+            assert_eq!(v.flu_up(), mps2(3.0));
+
+            let builder_v = Vector::<TestFlu, N2>::builder()
+                .flu_forward(mps2(1.0))
+                .flu_left(mps2(2.0))
+                .flu_up(mps2(3.0))
+                .build();
+            assert_eq!(builder_v, v);
         }
     }
 
