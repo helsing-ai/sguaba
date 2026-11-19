@@ -39,6 +39,9 @@ use core::ops::Mul;
 use uom::ConstZero;
 use uom::si::f64::{Angle, Length};
 
+#[cfg(any(feature = "approx", test))]
+use approx::{AbsDiffEq, RelativeEq};
+
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -84,6 +87,35 @@ impl<In> Copy for Orientation<In> {}
 impl<In> PartialEq<Self> for Orientation<In> {
     fn eq(&self, other: &Self) -> bool {
         self.inner.eq(&other.inner)
+    }
+}
+
+#[cfg(any(test, feature = "approx"))]
+impl<In> AbsDiffEq<Self> for Orientation<In> {
+    type Epsilon = <f64 as AbsDiffEq>::Epsilon;
+
+    fn default_epsilon() -> Self::Epsilon {
+        Rotation::<In, ObjectCoordinateSystem>::default_epsilon()
+    }
+
+    fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
+        self.inner.abs_diff_eq(&other.inner, epsilon)
+    }
+}
+
+#[cfg(any(test, feature = "approx"))]
+impl<In> RelativeEq for Orientation<In> {
+    fn default_max_relative() -> Self::Epsilon {
+        Rotation::<In, ObjectCoordinateSystem>::default_max_relative()
+    }
+
+    fn relative_eq(
+        &self,
+        other: &Self,
+        epsilon: Self::Epsilon,
+        max_relative: Self::Epsilon,
+    ) -> bool {
+        self.inner.relative_eq(&other.inner, epsilon, max_relative)
     }
 }
 
@@ -605,6 +637,35 @@ impl<In> PartialEq<Self> for Pose<In> {
     }
 }
 
+#[cfg(any(test, feature = "approx"))]
+impl<In> AbsDiffEq<Self> for Pose<In> {
+    type Epsilon = <f64 as AbsDiffEq>::Epsilon;
+
+    fn default_epsilon() -> Self::Epsilon {
+        RigidBodyTransform::<In, ObjectCoordinateSystem>::default_epsilon()
+    }
+
+    fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
+        self.inner.abs_diff_eq(&other.inner, epsilon)
+    }
+}
+
+#[cfg(any(test, feature = "approx"))]
+impl<In> RelativeEq for Pose<In> {
+    fn default_max_relative() -> Self::Epsilon {
+        RigidBodyTransform::<In, ObjectCoordinateSystem>::default_max_relative()
+    }
+
+    fn relative_eq(
+        &self,
+        other: &Self,
+        epsilon: Self::Epsilon,
+        max_relative: Self::Epsilon,
+    ) -> bool {
+        self.inner.relative_eq(&other.inner, epsilon, max_relative)
+    }
+}
+
 impl<In> Pose<In> {
     /// Constructs a pose from a position and orientation.
     #[must_use]
@@ -814,6 +875,42 @@ impl<In> Default for Pose<In> {
 }
 
 impl<In> Pose<In> {
+    /// Returns a pose at [`Coordinate::origin`] with [`Orientation::aligned`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use sguaba::{system, Coordinate, engineering::{Orientation, Pose}};
+    ///
+    /// system!(struct PlaneNed using NED);
+    ///
+    /// let origin = Pose::<PlaneNed>::origin();
+    /// assert_eq!(origin.position(), Coordinate::<PlaneNed>::origin());
+    /// assert_eq!(origin.orientation(), Orientation::<PlaneNed>::aligned());
+    /// ```
+    #[must_use]
+    pub fn origin() -> Self {
+        Self::default()
+    }
+
+    /// Returns a pose at [`Coordinate::origin`] with [`Orientation::aligned`].
+    ///
+    /// Alias for [`Pose::origin`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use sguaba::{system, engineering::Pose};
+    ///
+    /// system!(struct PlaneNed using NED);
+    ///
+    /// assert_eq!(Pose::<PlaneNed>::aligned(), Pose::<PlaneNed>::origin());
+    /// ```
+    #[must_use]
+    pub fn aligned() -> Self {
+        Self::origin()
+    }
+
     /// Returns the position of the object with this pose.
     #[must_use]
     pub fn position(&self) -> Coordinate<In> {
@@ -890,6 +987,24 @@ impl<From, To> Mul<RigidBodyTransform<From, To>> for Pose<From> {
 }
 
 impl<From, To> Mul<Pose<To>> for RigidBodyTransform<From, To> {
+    type Output = Pose<From>;
+
+    fn mul(self, rhs: Pose<To>) -> Self::Output {
+        Pose {
+            inner: self * rhs.inner,
+        }
+    }
+}
+
+impl<From, To> Mul<Rotation<From, To>> for Pose<From> {
+    type Output = Pose<To>;
+
+    fn mul(self, rhs: Rotation<From, To>) -> Self::Output {
+        rhs.inverse() * self
+    }
+}
+
+impl<From, To> Mul<Pose<To>> for Rotation<From, To> {
     type Output = Pose<From>;
 
     fn mul(self, rhs: Pose<To>) -> Self::Output {
@@ -1351,5 +1466,101 @@ mod tests {
         for (a, b) in [(y1, y2), (p1, p2), (r1, r2)] {
             assert_abs_diff_eq!(&BoundedAngle::new(a), &BoundedAngle::new(b));
         }
+    }
+
+    system!(struct PlaneEnu using ENU);
+
+    #[test]
+    fn pose_rotation_transform_round_trip() {
+        let position_ned = coordinate!(n = m(10.0), e = m(20.0), d = m(-5.0); in PlaneNed);
+        let orientation_ned = Orientation::<PlaneNed>::tait_bryan_builder()
+            .yaw(d(30.0))
+            .pitch(d(15.0))
+            .roll(d(5.0))
+            .build();
+        let pose_ned = Pose::new(position_ned, orientation_ned);
+
+        let ned_to_enu =
+            unsafe { Rotation::<PlaneNed, PlaneNed>::identity().into_enu_equivalent::<PlaneEnu>() };
+
+        // Pose * Rotation -> Pose in new coordinate system
+        let pose_enu = pose_ned * ned_to_enu;
+
+        // Position and orientation should match individually rotated values
+        assert_relative_eq!(pose_enu.position(), position_ned * ned_to_enu);
+        assert_relative_eq!(pose_enu.orientation(), orientation_ned * ned_to_enu);
+        assert_relative_eq!(
+            pose_enu,
+            Pose::new(position_ned * ned_to_enu, orientation_ned * ned_to_enu)
+        );
+
+        // Distance from origin is invariant under rotation
+        assert_abs_diff_eq!(
+            pose_ned.distance_from_origin().get::<meter>(),
+            pose_enu.distance_from_origin().get::<meter>(),
+            epsilon = 1e-10
+        );
+
+        // Rotation * Pose -> Pose in original coordinate system
+        let pose_ned_back = ned_to_enu * pose_enu;
+        assert_relative_eq!(pose_ned_back.position(), position_ned);
+        assert_relative_eq!(pose_ned_back.orientation(), orientation_ned);
+        assert_relative_eq!(pose_ned_back, pose_ned);
+
+        // Verify Rotation::transform and Rotation::inverse_transform
+        assert_relative_eq!(ned_to_enu.transform(pose_ned), pose_enu);
+        assert_relative_eq!(ned_to_enu.inverse_transform(pose_enu), pose_ned);
+    }
+
+    #[rstest]
+    #[case(d(0.), d(0.), d(0.))]
+    #[case(d(45.), d(0.), d(0.))]
+    #[case(d(0.), d(30.), d(0.))]
+    #[case(d(0.), d(0.), d(25.))]
+    #[case(d(60.), d(-20.), d(15.))]
+    #[case(d(180.), d(10.), d(-30.))]
+    fn pose_arbitrary_rotation_round_trip(
+        #[case] rot_yaw: Angle,
+        #[case] rot_pitch: Angle,
+        #[case] rot_roll: Angle,
+    ) {
+        let position = coordinate!(n = m(12.5), e = m(-8.0), d = m(3.5); in PlaneNed);
+        let orientation = Orientation::<PlaneNed>::tait_bryan_builder()
+            .yaw(d(25.0))
+            .pitch(d(-10.0))
+            .roll(d(40.0))
+            .build();
+        let pose = Pose::new(position, orientation);
+
+        let rotation = unsafe {
+            Rotation::<PlaneNed, PlaneBNed>::tait_bryan_builder()
+                .yaw(rot_yaw)
+                .pitch(rot_pitch)
+                .roll(rot_roll)
+                .build()
+        };
+
+        let transformed_pose = pose * rotation;
+        assert_relative_eq!(transformed_pose.position(), position * rotation);
+        assert_relative_eq!(
+            transformed_pose.orientation(),
+            orientation * rotation,
+            epsilon = 1e-10
+        );
+        assert_relative_eq!(
+            transformed_pose,
+            Pose::new(position * rotation, orientation * rotation),
+            epsilon = 1e-10
+        );
+        assert_abs_diff_eq!(
+            pose.distance_from_origin().get::<meter>(),
+            transformed_pose.distance_from_origin().get::<meter>(),
+            epsilon = 1e-10
+        );
+
+        let round_trip = rotation * transformed_pose;
+        assert_relative_eq!(round_trip.position(), position);
+        assert_relative_eq!(round_trip.orientation(), orientation, epsilon = 1e-10);
+        assert_relative_eq!(round_trip, pose, epsilon = 1e-10);
     }
 }
