@@ -16,7 +16,6 @@ use uom::ConstZero;
 use uom::si::angle::radian;
 use uom::si::f64::{Angle, Length};
 use uom::si::length::meter;
-use uom::si::ratio::ratio;
 
 #[cfg(doc)]
 use crate::{engineering::Pose, systems::BearingDefined};
@@ -633,26 +632,22 @@ impl<In> Coordinate<In> {
     }
 
     fn spherical_coordinates(&self) -> Option<(Angle, Angle)> {
-        let r = self.distance_from_origin();
+        let x = self.point.x;
+        let y = self.point.y;
+        let z = self.point.z;
 
-        if r == Length::ZERO {
+        if x == 0.0 && y == 0.0 && z == 0.0 {
             return None;
         }
 
-        let polar_value = (Length::new::<meter>(self.point.z) / r).get::<ratio>();
-        let polar = Angle::new::<radian>(FloatMath::acos(polar_value));
-        let xy = Length::new::<meter>(FloatMath::sqrt(
-            FloatMath::powi(self.point.x, 2) + FloatMath::powi(self.point.y, 2),
-        ));
-        if xy == Length::ZERO {
+        let xy = FloatMath::hypot(x, y);
+        let polar = Angle::new::<radian>(FloatMath::atan2(xy, z));
+        let azimuth = if xy == 0.0 {
             // as promised by bearing_from_origin
-            return Some((polar, Angle::ZERO));
-        }
-        let azimuth_value = (Length::new::<meter>(self.point.x) / xy).get::<ratio>();
-        let azimuth = Angle::new::<radian>(FloatMath::copysign(
-            FloatMath::acos(azimuth_value),
-            self.point.y,
-        ));
+            Angle::ZERO
+        } else {
+            Angle::new::<radian>(FloatMath::atan2(y, x))
+        };
 
         Some((polar, azimuth))
     }
@@ -671,8 +666,9 @@ impl<In> Coordinate<In> {
         // and then we can convert them into bearing.
         let (polar, azimuth) = self.spherical_coordinates()?;
         Some(
-            In::spherical_to_bearing(polar, azimuth)
-                .expect("polar is computed with acos, which is always 0°-180°"),
+            In::spherical_to_bearing(polar, azimuth).expect(
+                "polar is computed with atan2(xy, z) with xy >= 0, which is always 0°-180°",
+            ),
         )
     }
 }
@@ -855,8 +851,10 @@ mod tests {
     use crate::bearing;
     use crate::coordinate_systems::{Ecef, Enu, Frd, Ned};
     use crate::coordinates::Coordinate;
-    use approx::assert_relative_eq;
+    use approx::{assert_abs_diff_eq, assert_relative_eq};
     use rstest::rstest;
+    use uom::si::angle::{degree, radian};
+    use uom::si::f64::Angle;
 
     fn m(meters: f64) -> Length {
         Length::new::<uom::si::length::meter>(meters)
@@ -903,5 +901,60 @@ mod tests {
             down.bearing_from_origin().expect("down is not at origin"),
             bearing!(azimuth = deg(0.), elevation = deg(-90.); in Enu)
         );
+    }
+
+    #[test]
+    fn small_angle_azimuth_precision_preserved() {
+        // Points separated by tiny lateral displacements (e.g. y = 1e-8 relative to x = 1.0)
+        // previously collapsed to zero azimuth under acos(x / xy).
+        // With atan2(y, x), the true angle is preserved with full precision.
+        let coord = coordinate!(f = m(1.0), r = m(1e-8), d = m(0.0); in Frd);
+        let bearing = coord.bearing_from_origin().expect("not at origin");
+        let azimuth_rad = bearing.azimuth().get::<radian>();
+        assert_abs_diff_eq!(azimuth_rad, 1e-8, epsilon = 1e-15);
+
+        // Negative small angle
+        let coord_neg = coordinate!(f = m(1.0), r = m(-1e-8), d = m(0.0); in Frd);
+        let bearing_neg = coord_neg.bearing_from_origin().expect("not at origin");
+        let azimuth_neg_rad = bearing_neg.azimuth().get::<radian>();
+        assert_abs_diff_eq!(azimuth_neg_rad, -1e-8, epsilon = 1e-15);
+    }
+
+    #[test]
+    fn small_angle_polar_elevation_precision_preserved() {
+        // Point close to the vertical axis (e.g. lateral deviation 1e-8 relative to d = 1.0).
+        // Under acos(z / r), z / r = 1.0, losing all elevation deviation from the pole.
+        // With atan2(xy, z), full precision is retained.
+        let coord_near_pole = coordinate!(f = m(1e-8), r = m(0.0), d = m(1.0); in Frd);
+        let bearing = coord_near_pole
+            .bearing_from_origin()
+            .expect("not at origin");
+        // In FRD, elevation is angle towards -Z from XY plane.
+        // At d = 1.0, elevation is near -90 degrees (-pi/2 rad).
+        // Deviation from -pi/2 should be exactly 1e-8 radians.
+        let elevation_rad = bearing.elevation().get::<radian>();
+        let deviation = (elevation_rad - (-core::f64::consts::FRAC_PI_2)).abs();
+        assert_abs_diff_eq!(deviation, 1e-8, epsilon = 1e-15);
+    }
+
+    #[rstest]
+    #[case(100.0, 30.0, 45.0)]
+    #[case(500.0, 90.0, 0.0)]
+    #[case(250.0, 120.0, -30.0)]
+    #[case(1000.0, 45.0, 175.0)]
+    #[case(50.0, 150.0, -120.0)]
+    fn spherical_coordinates_round_trip(
+        #[case] radius_m: f64,
+        #[case] polar_deg: f64,
+        #[case] azimuth_deg: f64,
+    ) {
+        let coord = Coordinate::<Frd>::from_spherical(
+            m(radius_m),
+            Angle::new::<degree>(polar_deg),
+            Angle::new::<degree>(azimuth_deg),
+        );
+        let (polar, azimuth) = coord.spherical_coordinates().expect("not at origin");
+        assert_abs_diff_eq!(polar.get::<degree>(), polar_deg, epsilon = 1e-10);
+        assert_abs_diff_eq!(azimuth.get::<degree>(), azimuth_deg, epsilon = 1e-10);
     }
 }
