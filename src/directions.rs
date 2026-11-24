@@ -1,10 +1,13 @@
 use crate::Vector;
+use crate::float_math::FloatMath;
 use crate::util::BoundedAngle;
 use core::f64::consts::FRAC_PI_2;
 use core::fmt::{Display, Formatter};
 use core::marker::PhantomData;
-use uom::si::f64::{Angle, Length};
-use uom::si::{angle::degree, length::meter};
+use core::ops::{Mul, Neg};
+use typenum::{N1, N2, Z0};
+use uom::si::f64::{Acceleration, Angle, Length, Velocity};
+use uom::si::{angle::degree, angle::radian, length::meter};
 
 #[cfg(any(feature = "approx", test))]
 use approx::{AbsDiffEq, RelativeEq};
@@ -174,6 +177,83 @@ impl<In> Bearing<In> {
         Vector::from_bearing(*self, Length::new::<meter>(1.))
     }
 
+    /// Computes the angular separation (great-circle angle) between this bearing and another.
+    ///
+    /// The angle is returned in the range [0, π] radians ([0°, 180°]).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use sguaba::{system, Bearing};
+    /// use uom::si::f64::Angle;
+    /// use uom::si::angle::degree;
+    ///
+    /// system!(struct PlaneNed using NED);
+    ///
+    /// let north = Bearing::<PlaneNed>::builder()
+    ///     .azimuth(Angle::new::<degree>(0.0))
+    ///     .elevation(Angle::new::<degree>(0.0))
+    ///     .unwrap()
+    ///     .build();
+    /// let east = Bearing::<PlaneNed>::builder()
+    ///     .azimuth(Angle::new::<degree>(90.0))
+    ///     .elevation(Angle::new::<degree>(0.0))
+    ///     .unwrap()
+    ///     .build();
+    ///
+    /// let angle = north.angle_between(&east);
+    /// approx::assert_relative_eq!(angle.get::<degree>(), 90.0, epsilon = 1e-10);
+    /// ```
+    #[must_use]
+    pub fn angle_between(&self, other: &Self) -> Angle
+    where
+        In: crate::systems::BearingDefined,
+    {
+        let u1 = self.to_unit_vector().inner;
+        let u2 = other.to_unit_vector().inner;
+        let cross_norm = u1.cross(&u2).norm();
+        let dot = u1.dot(&u2);
+        Angle::new::<radian>(FloatMath::atan2(cross_norm, dot))
+    }
+
+    /// Returns the opposite bearing pointing in the exact reverse direction.
+    ///
+    /// For example, in an NED coordinate system, a bearing pointing North at +10° elevation
+    /// will have an opposite bearing pointing South at -10° elevation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use sguaba::{system, Bearing};
+    /// use uom::si::f64::Angle;
+    /// use uom::si::angle::degree;
+    ///
+    /// system!(struct PlaneNed using NED);
+    ///
+    /// let b = Bearing::<PlaneNed>::builder()
+    ///     .azimuth(Angle::new::<degree>(0.0))
+    ///     .elevation(Angle::new::<degree>(15.0))
+    ///     .unwrap()
+    ///     .build();
+    /// let opp = b.opposite();
+    /// let expected = Bearing::<PlaneNed>::builder()
+    ///     .azimuth(Angle::new::<degree>(180.0))
+    ///     .elevation(Angle::new::<degree>(-15.0))
+    ///     .unwrap()
+    ///     .build();
+    /// approx::assert_relative_eq!(opp, expected);
+    /// ```
+    #[must_use]
+    pub fn opposite(&self) -> Self
+    where
+        In: crate::systems::BearingDefined,
+    {
+        let neg_unit = -self.to_unit_vector();
+        neg_unit
+            .bearing_at_origin()
+            .expect("unit vector has non-zero length")
+    }
+
     /// Constructs a bearing in coordinate system `In` with azimuth and elevation set to 0.
     ///
     /// The definition of the azimuthal angle depends on the implementation of [`BearingDefined`]
@@ -255,6 +335,83 @@ impl<In> RelativeEq for Bearing<In> {
             epsilon,
             max_relative,
         )
+    }
+}
+
+impl<In> Neg for Bearing<In>
+where
+    In: crate::systems::BearingDefined,
+{
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        self.opposite()
+    }
+}
+
+impl<In> Mul<Length> for Bearing<In>
+where
+    In: crate::systems::BearingDefined,
+{
+    type Output = Vector<In, Z0>;
+
+    fn mul(self, length: Length) -> Self::Output {
+        Vector::from_bearing(self, length)
+    }
+}
+
+impl<In> Mul<Bearing<In>> for Length
+where
+    In: crate::systems::BearingDefined,
+{
+    type Output = Vector<In, Z0>;
+
+    fn mul(self, bearing: Bearing<In>) -> Self::Output {
+        Vector::from_bearing(bearing, self)
+    }
+}
+
+impl<In> Mul<Velocity> for Bearing<In>
+where
+    In: crate::systems::BearingDefined,
+{
+    type Output = Vector<In, N1>;
+
+    fn mul(self, velocity: Velocity) -> Self::Output {
+        Vector::from_bearing(self, velocity)
+    }
+}
+
+impl<In> Mul<Bearing<In>> for Velocity
+where
+    In: crate::systems::BearingDefined,
+{
+    type Output = Vector<In, N1>;
+
+    fn mul(self, bearing: Bearing<In>) -> Self::Output {
+        Vector::from_bearing(bearing, self)
+    }
+}
+
+impl<In> Mul<Acceleration> for Bearing<In>
+where
+    In: crate::systems::BearingDefined,
+{
+    type Output = Vector<In, N2>;
+
+    fn mul(self, acceleration: Acceleration) -> Self::Output {
+        Vector::from_bearing(self, acceleration)
+    }
+}
+
+impl<In> Mul<Bearing<In>> for Acceleration
+where
+    In: crate::systems::BearingDefined,
+{
+    type Output = Vector<In, N2>;
+
+    fn mul(self, bearing: Bearing<In>) -> Self::Output {
+        Vector::from_bearing(bearing, self)
     }
 }
 
@@ -726,5 +883,121 @@ mod tests {
 
             _assert_correct_angles((x, y, z), &frd_direction);
         }
+    }
+
+    #[test]
+    fn bearing_angle_between() {
+        let b_front = Bearing::<Frd>::builder()
+            .azimuth(d(0.0))
+            .elevation(d(0.0))
+            .unwrap()
+            .build();
+        let b_right = Bearing::<Frd>::builder()
+            .azimuth(d(90.0))
+            .elevation(d(0.0))
+            .unwrap()
+            .build();
+        let b_back = Bearing::<Frd>::builder()
+            .azimuth(d(180.0))
+            .elevation(d(0.0))
+            .unwrap()
+            .build();
+        let b_up = Bearing::<Frd>::builder()
+            .azimuth(d(0.0))
+            .elevation(d(90.0))
+            .unwrap()
+            .build();
+
+        // Orthogonal
+        assert_relative_eq!(
+            b_front.angle_between(&b_right).get::<degree>(),
+            90.0,
+            epsilon = 1e-10
+        );
+        assert_relative_eq!(
+            b_front.angle_between(&b_up).get::<degree>(),
+            90.0,
+            epsilon = 1e-10
+        );
+
+        // Collinear
+        assert_relative_eq!(
+            b_front.angle_between(&b_front).get::<degree>(),
+            0.0,
+            epsilon = 1e-10
+        );
+
+        // Opposite
+        assert_relative_eq!(
+            b_front.angle_between(&b_back).get::<degree>(),
+            180.0,
+            epsilon = 1e-10
+        );
+    }
+
+    #[test]
+    fn bearing_opposite_and_neg() {
+        let b = Bearing::<Frd>::builder()
+            .azimuth(d(30.0))
+            .elevation(d(20.0))
+            .unwrap()
+            .build();
+
+        let opp = b.opposite();
+        let expected = Bearing::<Frd>::builder()
+            .azimuth(d(210.0))
+            .elevation(d(-20.0))
+            .unwrap()
+            .build();
+        assert_abs_diff_eq!(opp, expected);
+
+        let neg = -b;
+        assert_abs_diff_eq!(neg, opp);
+
+        // Double negation round-trip
+        let double_neg = -(-b);
+        assert_abs_diff_eq!(double_neg, b);
+    }
+
+    #[test]
+    fn bearing_scaling_mul() {
+        use uom::si::acceleration::meter_per_second_squared;
+        use uom::si::f64::{Acceleration, Velocity};
+        use uom::si::velocity::meter_per_second;
+
+        let b = Bearing::<Frd>::builder()
+            .azimuth(d(0.0))
+            .elevation(d(0.0))
+            .unwrap()
+            .build();
+
+        // Length
+        let l = Length::new::<meter>(50.0);
+        let v1 = b * l;
+        let v2 = l * b;
+        assert_relative_eq!(v1, v2);
+        assert_relative_eq!(v1.frd_front().get::<meter>(), 50.0, epsilon = 1e-10);
+
+        // Velocity
+        let vel = Velocity::new::<meter_per_second>(250.0);
+        let vel1 = b * vel;
+        let vel2 = vel * b;
+        assert_relative_eq!(vel1, vel2);
+        assert_relative_eq!(
+            vel1.frd_front().get::<meter_per_second>(),
+            250.0,
+            epsilon = 1e-10
+        );
+
+        // Acceleration
+        let acc = Acceleration::new::<meter_per_second_squared>(9.81);
+        let acc1 = b * acc;
+        let acc2 = acc * b;
+        assert_relative_eq!(acc1, acc2);
+        assert_relative_eq!(
+            acc1.frd_front().get::<meter_per_second_squared>(),
+            9.81,
+            epsilon = 1e-10
+        );
     }
 }

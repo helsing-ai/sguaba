@@ -12,6 +12,7 @@ use core::fmt;
 use core::fmt::{Display, Formatter};
 use core::marker::PhantomData;
 use core::ops::{Add, AddAssign, Neg, Sub, SubAssign};
+use typenum::Integer;
 use uom::ConstZero;
 use uom::si::angle::radian;
 use uom::si::f64::{Angle, Length};
@@ -672,8 +673,95 @@ impl<In> Coordinate<In> {
         let (polar, azimuth) = self.spherical_coordinates()?;
         Some(
             In::spherical_to_bearing(polar, azimuth)
-                .expect("polar is computed with acos, which is always 0°-180°"),
+                .expect("polar is computed with atan2, which is always 0°-180°"),
         )
+    }
+
+    /// Calculates the bearing from this coordinate towards another coordinate.
+    ///
+    /// Returns `None` if the two coordinates are identical, as the azimuth is then ill-defined.
+    ///
+    /// Returns an azimuth of zero for coordinates along the Z axis relative to `self`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use sguaba::{coordinate, system, Coordinate};
+    /// use uom::si::f64::{Angle, Length};
+    /// use uom::si::{angle::degree, length::meter};
+    ///
+    /// system!(struct PlaneNed using NED);
+    ///
+    /// let origin = Coordinate::<PlaneNed>::origin();
+    /// let target = coordinate!(
+    ///     n = Length::new::<meter>(100.0),
+    ///     e = Length::new::<meter>(100.0),
+    ///     d = Length::new::<meter>(0.0);
+    ///     in PlaneNed
+    /// );
+    ///
+    /// let bearing = origin.bearing_to(&target).unwrap();
+    /// approx::assert_relative_eq!(bearing.azimuth().get::<degree>(), 45.0, epsilon = 1e-10);
+    /// approx::assert_relative_eq!(bearing.elevation().get::<degree>(), 0.0, epsilon = 1e-10);
+    /// ```
+    #[must_use]
+    pub fn bearing_to(&self, other: &Self) -> Option<Bearing<In>>
+    where
+        In: crate::systems::BearingDefined,
+    {
+        (*other - *self).bearing_at_origin()
+    }
+
+    /// Rotates this coordinate around the given rotation axis passing through the origin.
+    ///
+    /// The rotation axis can be any [`Vector`] in the same coordinate system.
+    #[must_use]
+    pub fn rotate_around_axis<AxisTime: Integer>(
+        &self,
+        axis: &Vector<In, AxisTime>,
+        angle: Angle,
+    ) -> Self {
+        self.rotate_around_point(&Self::origin(), axis, angle)
+    }
+
+    /// Rotates this coordinate around a rotation axis passing through the specified `center` point.
+    ///
+    /// The rotation axis can be any [`Vector`] in the same coordinate system.
+    #[must_use]
+    pub fn rotate_around_point<AxisTime: Integer>(
+        &self,
+        center: &Self,
+        axis: &Vector<In, AxisTime>,
+        angle: Angle,
+    ) -> Self {
+        let offset = *self - *center;
+        let rotated_offset = offset.rotate(axis, angle);
+        *center + rotated_offset
+    }
+
+    /// Rotates this coordinate around the given bearing direction passing through the origin.
+    #[must_use]
+    pub fn rotate_around_bearing(&self, axis: Bearing<In>, angle: Angle) -> Self
+    where
+        In: crate::systems::BearingDefined,
+    {
+        let unit_axis = axis.to_unit_vector();
+        self.rotate_around_axis(&unit_axis, angle)
+    }
+
+    /// Rotates this coordinate around the given bearing direction passing through the specified `center` point.
+    #[must_use]
+    pub fn rotate_around_point_bearing(
+        &self,
+        center: &Self,
+        axis: Bearing<In>,
+        angle: Angle,
+    ) -> Self
+    where
+        In: crate::systems::BearingDefined,
+    {
+        let unit_axis = axis.to_unit_vector();
+        self.rotate_around_point(center, &unit_axis, angle)
     }
 }
 
@@ -902,6 +990,84 @@ mod tests {
         assert_relative_eq!(
             down.bearing_from_origin().expect("down is not at origin"),
             bearing!(azimuth = deg(0.), elevation = deg(-90.); in Enu)
+        );
+    }
+
+    #[test]
+    fn coordinate_bearing_to() {
+        let p1 = coordinate!(n = m(10.0), e = m(20.0), d = m(0.0); in Ned);
+        let p2 = coordinate!(n = m(110.0), e = m(120.0), d = m(0.0); in Ned);
+
+        let bearing = p1.bearing_to(&p2).expect("distinct points have bearing");
+        assert_relative_eq!(
+            bearing.azimuth().get::<uom::si::angle::degree>(),
+            45.0,
+            epsilon = 1e-10
+        );
+        assert_relative_eq!(
+            bearing.elevation().get::<uom::si::angle::degree>(),
+            0.0,
+            epsilon = 1e-10
+        );
+
+        // Identical points return None
+        assert!(p1.bearing_to(&p1).is_none());
+    }
+
+    #[test]
+    fn coordinate_rotations() {
+        use crate::vector;
+        use uom::si::angle::degree;
+        use uom::si::f64::Angle;
+
+        let p = coordinate!(n = m(100.0), e = m(0.0), d = m(0.0); in Ned);
+        let down_axis = vector!(n = m(0.0), e = m(0.0), d = m(1.0); in Ned);
+
+        // In NED, rotating about Down (+Z) by +90° rotates North (+X) to East (+Y)
+        let rotated = p.rotate_around_axis(&down_axis, Angle::new::<degree>(90.0));
+        assert_relative_eq!(
+            rotated.ned_north().get::<uom::si::length::meter>(),
+            0.0,
+            epsilon = 1e-10
+        );
+        assert_relative_eq!(
+            rotated.ned_east().get::<uom::si::length::meter>(),
+            100.0,
+            epsilon = 1e-10
+        );
+        assert_relative_eq!(
+            rotated.ned_down().get::<uom::si::length::meter>(),
+            0.0,
+            epsilon = 1e-10
+        );
+
+        // Rotate around another center point
+        let center = coordinate!(n = m(50.0), e = m(0.0), d = m(0.0); in Ned);
+        let rotated_center = p.rotate_around_point(&center, &down_axis, Angle::new::<degree>(90.0));
+        // Offset is (50, 0, 0), rotated 90° about Down -> (0, 50, 0), plus center -> (50, 50, 0)
+        assert_relative_eq!(
+            rotated_center.ned_north().get::<uom::si::length::meter>(),
+            50.0,
+            epsilon = 1e-10
+        );
+        assert_relative_eq!(
+            rotated_center.ned_east().get::<uom::si::length::meter>(),
+            50.0,
+            epsilon = 1e-10
+        );
+
+        // Rotate around bearing
+        let down_bearing = bearing!(azimuth = deg(0.0), elevation = deg(-90.0); in Ned);
+        let rotated_bearing = p.rotate_around_bearing(down_bearing, Angle::new::<degree>(90.0));
+        assert_relative_eq!(
+            rotated_bearing.ned_north().get::<uom::si::length::meter>(),
+            0.0,
+            epsilon = 1e-10
+        );
+        assert_relative_eq!(
+            rotated_bearing.ned_east().get::<uom::si::length::meter>(),
+            100.0,
+            epsilon = 1e-10
         );
     }
 }

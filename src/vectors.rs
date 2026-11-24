@@ -767,6 +767,7 @@ where
     //       Since this is only used for `rotate()`, where one of the vector is the unit-less
     //       unit vector it's fine there but most likely not anywhere else
     #[must_use]
+    #[cfg(test)]
     fn cross(&self, rhs: &Self) -> Self {
         Self::from_nalgebra_vector(self.inner.cross(&rhs.inner))
     }
@@ -797,19 +798,123 @@ where
 
     /// Rotates this vector around the rotation axis based on [Rodrigues' rotation formula][rrf].
     ///
+    /// The rotation axis can be any [`Vector`] in the same coordinate system, regardless of its
+    /// unit (e.g. a [`VelocityVector`] can be rotated around a [`LengthVector`]).
+    ///
     /// ```text
     /// v' = v * cos(θ) + (k x v) * sin(θ) + k(k * v)(1 - cos(θ))
     /// ```
     ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use sguaba::{system, vector, Vector, vector::{LengthVector, VelocityVector}};
+    /// use uom::si::f64::{Angle, Length, Velocity};
+    /// use uom::si::{angle::degree, length::meter, velocity::meter_per_second};
+    ///
+    /// system!(struct PlaneFrd using FRD);
+    ///
+    /// let vel: VelocityVector<PlaneFrd> = vector!(
+    ///     f = Velocity::new::<meter_per_second>(100.0),
+    ///     r = Velocity::new::<meter_per_second>(0.0),
+    ///     d = Velocity::new::<meter_per_second>(0.0);
+    ///     in PlaneFrd
+    /// );
+    ///
+    /// // Pitch axis (Right axis) is a LengthVector
+    /// let pitch_axis: LengthVector<PlaneFrd> = vector!(
+    ///     f = Length::new::<meter>(0.0),
+    ///     r = Length::new::<meter>(1.0),
+    ///     d = Length::new::<meter>(0.0);
+    ///     in PlaneFrd
+    /// );
+    ///
+    /// // Rotate velocity vector up by 90° (rotation about Right axis rotates +X to -Z)
+    /// let pitch_up = vel.rotate(&pitch_axis, Angle::new::<degree>(90.0));
+    /// approx::assert_relative_eq!(pitch_up.frd_front().get::<meter_per_second>(), 0.0, epsilon = 1e-10);
+    /// approx::assert_relative_eq!(pitch_up.frd_down().get::<meter_per_second>(), -100.0, epsilon = 1e-10);
+    /// ```
+    ///
     /// [rrf]: https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
-    pub fn rotate(&self, rotation_axis: &Self, rotation: Angle) -> Self {
-        let rotation_axis = rotation_axis.normalized();
-        let rotation = rotation.get::<radian>();
-        self.scale(rotation.cos())
-            // NOTE: `rotation_axis`, while being of type `Self`, is actually a unit-less unit
-            //       vector so the cross product does not introduce unit issues
-            + rotation_axis.cross(self).scale(rotation.sin())
-            + rotation_axis * (rotation_axis.dot(self)) * (1.0 - rotation.cos())
+    #[must_use]
+    pub fn rotate<AxisTime: Integer>(
+        &self,
+        rotation_axis: &Vector<In, AxisTime>,
+        rotation: Angle,
+    ) -> Self {
+        let k = rotation_axis.inner.normalize();
+        let theta = rotation.get::<radian>();
+        let cos_theta = FloatMath::cos(theta);
+        let sin_theta = FloatMath::sin(theta);
+        let v = self.inner;
+        let rotated = v * cos_theta + k.cross(&v) * sin_theta + k * k.dot(&v) * (1.0 - cos_theta);
+        Self::from_nalgebra_vector(rotated)
+    }
+
+    /// Rotates this vector around a direction given by a [`Bearing`] based on [Rodrigues' rotation formula][rrf].
+    ///
+    /// [rrf]: https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
+    #[must_use]
+    pub fn rotate_around_bearing(&self, rotation_axis: Bearing<In>, rotation: Angle) -> Self
+    where
+        In: crate::systems::BearingDefined,
+    {
+        let unit_axis = rotation_axis.to_unit_vector();
+        self.rotate(&unit_axis, rotation)
+    }
+
+    /// Computes the angle between this vector and another.
+    ///
+    /// The angle is returned in the range [0, π] radians ([0°, 180°]).
+    /// Returns 0° if either vector has zero length.
+    ///
+    /// The two vectors can have different units (for example, finding the angle between a
+    /// fuselage [`LengthVector`] and a flight [`VelocityVector`], which corresponds to the
+    /// angle of attack/sideslip).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use sguaba::{system, vector, vector::{LengthVector, VelocityVector}};
+    /// use uom::si::f64::{Angle, Length, Velocity};
+    /// use uom::si::{angle::degree, length::meter, velocity::meter_per_second};
+    ///
+    /// system!(struct PlaneFrd using FRD);
+    ///
+    /// let forward: LengthVector<PlaneFrd> = vector!(
+    ///     f = Length::new::<meter>(1.0),
+    ///     r = Length::new::<meter>(0.0),
+    ///     d = Length::new::<meter>(0.0);
+    ///     in PlaneFrd
+    /// );
+    ///
+    /// let vel: VelocityVector<PlaneFrd> = vector!(
+    ///     f = Velocity::new::<meter_per_second>(100.0),
+    ///     r = Velocity::new::<meter_per_second>(100.0),
+    ///     d = Velocity::new::<meter_per_second>(0.0);
+    ///     in PlaneFrd
+    /// );
+    ///
+    /// let angle = forward.angle_between(&vel);
+    /// approx::assert_relative_eq!(angle.get::<degree>(), 45.0, epsilon = 1e-10);
+    /// ```
+    #[must_use]
+    pub fn angle_between<OtherTime: Integer>(&self, other: &Vector<In, OtherTime>) -> Angle {
+        let cross_norm = self.inner.cross(&other.inner).norm();
+        let dot = self.inner.dot(&other.inner);
+        Angle::new::<radian>(FloatMath::atan2(cross_norm, dot))
+    }
+
+    /// Computes the angle between this vector and a direction given by a [`Bearing`].
+    ///
+    /// The angle is returned in the range [0, π] radians ([0°, 180°]).
+    /// Returns 0° if this vector has zero length.
+    #[must_use]
+    pub fn angle_to_bearing(&self, bearing: Bearing<In>) -> Angle
+    where
+        In: crate::systems::BearingDefined,
+    {
+        self.angle_between(&bearing.to_unit_vector())
     }
 
     /// Multiply each component of the vector by the given `real`.
@@ -2031,6 +2136,111 @@ mod tests {
             assert_eq!(v.x(), mps2(1.0));
             assert_eq!(v.y(), mps2(2.0));
             assert_eq!(v.z(), mps2(3.0));
+        }
+
+        #[test]
+        fn rotate_across_different_units() {
+            // Rotate a VelocityVector around a LengthVector axis
+            let vel: Vector<TestFrd, N1> =
+                vector!(f = mps(100.0), r = mps(0.0), d = mps(0.0); in TestFrd);
+            let pitch_axis: Vector<TestFrd, Z0> =
+                vector!(f = m(0.0), r = m(1.0), d = m(0.0); in TestFrd);
+
+            // Right-hand rotation about Right (+Y) rotates +X (Front) into -Z (Up / negative Down)
+            let pitched = vel.rotate(&pitch_axis, Angle::new::<degree>(90.0));
+            assert_abs_diff_eq!(
+                pitched.frd_front().get::<meter_per_second>(),
+                0.0,
+                epsilon = 1e-10
+            );
+            assert_abs_diff_eq!(
+                pitched.frd_right().get::<meter_per_second>(),
+                0.0,
+                epsilon = 1e-10
+            );
+            assert_abs_diff_eq!(
+                pitched.frd_down().get::<meter_per_second>(),
+                -100.0,
+                epsilon = 1e-10
+            );
+        }
+
+        #[test]
+        fn rotate_around_bearing() {
+            let vel: Vector<TestFrd, N1> =
+                vector!(f = mps(100.0), r = mps(0.0), d = mps(0.0); in TestFrd);
+            // Right axis as bearing: azimuth = 90°, elevation = 0°
+            let right_bearing = Bearing::<TestFrd>::builder()
+                .azimuth(Angle::new::<degree>(90.0))
+                .elevation(Angle::new::<degree>(0.0))
+                .unwrap()
+                .build();
+
+            let pitched = vel.rotate_around_bearing(right_bearing, Angle::new::<degree>(90.0));
+            assert_abs_diff_eq!(
+                pitched.frd_front().get::<meter_per_second>(),
+                0.0,
+                epsilon = 1e-10
+            );
+            assert_abs_diff_eq!(
+                pitched.frd_down().get::<meter_per_second>(),
+                -100.0,
+                epsilon = 1e-10
+            );
+        }
+
+        #[test]
+        fn angle_between_vectors() {
+            use approx::assert_relative_eq;
+
+            let forward: Vector<TestFrd, Z0> =
+                vector!(f = m(1.0), r = m(0.0), d = m(0.0); in TestFrd);
+            let right: Vector<TestFrd, Z0> =
+                vector!(f = m(0.0), r = m(1.0), d = m(0.0); in TestFrd);
+            let back: Vector<TestFrd, Z0> =
+                vector!(f = m(-1.0), r = m(0.0), d = m(0.0); in TestFrd);
+
+            // Orthogonal
+            assert_relative_eq!(
+                forward.angle_between(&right).get::<degree>(),
+                90.0,
+                epsilon = 1e-10
+            );
+
+            // Collinear
+            assert_relative_eq!(
+                forward.angle_between(&forward).get::<degree>(),
+                0.0,
+                epsilon = 1e-10
+            );
+
+            // Opposite
+            assert_relative_eq!(
+                forward.angle_between(&back).get::<degree>(),
+                180.0,
+                epsilon = 1e-10
+            );
+
+            // Cross-unit: LengthVector with VelocityVector
+            let vel_45: Vector<TestFrd, N1> =
+                vector!(f = mps(10.0), r = mps(10.0), d = mps(0.0); in TestFrd);
+            assert_relative_eq!(
+                forward.angle_between(&vel_45).get::<degree>(),
+                45.0,
+                epsilon = 1e-10
+            );
+
+            // Angle to bearing
+            let bearing_right = Bearing::<TestFrd>::builder()
+                .azimuth(Angle::new::<degree>(90.0))
+                .elevation(Angle::new::<degree>(0.0))
+                .unwrap()
+                .build();
+            assert_relative_eq!(
+                forward.angle_to_bearing(bearing_right).get::<degree>(),
+                90.0,
+                epsilon = 1e-10
+            );
         }
     }
 
